@@ -2,7 +2,7 @@
 # Script to run all the steps of the Verbal Autopsy pipeline
 
 # Parameters
-set="child_cat" # all, adult, child, or neonate
+set="all_cat" # all, adult, child, or neonate
 labels="ICD_cat" # ICD_cat or Final_code
 features="narr_count" # narr_bow, narr_tfidf, kw_bow, kw_tfidf
 model="svm" # svm, knn, or nn
