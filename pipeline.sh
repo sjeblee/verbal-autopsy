@@ -2,14 +2,14 @@
 # Script to run all the steps of the Verbal Autopsy pipeline
 
 # Parameters
-set="all_cat" # all, adult, child, or neonate
+set="adult_cat" # all, adult, child, or neonate
 labels="ICD_cat" # ICD_cat or Final_code
 features="narr_count" # narr_bow, narr_tfidf, kw_bow, kw_tfidf
 model="svm" # svm, knn, or nn
 
 # Location of data files
 dataloc="/home/sjeblee/Documents/Research/VerbalAutopsy/data/datasets"
-resultsloc="/home/sjeblee/Documents/Research/VerbalAutopsy/data/minimal6"
+resultsloc="/home/sjeblee/Documents/Research/VerbalAutopsy/data/minimal6spell"
 
 # Setup
 mkdir -p $resultsloc
@@ -18,6 +18,14 @@ devset="$dataloc/dev_$set.xml"
 trainfeatures="$resultsloc/train_$set.features"
 devfeatures="$resultsloc/dev_$set.features"
 devresults="$resultsloc/dev_$set.results"
+
+# Preprocessing
+#echo "Preprocessing..."
+#python spellcorrect.py --in $trainset --out "$dataloc/train_$set_spell.xml"
+#python spellcorrect.py --in $devset --out "$dataloc/dev_$set_spell.xml"
+
+trainset="$dataloc/train_$set_spell.xml"
+devset="$dataloc/dev_$set_spell.xml"
 
 # Feature Extraction
 echo "Extracting features..."

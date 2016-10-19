@@ -20,6 +20,7 @@ def main():
         exit()
 
     d = enchant.DictWithPWL("en_CA", "dictionary.txt")
+    mapping = {'labor':'labour', 'laborer':'labourer', 'color':'colour', 'yeras':'years', 'elergies':'allergies', 'around12':'around 12', 'learnt':'learned', 'rigor':'rigour', 'didn':'didn\'t'}
 
     # Get the xml from file
     tree = etree.parse(args.infile)
@@ -32,16 +33,17 @@ def main():
         if node != None:
             narr = node.text
 
-        # Fix spelling
+        # Fix spelling, unless it's a number or the first letter is capitalized
         narr_words = re.findall(r"[\w']+|[.,!?;]", narr)
         print "narr_words: " + str(narr_words)
         narr_fixed = ""
         for word in narr_words:
             if len(word) > 0:
-                if d.check(word):
+                if word in mapping.keys():
+                    narr_fixed = narr_fixed + " " + mapping[word]
+                elif d.check(word) or word.isdigit() or word.istitle():
                     narr_fixed = narr_fixed + " " + word
                 else:
-                    # TODO: don't change if it's just numbers
                     sugg = d.suggest(word)
                     w = word
                     if (len(sugg) > 0) and editdistance.eval(word, sugg[0]) < 4:
