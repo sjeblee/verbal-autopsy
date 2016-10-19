@@ -5,6 +5,7 @@
 import argparse
 import time
 from sklearn import metrics
+from sklearn import neighbors
 from sklearn import preprocessing
 from sklearn import svm
 from sklearn.feature_selection import SelectKBest, f_classif
@@ -56,7 +57,9 @@ def main():
         clf = svm.SVC(kernel='rbf')
         pipeline = make_pipeline(anova_filter, clf)
     elif model == "knn":
-        print "knn not implemented yet"
+        print "k-nearest neighbor"
+        knn = neighbors.KNeighborsClassifier(n_neighbors=5, weights='distance', n_jobs=-1)
+        pipeline = make_pipeline(anova_filter, knn)
         
     pipeline.fit(X, Y)
 
