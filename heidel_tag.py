@@ -26,7 +26,7 @@ def main():
         node = child.find("narrative")
         narr = ""
         if node != None:
-            narr = node.text
+            narr = node.text.encode('utf-8')
         if len(narr) > 0:
             temp = open("/home/sjeblee/temp.txt", "w")
             temp.write(narr)
@@ -35,7 +35,7 @@ def main():
             process = subprocess.Popen(["java", "-jar", "/home/sjeblee/Tools/heideltime/heideltime-standalone/de.unihd.dbs.heideltime.standalone.jar", "/home/sjeblee/temp.txt"], stdout=subprocess.PIPE)
             output, err = process.communicate()
             newnode = etree.Element("narr_tagged")
-            newnode.text = output.encode('utf-8')
+            newnode.text = output.decode('utf-8')
             child.append(newnode)
         
     # write the stats to file

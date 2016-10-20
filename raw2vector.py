@@ -19,7 +19,7 @@ def main():
     if not (args.infile and args.outfile):
         print "usage: ./raw2vector.py --input [file.xml] --output [outfile] --labels [labelname] --features [f1,f2,f3]"
         print "labels: Final_code, ICD_cat"
-        print "features: kw_bow, kw_tfidf, narr_bow, narr_tfidf"
+        print "features: checklist, kw_bow, kw_tfidf, narr_bow, narr_tfidf"
         exit()
 
     labelname = "Final_code"
@@ -27,18 +27,22 @@ def main():
         labelname = args.labelname
 
     global featurenames
+    rec_type = "type"
+    checklist = "checklist"
     kw_bow = "kw_bow"
     kw_tfidf ="kw_tfidf"
     narr_bow = "narr_bow"
     narr_count = "narr_count"
     narr_tfidf = "narr_tfidf"
-    featurenames = [kw_bow]
+    featurenames = [checklist, kw_bow]
     if args.featurenames:
         featurenames = args.featurenames.split(',')
     print "Features: " + str(featurenames)
 
     # Set up the keys for the feature vector
-    dict_keys = ["MG_ID", labelname, "DeathAge", "ageunit", "DeceasedSex", "Occupation", "Marital", "Hypertension", "Heart", "Stroke", "Diabetes", "TB", "HIV", "Cancer", "Asthma","InjuryHistory", "SmokeD", "AlcoholD", "ApplytobaccoD"]
+    dict_keys = ["MG_ID", labelname]
+    if checklist in featurenames:
+        dict_keys = dict_keys + ["DeathAge", "ageunit", "DeceasedSex", "Occupation", "Marital", "Hypertension", "Heart", "Stroke", "Diabetes", "TB", "HIV", "Cancer", "Asthma","InjuryHistory", "SmokeD", "AlcoholD", "ApplytobaccoD"]
     keywords = set([])
     narrwords = set([])
 
@@ -79,6 +83,9 @@ def main():
         #for subchild in child:
             #print "- subchild: " + subchild.tag
         features = {}
+
+        if rec_type in featurenames:
+            features[rec_type] = child.tag
 
         # CHECKLIST features
         for key in dict_keys:
