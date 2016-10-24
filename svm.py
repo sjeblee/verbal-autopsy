@@ -51,6 +51,7 @@ def main():
 
     # Train model
     print "training model..."
+    stime = time.time()
     
     anova_filter = SelectKBest(f_classif, k=200)
     if model == "svm":
@@ -62,6 +63,8 @@ def main():
         pipeline = make_pipeline(anova_filter, knn)
         
     pipeline.fit(X, Y)
+    etime = time.time()
+    print "training took " + str(etime - stime) + " s"
 
     selected = anova_filter.get_support(True)
     print "features selected: "
@@ -70,6 +73,7 @@ def main():
 
     # Test
     print "testing..."
+    stime = time.time()
     testids = []
     testlabels = []
     testX = []
@@ -77,6 +81,8 @@ def main():
     testY = preprocess(args.testfile, testids, testlabels, testX, testY)
     results = pipeline.predict(testX)
     predictedlabels = labelencoder.inverse_transform(results)
+    etime = time.time()
+    print "testing took " + str(etime - stime) + " s"
 
     # TODO: calculate F1 score of results
     print "calculating scores..."
