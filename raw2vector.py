@@ -65,6 +65,11 @@ def main():
 
     # NARRATIVE setup
     if narr_features:
+        stopwords = []
+        with open("stopwords_small.txt", "r") as f:
+            for line in f:
+                stopwords.append(line.strip())
+
         for child in root:
             narr_string = ""
             node = child.find("narrative")
@@ -72,7 +77,8 @@ def main():
                 narr_string = node.text.encode("utf-8")
             words = narr_string.lower().translate(string.maketrans("",""), string.punctuation).split(' ')
             for word in words:
-                narrwords.add(word.strip())
+                if word not in stopwords:
+                    narrwords.add(word.strip())
 
         print "Words: " + str(len(narrwords))
         
@@ -167,10 +173,10 @@ def main():
                 feat[key] = val
 
     # Write the features to file
-    print "writing to file..."
+    print "writing " + str(len(matrix)) + " feature vectors to file..."
     output = open(args.outfile, 'w')
     for feat in matrix:
-        print "ICD_cat: " + feat["ICD_cat"]
+        #print "ICD_cat: " + feat["ICD_cat"]
         output.write(str(feat) + "\n")
     output.close()
     

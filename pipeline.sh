@@ -3,10 +3,10 @@
 
 # Parameters
 trainname="all_cat" # all, adult, child, or neonate
-devname="adult_cat"
+devname="all_cat"
 pre="" # spell, heidel
 labels="ICD_cat" # ICD_cat or Final_code
-featureset="narrc" # Name of the feature set for feature file
+featureset="narrc_nsw" # Name of the feature set for feature file
 features="type,narr_count" # type, checklist, narr_bow, narr_tfidf, kw_bow, kw_tfidf
 model="svm" # svm, knn, or nn
 
@@ -20,9 +20,9 @@ scriptdir=$(pwd)
 mkdir -p $resultsloc
 trainset="$dataloc/train_$trainname.xml"
 devset="$dataloc/dev_$devname.xml"
-trainfeatures="$resultsloc/train_$set.features.$featureset"
-devfeatures="$resultsloc/dev_$set.features"
-devresults="$resultsloc/dev_$set.resultsk5"
+trainfeatures="$resultsloc/train_$trainname.features.$featureset"
+devfeatures="$resultsloc/dev_$devname.features.$featureset"
+devresults="$resultsloc/dev_$devname.results.$featureset"
 
 # Preprocessing
 echo "Preprocessing..."

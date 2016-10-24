@@ -58,7 +58,7 @@ def main():
         pipeline = make_pipeline(anova_filter, clf)
     elif model == "knn":
         print "k-nearest neighbor"
-        knn = neighbors.KNeighborsClassifier(n_neighbors=5, weights='distance', n_jobs=-1)
+        knn = neighbors.KNeighborsClassifier(n_neighbors=1, weights='distance', n_jobs=-1)
         pipeline = make_pipeline(anova_filter, knn)
         
     pipeline.fit(X, Y)
@@ -119,7 +119,7 @@ def preprocess(filename, ids, labels, x, y, trainlabels=False):
                         features.append('0')
             x.append(features)
             #print "features: " + str(features)
-    print "trainlabels: " + str(labels)
+#    print "trainlabels: " + str(labels)
 
     # Convert ICD codes to numerical labels
     if trainlabels:
