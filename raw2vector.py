@@ -19,7 +19,7 @@ def main():
     if not (args.infile and args.outfile):
         print "usage: ./raw2vector.py --input [file.xml] --output [outfile] --labels [labelname] --features [f1,f2,f3]"
         print "labels: Final_code, ICD_cat"
-        print "features: checklist, kw_bow, kw_tfidf, narr_bow, narr_tfidf"
+        print "features: checklist, kw_bow, kw_tfidf, kw_phrase, narr_bow, narr_tfidf"
         exit()
 
     labelname = "Final_code"
@@ -29,6 +29,7 @@ def main():
     global featurenames
     rec_type = "type"
     checklist = "checklist"
+    kw_phrase = "kw_phrase"
     kw_bow = "kw_bow"
     kw_tfidf ="kw_tfidf"
     narr_bow = "narr_bow"
@@ -52,24 +53,25 @@ def main():
     # Get the xml from file
     root = etree.parse(args.infile).getroot()
 
-    kw_features = kw_bow in featurenames or kw_tfidf in featurenames
+    kw_features = kw_bow in featurenames or kw_tfidf in featurenames or kw_phrase in featurenames
     narr_features = narr_bow in featurenames or narr_tfidf in featurenames or narr_count in featurenames
-    
+    stopwords = []
+
+    if kw_features or narr_features:
+        with open("stopwords_small.txt", "r") as f:
+            for line in f:
+                stopwords.append(line.strip())
+
     # KEYWORDS setup
     if kw_features:
         for child in root:
             keyword_string = get_keywords(child)
-            add_keywords(keywords, keyword_string, translate_table)
+            add_keywords(keywords, keyword_string, translate_table, stopwords)
 
         print "Keywords: " + str(len(keywords))
 
     # NARRATIVE setup
     if narr_features:
-        stopwords = []
-        with open("stopwords_small.txt", "r") as f:
-            for line in f:
-                stopwords.append(line.strip())
-
         for child in root:
             narr_string = ""
             node = child.find("narrative")
@@ -85,9 +87,6 @@ def main():
     # Extract features
     matrix = []
     for child in root:
-#        print "child: " + child.tag
-        #for subchild in child:
-            #print "- subchild: " + subchild.tag
         features = {}
 
         if rec_type in featurenames:
@@ -119,9 +118,9 @@ def main():
             for keyword in keywords:
                 value = 0
                 if keyword in words:
-                    if "keyword_bow" in featurenames:
+                    if kw_bow in featurenames:
                         value = 1
-                    elif "keyword_tfidf" in featurenames:
+                    elif kw_tfidf in featurenames:
                         value = 1 # TODO: calculate tfidf
                 features["KW_" + keyword] = value
                 
@@ -205,10 +204,17 @@ def get_keywords(elem):
         keyword_string = keyword_string + keywords2.text.encode("utf-8")
     return keyword_string.lower()
 
-def add_keywords(keywords, keyword_string, translate_table):
+def add_keywords(keywords, keyword_string, translate_table, stopwords):
     for word in keyword_string.split(','):
         word = word.translate(string.maketrans("",""), string.punctuation)
-        for w in word.strip().split(' '):
-            keywords.add(w.strip().strip('–'))
+        w0 = word.strip()
+        if "kw_phrase" in featurenames:
+            keywords.add(w0)
+            # TODO: remove stopwords
+        else:
+            for w in w0.split(' '):
+                w2 = w.strip().strip('-')
+                if w2 not in stopwords:
+                    keywords.add(w2)
 
 if __name__ == "__main__":main()
