@@ -209,8 +209,12 @@ def add_keywords(keywords, keyword_string, translate_table, stopwords):
         word = word.translate(string.maketrans("",""), string.punctuation)
         w0 = word.strip()
         if "kw_phrase" in featurenames:
-            keywords.add(w0)
-            # TODO: remove stopwords
+            w1 = ""
+            for w in w0.split(' '):
+                w2 = w.strip().strip('-')
+                if w2 not in stopwords:
+                    w1 = w1 + " " + w2
+            keywords.add(w1.strip())
         else:
             for w in w0.split(' '):
                 w2 = w.strip().strip('-')

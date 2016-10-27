@@ -3,16 +3,16 @@
 
 # Parameters
 trainname="all_cat" # all, adult, child, or neonate
-devname="all_cat"
+devname="adult_cat"
 pre="" # spell, heidel
 labels="ICD_cat" # ICD_cat or Final_code
-featureset="narrc_nsw" # Name of the feature set for feature file
-features="type,narr_count" # type, checklist, narr_bow, narr_tfidf, kw_bow, kw_tfidf
+featureset="kw_phrase" # Name of the feature set for feature file
+features="type,kw_phrase" # type, checklist, narr_bow, narr_tfidf, kw_bow, kw_tfidf
 model="svm" # svm, knn, or nn
 
 # Location of data files
 dataloc="/home/sjeblee/Documents/Research/VerbalAutopsy/data/datasets"
-resultsloc="/home/sjeblee/Documents/Research/VerbalAutopsy/data/svm_narr"
+resultsloc="/home/sjeblee/Documents/Research/VerbalAutopsy/data/svm_kw"
 heideldir="/home/sjeblee/Tools/heideltime/heideltime-standalone"
 scriptdir=$(pwd)
 
