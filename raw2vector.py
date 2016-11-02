@@ -151,6 +151,7 @@ def main():
         matrix_keys = []
         for w in narrwords:
             matrix_keys.append("W_" + w)
+        print "matrix_keys: " + str(len(matrix_keys))
 
         for feat in matrix:
             w_features = []
@@ -161,14 +162,17 @@ def main():
         # Convert matrix to tfidf
         tfidfTransformer = sklearn.feature_extraction.text.TfidfTransformer()
         tfidf_matrix = tfidfTransformer.fit_transform(count_matrix)
+        print "count_matrix: " + str(len(count_matrix))
+        print "tfidf_matrix: " + str(tfidf_matrix.shape)
             
         # Replace features in matrix with tfidf
         for x in range(len(matrix)):
             feat = matrix[x]
-            values = tfidf_matrix[x]
+            #values = tfidf_matrix[x,0:]
+            #print "values: " + str(values.shape[0])
             for i in range(len(matrix_keys)):
                 key = matrix_keys[i]
-                val = values[i]
+                val = tfidf_matrix[x,i]
                 feat[key] = val
 
     # Write the features to file
