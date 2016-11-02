@@ -33,7 +33,11 @@ def main():
         if node != None:
             narr = node.text
 
-        # Fix spelling, unless it's a number or the first letter is capitalized
+        # If the whole narrative is uppercase, lowercase it
+        if narr.isupper():
+            narr = narr.lower()
+
+        # Fix spelling, unless it's a number or it's capitalized
         narr_words = re.findall(r"[\w']+|[.,!?;]", narr)
         print "narr_words: " + str(narr_words)
         narr_fixed = ""
@@ -41,12 +45,12 @@ def main():
             if len(word) > 0:
                 if word in mapping.keys():
                     narr_fixed = narr_fixed + " " + mapping[word]
-                elif d.check(word) or word.isdigit() or word.istitle():
+                elif d.check(word) or word.isdigit() or word.istitle() or word.isupper():
                     narr_fixed = narr_fixed + " " + word
                 else:
                     sugg = d.suggest(word)
                     w = word
-                    if (len(sugg) > 0) and editdistance.eval(word, sugg[0]) < 4:
+                    if (len(sugg) > 0) and editdistance.eval(word, sugg[0]) < 3:
                         w = sugg[0]
                         print word + " -> " + sugg[0]
                     narr_fixed = narr_fixed + " " + w
