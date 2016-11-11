@@ -6,6 +6,7 @@
 from lxml import etree
 import sklearn.feature_extraction
 import argparse
+import os
 import string
 
 def main():
@@ -14,6 +15,7 @@ def main():
     argparser.add_argument('--out', action="store", dest="outfile")
     argparser.add_argument('--labels', action="store", dest="labelname")
     argparser.add_argument('--features', action="store", dest="featurenames")
+    argparser.add_argument('--keys', action="store", dest="keyfile")
     args = argparser.parse_args()
 
     if not (args.infile and args.outfile):
@@ -39,6 +41,15 @@ def main():
     if args.featurenames:
         featurenames = args.featurenames.split(',')
     print "Features: " + str(featurenames)
+
+    # Read in feature keys
+    global keys
+    keys = []
+    usekeys = False
+    if args.keyfile:
+        usekeys = True
+        with open(args.keyfile, "r") as kfile:
+            keys = eval(kfile.read())
 
     # Set up the keys for the feature vector
     dict_keys = ["MG_ID", labelname]
@@ -121,7 +132,7 @@ def main():
                     if kw_bow in featurenames:
                         value = 1
                     elif kw_tfidf in featurenames:
-                        value = 1 # TODO: calculate tfidf
+                        value = 1
                 features["KW_" + keyword] = value
                 
         # NARRATIVE features
@@ -139,7 +150,14 @@ def main():
                         value = 1
                     else:
                         value = narr_words.count(word)
-                features["W_" + word] = value
+                fkey = "W_" + word
+                if (not usekeys) or (fkey in keys):
+                    features["W_" + word] = value
+            # Make sure that features align with the training set
+            if usekeys:
+                for wordkey in keys:
+                    if wordkey not in features.keys():
+                        features[wordkey] = 0
 
         # Save features
         matrix.append(features)
@@ -149,8 +167,13 @@ def main():
         print "converting to tfidf..."
         count_matrix = []
         matrix_keys = []
-        for w in narrwords:
-            matrix_keys.append("W_" + w)
+        if usekeys:
+            for ky in keys:
+                if "W_" in ky:
+                    matrix_keys.append(ky)
+        else:
+            for w in narrwords:
+                matrix_keys.append("W_" + w)
         print "matrix_keys: " + str(len(matrix_keys))
 
         for feat in matrix:
@@ -159,9 +182,25 @@ def main():
                 w_features.append(feat[key])
             count_matrix.append(w_features)
 
-        # Convert matrix to tfidf
         tfidfTransformer = sklearn.feature_extraction.text.TfidfTransformer()
-        tfidf_matrix = tfidfTransformer.fit_transform(count_matrix)
+
+        # Use the training count matrix for fitting
+        if ("train" in args.infile):
+            outf = open("temp.countmatrix", "w")
+            outf.write(str(count_matrix))
+            outf.close()
+            tfidfTransformer.fit(count_matrix)
+        else:
+            if not os.path.exists("./temp.countmatrix"):
+                print "ERROR: train features must be computed first for idf matrix"
+                exit(1)
+            train_count_matrix = []
+            with open("temp.countmatrix", "r") as inf:
+                train_count_matrix = eval(inf.read())
+            tfidfTransformer.fit(train_count_matrix)
+
+        # Convert matrix to tfidf
+        tfidf_matrix = tfidfTransformer.transform(count_matrix)
         print "count_matrix: " + str(len(count_matrix))
         print "tfidf_matrix: " + str(tfidf_matrix.shape)
             

@@ -2,18 +2,18 @@
 # Script to run all the steps of the Verbal Autopsy pipeline
 
 # Parameters
-trainname="all_cat" # all, adult, child, or neonate
+trainname="adult_cat" # all, adult, child, or neonate
 devname="adult_cat"
-pre="" # spell, heidel
+pre="spell" # spell, heidel
 labels="ICD_cat" # ICD_cat or Final_code
-featureset="kw_phrase" # Name of the feature set for feature file
-features="type,kw_phrase" # type, checklist, narr_bow, narr_tfidf, kw_bow, kw_tfidf
+featureset="narr_tfidf" # Name of the feature set for feature file
+features="type,narr_tfidf" # type, checklist, narr_bow, narr_tfidf, kw_bow, kw_tfidf
 model="svm" # svm, knn, or nn
 
 # Location of data files
-dataloc="/home/sjeblee/Documents/Research/VerbalAutopsy/data/datasets"
-resultsloc="/home/sjeblee/Documents/Research/VerbalAutopsy/data/svm_kw"
-heideldir="/home/sjeblee/Tools/heideltime/heideltime-standalone"
+dataloc="/u/sjeblee/research/va/data/datasets"
+resultsloc="/u/sjeblee/research/va/data/svm_tfidf"
+heideldir="/u/sjeblee/tools/heideltime/heideltime-standalone"
 scriptdir=$(pwd)
 
 # Setup
@@ -29,11 +29,15 @@ echo "Preprocessing..."
 if [[ $pre == *"spell"* ]]
 then
     echo "Running spelling correction..."
-   python spellcorrect.py --in $trainset --out "$dataloc/train_$set_spell.xml"
-   python spellcorrect.py --in $devset --out "$dataloc/dev_$set_spell.xml"
+    if [ ! -f "$dataloc/train_${trainname}_spell.xml" ]; then
+	python spellcorrect.py --in $trainset --out "$dataloc/train_${trainname}_spell.xml"
+    fi
+    if [ ! -f "$dataloc/dev_${devname}_spell.xml" ]; then
+	python spellcorrect.py --in $devset --out "$dataloc/dev_${devname}_spell.xml"
+    fi
 
-   trainset="$dataloc/train_$set_spell.xml"
-   devset="$dataloc/dev_$set_spell.xml"
+   trainset="$dataloc/train_${trainname}_spell.xml"
+   devset="$dataloc/dev_${devname}_spell.xml"
 fi
 
 if [[ $pre == *"heidel"* ]]
@@ -66,7 +70,7 @@ fi
 if [ ! -f $devfeatures ]
 then
     echo "Extracting features for dev..."
-    python raw2vector.py --in $devset --out $devfeatures --labels $labels --features $features
+    python raw2vector.py --in $devset --out $devfeatures --labels $labels --features $features --keys "$trainfeatures.keys"
 fi
 
 # Model
