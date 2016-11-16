@@ -33,14 +33,13 @@ def main():
             temp.write(narr)
             temp.close()
             # Run Stanford parser on narr
-            process = subprocess.Popen(["java", "-cp", "/p/spoclab/tools/Stanford/stanford-corenlp-full-2015-04-20/stanford-corenlp-3.5.2.jar", "edu.stanford.nlp.parser.nndep.DependencyParser", "-model", "/u/sjeblee/research/va/res/stanford/english_SD.gz", "-textFile", tempname, "-outFile", "-"], stdout=subprocess.PIPE)
+            process = subprocess.Popen(["java", "-cp", "/p/spoclab/tools/Stanford/stanford-corenlp-full-2015-04-20/stanford-corenlp-3.5.2.jar:/p/spoclab/tools/Stanford/stanford-corenlp-full-2015-04-20/stanford-corenlp-3.5.2-models.jar", "edu.stanford.nlp.parser.nndep.DependencyParser", "-model", "/u/sjeblee/research/va/res/stanford/english_SD.gz", "-textFile", tempname, "-outFile", "-"], stdout=subprocess.PIPE)
             output, err = process.communicate()
-            newnode = etree.Element("narr_parsed")
+            newnode = etree.Element("narr_depparse")
             newnode.text = output.decode('utf-8')
             child.append(newnode)
         
-    # write the stats to file
+    # write the new xml to file
     tree.write(args.outfile)
-    
 
 if __name__ == "__main__":main()
