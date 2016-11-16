@@ -2,17 +2,17 @@
 # Script to run all the steps of the Verbal Autopsy pipeline
 
 # Parameters
-trainname="adult_cat" # all, adult, child, or neonate
+trainname="all_cat" # all, adult, child, or neonate
 devname="adult_cat"
 pre="spell" # spell, heidel
 labels="ICD_cat" # ICD_cat or Final_code
-featureset="narr_tfidf" # Name of the feature set for feature file
-features="type,narr_tfidf" # type, checklist, narr_bow, narr_tfidf, kw_bow, kw_tfidf
+featureset="narrc" # Name of the feature set for feature file
+features="type,narr_count" # type, checklist, narr_bow, narr_tfidf, kw_bow, kw_tfidf
 model="svm" # svm, knn, or nn
 
 # Location of data files
 dataloc="/u/sjeblee/research/va/data/datasets"
-resultsloc="/u/sjeblee/research/va/data/svm_tfidf"
+resultsloc="/u/sjeblee/research/va/data/svm_narr_splm"
 heideldir="/u/sjeblee/tools/heideltime/heideltime-standalone"
 scriptdir=$(pwd)
 
@@ -25,19 +25,22 @@ devfeatures="$resultsloc/dev_$devname.features.$featureset"
 devresults="$resultsloc/dev_$devname.results.$featureset"
 
 # Preprocessing
+spname="splm"
 echo "Preprocessing..."
 if [[ $pre == *"spell"* ]]
 then
     echo "Running spelling correction..."
-    if [ ! -f "$dataloc/train_${trainname}_spell.xml" ]; then
-	python spellcorrect.py --in $trainset --out "$dataloc/train_${trainname}_spell.xml"
+    trainsp="$dataloc/train_${trainname}_${spname}.xml"
+    devsp="$dataloc/dev_${devname}_${spname}.xml"
+    if [ ! -f $trainsp ]; then
+	python spellcorrect.py --in $trainset --out $trainsp
     fi
-    if [ ! -f "$dataloc/dev_${devname}_spell.xml" ]; then
-	python spellcorrect.py --in $devset --out "$dataloc/dev_${devname}_spell.xml"
+    if [ ! -f $devsp ]; then
+	python spellcorrect.py --in $devset --out $devsp
     fi
 
-   trainset="$dataloc/train_${trainname}_spell.xml"
-   devset="$dataloc/dev_${devname}_spell.xml"
+   trainset=$trainsp
+   devset=$devsp
 fi
 
 if [[ $pre == *"heidel"* ]]
