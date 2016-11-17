@@ -6,6 +6,7 @@ from lxml import etree
 import argparse
 import editdistance
 import enchant
+import kenlm
 import re
 import string
 
@@ -13,14 +14,19 @@ def main():
     argparser = argparse.ArgumentParser()
     argparser.add_argument('--in', action="store", dest="infile")
     argparser.add_argument('--out', action="store", dest="outfile")
+    argparser.add_argument('--lm', action="store_true")
     args = argparser.parse_args()
 
     if not (args.infile and args.outfile):
-        print "usage: ./addcategory.py --in [file.xml] --out [outfile.xml]"
+        print "usage: ./spellcorrect.py --in [file.xml] --out [outfile.xml] (--lm)"
         exit()
 
     d = enchant.DictWithPWL("en_CA", "dictionary.txt")
-    mapping = {'labor':'labour', 'laborer':'labourer', 'color':'colour', 'yeras':'years', 'elergies':'allergies', 'around12':'around 12', 'learnt':'learned', 'rigor':'rigour', 'didn':'didn\'t'}
+    mapping = {'labor':'labour', 'laborer':'labourer', 'color':'colour', 'yeras':'years', 'elergies':'allergies', 'around12':'around 12', 'learnt':'learned', 'rigor':'rigour', 'didn':'didn\'t', 'neighbor':'neighbour', 'enjury':'injury'}
+
+    # Language model
+    lmfile = "/u/sjeblee/research/va/res/ICE-India/ice-lm-5.binary"
+    lm = kenlm.Model(lmfile)
 
     # Get the xml from file
     tree = etree.parse(args.infile)
@@ -41,19 +47,50 @@ def main():
         narr_words = re.findall(r"[\w']+|[.,!?;]", narr)
         print "narr_words: " + str(narr_words)
         narr_fixed = ""
+        prevwords = []
+        prevn = 4
         for word in narr_words:
             if len(word) > 0:
+                # Hand-crafted mappings
                 if word in mapping.keys():
                     narr_fixed = narr_fixed + " " + mapping[word]
-                elif d.check(word) or word.isdigit() or word.istitle() or word.isupper():
+                    prevwords.append(mapping[word])
+                    print word + " -> " + mapping[word]
+                elif d.check(word) or word.isdigit() or word.isupper() or word.istitle() or (len(word) < 3):
                     narr_fixed = narr_fixed + " " + word
+                    prevwords.append(word)
                 else:
+                    # Split XXX from other words
+                    if word[0:3] == "XXX" and len(word) > 3:
+                        word = "XXX " + word[3:]
                     sugg = d.suggest(word)
-                    w = word
-                    if (len(sugg) > 0) and editdistance.eval(word, sugg[0]) < 3:
-                        w = sugg[0]
-                        print word + " -> " + sugg[0]
-                    narr_fixed = narr_fixed + " " + w
+                    bestw = word
+                    ngram = get_ngram(word, prevwords)
+                    bestp = lm.score(ngram, bos=False, eos=False)
+                    bested = 3
+                    print "orig: " + ngram + " : " + str(bestp)
+
+                    if args.lm:
+                        for s in sugg:
+                            ed = editdistance.eval(word, s)
+                            if (len(s) > 0) and (ed <= bested):
+                                # Favor corrections with lower edit distances
+                                if ed < bested:
+                                    bested = ed
+                                ngram = get_ngram(s, prevwords)
+                                prob = lm.score(ngram, bos=False, eos=False)
+                                print "try: " + ngram + " : " + str(prob)
+                                if prob > bestp:
+                                    bestp = prob
+                                    bestw = s
+                    else:
+                        if editdistance.eval(word, sugg[0]) < bested:
+                            bestw = sugg[0]
+                    print word + " -> " + bestw
+                    narr_fixed = narr_fixed + " " + bestw
+                    prevwords.append(bestw)
+                if len(prevwords) > prevn:
+                    del prevwords[0]
 
         # Save corrected narrative
         if node == None:
@@ -63,5 +100,12 @@ def main():
         
     # write the xml to file
     tree.write(args.outfile)
+
+def get_ngram(word, prevwords):
+    ngram = ""
+    for pw in prevwords:
+        ngram = ngram + pw + " "
+    ngram = ngram + word
+    return ngram
 
 if __name__ == "__main__":main()
