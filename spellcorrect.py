@@ -63,6 +63,8 @@ def main():
                     # Split XXX from other words
                     if word[0:3] == "XXX" and len(word) > 3:
                         word = "XXX " + word[3:]
+                    elif word[-3:] == "XXX" and len(word) > 3:
+                        word = word[0:-3] + " XXX"
                     sugg = d.suggest(word)
                     bestw = word
                     ngram = get_ngram(word, prevwords)
@@ -84,7 +86,7 @@ def main():
                                     bestp = prob
                                     bestw = s
                     else:
-                        if editdistance.eval(word, sugg[0]) < bested:
+                        if len(sugg) > 0 and editdistance.eval(word, sugg[0]) < bested:
                             bestw = sugg[0]
                     print word + " -> " + bestw
                     narr_fixed = narr_fixed + " " + bestw
