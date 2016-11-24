@@ -39,4 +39,35 @@ def get_records(inf, outf, f, vals):
     # write the xml to file
     tree.write(outf)
 
+def get_narrwords(inf, outf, f, vals):
+    codeset = vals.split(",")
+
+    # Get the xml from file
+    tree = etree.parse(inf)
+    root = tree.getroot()
+    narrwords = []
+
+    for child in root:
+        val = ""
+        node = child.find(f)
+        if node != None:
+            val = node.text
+        if val in codeset:
+            nwords = []
+            narrnode = child.find("narrative")
+            narrtext = ""
+            if narrnode != None:
+                narrtext = narrnode.text
+            words = narrtext.split()
+            for word in words:
+                if word not in nwords:
+                    nwords.append(word)
+            narrwords.append(nwords)
+
+    # write the xml to file
+    fileout = open(outf, 'w')
+    for vec in narrwords:
+        fileout.write(vec)
+    fileout.close() 
+
 if __name__ == "__main__":main()
