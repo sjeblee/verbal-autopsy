@@ -15,15 +15,15 @@ def main():
     argparser.add_argument('--features', action="store", dest="featfile")
     args = argparser.parse_args()
 
-    if not (args.infile and args.outfile and args.features):
-        print "usage: ./getrecords.py --in [file.xml] --out [outfile.xml] --features [feat.txt]"
+    if not (args.infile and args.outfile and args.featfile):
+        print "usage: ./getrecords.py --in [file.xml] --out [outfile.csv] --features [feat.txt]"
         exit()
 
     icdcats = ["1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17"]
     cats = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,15,17]
     field = "ICD_cat"
 
-    with open(args.infile, 'r') as f:
+    with open(args.featfile, 'r') as f:
         feats = f.readlines()
 
     files = {}
@@ -38,20 +38,23 @@ def main():
         getrecords.get_narrwords(args.infile, out, field, cat)
 
     for feat in feats:
-        if feat[:2] == "W_":
+        index = feats.index(feat)
+        feat = feat.strip()
+        if feat[0:2] == "W_":
             feat = feat[2:]
+        feats[index] = feat
         recs[feat] = [0] # ignore slot 0 so we can use 1-17
         sensitivity[feat] = []
         specificity[feat] = []
         for cat in icdcats:
             recfile = files[cat]
             num = 0
-            subprocess("grep", "-c", "\'" + feat + "\'", recfile)
-            # TODO: calculate number of records in each category that have this word
+            # Calculate number of records in each category that have this word
             process = subprocess.Popen(["grep", "-c", "\'" + feat + "\'", recfile], stdout=subprocess.PIPE)
             output, err = process.communicate()
-            num = int(output)
-            recs.append(num)
+            if len(output) > 0:
+                num = int(output)
+            recs[feat].append(num)
 
     total = 0
     for cat in cats:
@@ -63,13 +66,17 @@ def main():
 
     # Calculate sensitivity and specificity
     for feat in feats:
+        print "Analyzing feat: " + feat
         featsum = 0
         for cat in cats:
             featsum = featsum + (recs[feat])[cat]
         for cat in cats:
             tp = (recs[feat])[cat]
             p = rectotals[cat]
-            sens = tp / p
+            print str(cat) + " tp: " + str(tp) + " p: " + str(p)
+            sens = 0
+            if p > 0:
+                sens = tp / p
             spec = (total - featsum - (p - tp)) / total
             sensitivity[feat].append(sens)
             specificity[feat].append(spec)
@@ -83,10 +90,10 @@ def main():
     for feat in feats:
         fileout.write("sens(" + feat + ")")
         for x in sensitivity[feat]:
-            fileout.write("," + x)
+            fileout.write("," + str(x))
         fileout.write("\nspec(" + feat + ")")
         for y in specificity[feat]:
-            fileout.write("," + y)
+            fileout.write("," + str(y))
         fileout.write("\n")
     fileout.close()
 

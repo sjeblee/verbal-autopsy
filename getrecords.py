@@ -67,7 +67,7 @@ def get_narrwords(inf, outf, f, vals):
     # write the xml to file
     fileout = open(outf, 'w')
     for vec in narrwords:
-        fileout.write(vec)
+        fileout.write(str(vec) + "\n")
     fileout.close() 
 
 if __name__ == "__main__":main()
