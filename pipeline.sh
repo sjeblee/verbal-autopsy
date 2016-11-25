@@ -3,16 +3,16 @@
 
 # Parameters
 trainname="all_cat" # all, adult, child, or neonate
-devname="adult_cat"
+devname="child_cat"
 pre="spell" # spell, heidel
 labels="ICD_cat" # ICD_cat or Final_code
-featureset="narrc" # Name of the feature set for feature file
-features="type,narr_count" # type, checklist, narr_bow, narr_tfidf, kw_bow, kw_tfidf
+featureset="narr_count" # Name of the feature set for feature file
+features="type,narr_count" # type, checklist, narr_bow, narr_tfidf, narr_count, kw_bow, kw_tfidf
 model="svm" # svm, knn, or nn
 
 # Location of data files
 dataloc="/u/sjeblee/research/va/data/datasets"
-resultsloc="/u/sjeblee/research/va/data/svm_narr_splm"
+resultsloc="/u/sjeblee/research/va/data/svm_ngram"
 heideldir="/u/sjeblee/tools/heideltime/heideltime-standalone"
 scriptdir=$(pwd)
 
@@ -25,7 +25,7 @@ devfeatures="$resultsloc/dev_$devname.features.$featureset"
 devresults="$resultsloc/dev_$devname.results.$featureset"
 
 # Preprocessing
-spname="splm"
+spname="sp"
 echo "Preprocessing..."
 if [[ $pre == *"spell"* ]]
 then
@@ -65,15 +65,10 @@ then
 fi
 
 # Feature Extraction
-if [ ! -f $trainfeatures ]
+if [ ! -f $trainfeatures ] || [ ! -f $devfeatures ]
 then
-    echo "Extracting features for train..."
-    python raw2vector.py --in $trainset --out $trainfeatures --labels $labels --features $features
-fi
-if [ ! -f $devfeatures ]
-then
-    echo "Extracting features for dev..."
-    python raw2vector.py --in $devset --out $devfeatures --labels $labels --features $features --keys "$trainfeatures.keys"
+    echo "Extracting features..."
+    python extract_features.py --train $trainset --trainfeats $trainfeatures --test $devset --testfeats $devfeatures --labels $labels --features $features
 fi
 
 # Model
