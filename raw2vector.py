@@ -176,6 +176,8 @@ def main():
                 matrix_keys.append("W_" + w)
         print "matrix_keys: " + str(len(matrix_keys))
 
+        matrix_keys = sorted(matrix_keys)
+
         for feat in matrix:
             w_features = []
             for key in matrix_keys:

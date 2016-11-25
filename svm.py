@@ -8,7 +8,7 @@ from sklearn import metrics
 from sklearn import neighbors
 from sklearn import preprocessing
 from sklearn import svm
-from sklearn.feature_selection import SelectKBest, f_classif
+from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classif
 from sklearn.pipeline import make_pipeline
 
 labelencoder = None
@@ -71,6 +71,9 @@ def main():
     for i in selected:
         print "\t" + keys[i+2]
 
+    # TEMP for HIV
+    #print "feats in X: " + str(len(X[0]))
+
     # Test
     print "testing..."
     stime = time.time()
@@ -105,6 +108,11 @@ def main():
 
 def preprocess(filename, ids, labels, x, y, trainlabels=False):
     global labelencoder
+
+    #TEMP
+    hivcodes = ["B20", "B21", "B22", "B23", "B24"]
+    printfeats = False
+
     # Read in the feature vectors
     starttime = time.time()
     print "preprocessing features..."
@@ -118,13 +126,25 @@ def preprocess(filename, ids, labels, x, y, trainlabels=False):
                     #print "ID: " + vector[key]
                 elif key == labelname:
                     labels.append(vector[key])
+                    val = vector[key]
+                    #if val in hivcodes:
+                    #    printfeats = True
                 else:
                     if vector.has_key(key):
                         features.append(vector[key])
                     else:
                         features.append('0')
             x.append(features)
-            #print "features: " + str(features)
+
+            #TEMP
+            if printfeats:
+                print "HIV record: " + vector[labelname]
+                for key in keys:
+                    val = str(vector[key])
+                    if val != "0":
+                        print "- " + key + ": " + val
+                printfeats = False
+
 #    print "trainlabels: " + str(labels)
 
     # Convert ICD codes to numerical labels
