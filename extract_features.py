@@ -8,6 +8,7 @@ import sklearn.feature_extraction
 import argparse
 import os
 import string
+import time
 
 def main():
     argparser = argparse.ArgumentParser()
@@ -24,6 +25,9 @@ def main():
         print "labels: Final_code, ICD_cat"
         print "features: checklist, kw_bow, kw_tfidf, kw_phrase, narr_bow, narr_count, narr_tfidf, narr_ngram"
         exit()
+
+    # Timing
+    starttime = time.time()
 
     global labelname
     labelname = "Final_code"
@@ -47,8 +51,8 @@ def main():
 
     # Ngram feature params
     global min_ngram, max_ngram
-    min_ngram = 1
-    max_ngram = 1
+    min_ngram = 2
+    max_ngram = 2
 
     global translate_table
     not_letters_or_digits = u'!"#%\'()*+,-./:;<=>?@[\]^_`{|}~'
@@ -68,6 +72,9 @@ def main():
     keys = extract(args.trainfile, args.trainoutfile, None)
     extract(args.testfile, args.testoutfile, keys)
 
+    endtime = time.time()
+    totaltime = endtime - starttime
+    print "feature extraction took " + str(totaltime/60) + " mins"
 
 def extract(infile, outfile, dict_keys):
     train = False
@@ -163,6 +170,11 @@ def extract(infile, outfile, dict_keys):
     print "transforming data with count_vectorizer"
     count_matrix = count_vectorizer.transform(narratives)
     matrix_keys = count_vectorizer.get_feature_names()
+
+    print "writing count matrix to file"
+    out_matrix = open(infile + ".countmatrix", "w")
+    out_matrix.write(str(count_matrix))
+    out_matrix.close()
 
     # Add count features to the dictionary
     for x in range(len(matrix)):
