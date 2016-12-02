@@ -51,8 +51,8 @@ def main():
 
     # Ngram feature params
     global min_ngram, max_ngram
-    min_ngram = 2
-    max_ngram = 2
+    min_ngram = 1
+    max_ngram = 1
 
     global translate_table
     not_letters_or_digits = u'!"#%\'()*+,-./:;<=>?@[\]^_`{|}~'

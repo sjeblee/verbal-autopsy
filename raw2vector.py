@@ -31,6 +31,7 @@ def main():
     global featurenames
     rec_type = "type"
     checklist = "checklist"
+    dem = "dem"
     kw_phrase = "kw_phrase"
     kw_bow = "kw_bow"
     kw_tfidf ="kw_tfidf"
@@ -41,6 +42,11 @@ def main():
     if args.featurenames:
         featurenames = args.featurenames.split(',')
     print "Features: " + str(featurenames)
+
+     # Ngram feature params
+     global min_ngram, max_ngram
+     min_ngram = 1
+     max_ngram = 2
 
     # Read in feature keys
     global keys
@@ -54,7 +60,9 @@ def main():
     # Set up the keys for the feature vector
     dict_keys = ["MG_ID", labelname]
     if checklist in featurenames:
-        dict_keys = dict_keys + ["DeathAge", "ageunit", "DeceasedSex", "Occupation", "Marital", "Hypertension", "Heart", "Stroke", "Diabetes", "TB", "HIV", "Cancer", "Asthma","InjuryHistory", "SmokeD", "AlcoholD", "ApplytobaccoD"]
+        dict_keys = dict_keys + ["CL_DeathAge", "CL_ageunit", "CL_DeceasedSex", "CL_Occupation", "CL_Marital", "CL_Hypertension", "CL_Heart", "CL_Stroke", "CL_Diabetes", "CL_TB", "CL_HIV", "CL_Cancer", "CL_Asthma","CL_InjuryHistory", "CL_SmokeD", "CL_AlcoholD", "CL_ApplytobaccoD"]
+    elif dem in featurenames:
+        dict_keys = dict_keys + ["CL_DeathAge", "CL_DeceasedSex"]
     keywords = set([])
     narrwords = set([])
 
@@ -106,6 +114,8 @@ def main():
         # CHECKLIST features
         for key in dict_keys:
 #            print "- key: " + key
+            if key[0:3] == "CL_":
+                key = key[3:]
             item = child.find(key)
             value = "0"
             if item != None:
@@ -143,16 +153,23 @@ def main():
                 narr_string = item.text.encode("utf-8")
             narr_words = [w.strip() for w in narr_string.lower().translate(string.maketrans("",""), string.punctuation).split(' ')]
             #features["narr_length"] = len(narr_words)
+            ngrams = {}
             for word in narrwords:
+                for x in range(min_ngram, max_ngram):
+                    # Cut off the first word
+                    grams = ngrams[x]
+                    if len(grams > x-1):
+                        grams.remove(0)
+
                 value = 0
                 if word in narr_words:
                     if "narr_bow" in featurenames:
                         value = 1
                     else:
                         value = narr_words.count(word)
-                fkey = "W_" + word
+                fkey = word
                 if (not usekeys) or (fkey in keys):
-                    features["W_" + word] = value
+                    features[word] = value
             # Make sure that features align with the training set
             if usekeys:
                 for wordkey in keys:
@@ -169,11 +186,11 @@ def main():
         matrix_keys = []
         if usekeys:
             for ky in keys:
-                if "W_" in ky:
+                if "CL_" not in ky:
                     matrix_keys.append(ky)
         else:
             for w in narrwords:
-                matrix_keys.append("W_" + w)
+                matrix_keys.append(w)
         print "matrix_keys: " + str(len(matrix_keys))
 
         matrix_keys = sorted(matrix_keys)
@@ -231,7 +248,7 @@ def main():
     if narr_features:
         #dict_keys.append("narr_length")
         for w in narrwords:
-            dict_keys.append("W_" + w)
+            dict_keys.append(w)
 
     kw_output = open(args.outfile + ".keys", "w")
     kw_output.write(str(dict_keys))
