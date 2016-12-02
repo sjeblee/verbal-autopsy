@@ -22,7 +22,7 @@ def main():
         exit()
 
     d = enchant.DictWithPWL("en_CA", "dictionary.txt")
-    mapping = {'labor':'labour', 'laborer':'labourer', 'color':'colour', 'yeras':'years', 'elergies':'allergies', 'around12':'around 12', 'learnt':'learned', 'rigor':'rigour', 'didn':'didn\'t', 'neighbor':'neighbour', 'enjury':'injury'}
+    mapping = {'labor':'labour', 'laborer':'labourer', 'color':'colour', 'yeras':'years', 'elergies':'allergies', 'around12':'around 12', 'learnt':'learned', 'rigor':'rigour', 'couldn':'couldn\'t', 'didn':'didn\'t', 'neighbor':'neighbour', 'enjury':'injury'}
 
     # Language model
     lmfile = "/u/sjeblee/research/va/res/ICE-India/ice-lm-5.binary"
