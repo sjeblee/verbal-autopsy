@@ -64,6 +64,8 @@ def main():
     csmf_corr_min = 1
     csmf_sum = 0
     for key in labels_correct.keys():
+        if not labels_pred.has_key(key):
+            labels_pred[key] = 0
         num_corr = labels_correct[key]
         num_pred = labels_pred[key]
         csmf_c = num_corr/n

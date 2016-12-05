@@ -8,7 +8,7 @@ from sklearn import metrics
 from sklearn import neighbors
 from sklearn import preprocessing
 from sklearn import svm
-from sklearn.feature_selection import SelectKBest, f_classif, mutual_info_classif
+from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.pipeline import make_pipeline
 
 labelencoder = None
