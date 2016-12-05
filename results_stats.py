@@ -113,9 +113,12 @@ def main():
             output.write("," + str(row[j]))
         output.write("\n")
 
-    output.write("icd_cat,num_records\n")
+    output.write("predicted distribution\nicd_cat,num_records\n")
     for key in labels_pred.keys():
         output.write(key + "," + str(labels_pred[key]) + "\n")
+    output.write("correct distribution\nicd_cat,num_records\n")
+    for key in labels_correct.keys():
+        output.write(key + "," + str(labels_correct[key]) + "\n")
     output.close()
 
 if __name__ == "__main__":main()
