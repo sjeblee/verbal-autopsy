@@ -34,7 +34,10 @@ def main():
 
     out = open(args.outfile, "w")
     for narr in narratives:
-        out.write(narr + "\n")
+        sentences = narr.split(".")
+        for sen in sentences:
+            if len(sen) > 0:
+                out.write(sen.strip().lower() + " .\n")
     out.close()
 
 if __name__ == "__main__":main()

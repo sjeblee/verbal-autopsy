@@ -48,6 +48,7 @@ def main():
                 labels_pred[pred] = 1
 
     tp = 0    # True positives
+    fn = 0    # False negatives
     n = len(correct)
     print "n: " + str(n)
 
@@ -57,6 +58,8 @@ def main():
         pred = predicted[x]
         if pred == cor:
             tp = tp +1
+        else:
+            fn = fn +1
 
     # Calculate CSMF accuracy
     csmf_pred = {}
@@ -80,9 +83,10 @@ def main():
     csmf_accuracy = 1 - (csmf_sum / (2 * (1 - csmf_corr_min)))
 
     # Calculate precision, recall, F1, and PCCC
-    precision = metrics.precision_score(correct, predicted)
-    recall = metrics.recall_score(correct, predicted)
-    f1 = metrics.f1_score(correct, predicted)
+    precision = metrics.precision_score(correct, predicted, average="weighted")
+    recall = metrics.recall_score(correct, predicted, average="weighted")
+    total_recall = tp / (tp + fn)
+    f1 = metrics.f1_score(correct, predicted, average="weighted")
 
     # PCCC
     pccc = ((tp/n) - (k/n)) / (1 - (k/n))
@@ -94,6 +98,7 @@ def main():
     print "Metrics:\n"
     print "p: " + str(precision) + "\n"
     print "r: " + str(recall) + "\n"
+    print "total_r: " + str(total_recall) + "\n"
     print "f1: " + str(f1) + "\n"
     print "pccc: " + str(pccc) + "\n"
     print "csmf accuracy: " + str(csmf_accuracy) + "\n"
