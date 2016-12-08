@@ -28,13 +28,13 @@ def main():
         if node != None:
             narr = node.text.encode('utf-8')
         if len(narr) > 0:
-            temp = open("/home/sjeblee/temp.txt", "w")
+            temp = open("/u/sjeblee/temp.txt", "w")
             temp.write(narr)
             temp.close()
-            # TODO: run Heideltime tagger on narr
-            process = subprocess.Popen(["java", "-jar", "/home/sjeblee/Tools/heideltime/heideltime-standalone/de.unihd.dbs.heideltime.standalone.jar", "/home/sjeblee/temp.txt"], stdout=subprocess.PIPE)
+            # Run Heideltime tagger on narr
+            process = subprocess.Popen(["java", "-jar", "/u/sjeblee/tools/heideltime/heideltime-standalone/de.unihd.dbs.heideltime.standalone.jar", "/u/sjeblee/temp.txt"], stdout=subprocess.PIPE)
             output, err = process.communicate()
-            newnode = etree.Element("narr_tagged")
+            newnode = etree.Element("narr_heidel")
             newnode.text = output.decode('utf-8')
             child.append(newnode)
         
