@@ -56,8 +56,9 @@ def main():
     with open(args.infile + ".keys", "r") as kfile:
         keys = eval(kfile.read())
         
-    global labelencoder
+    global labelencoder, typeencoder
     labelencoder = preprocessing.LabelEncoder() # Transforms ICD codes to numbers
+    typeencoder = preprocessing.LabelEncoder()
     Y = preprocess(args.infile, trainids, trainlabels, X, Y, True)
     print "X: " + str(len(X)) + "\nY: " + str(len(Y))
 
@@ -77,7 +78,7 @@ def main():
         print "creating a new model"
         if model == "nn":
             nn = Sequential([
-                    Dense(32, input_dim=num_feats),
+                    Dense(128, input_dim=num_feats),
                     Activation('relu'),
                     Dense(Y.shape[1]),
                     Activation('softmax'),
@@ -87,8 +88,8 @@ def main():
             nn.fit(X, Y)
         elif model == "lstm":
             nn = Sequential()
-            nn.add(Embedding(max_features, 256, input_length=maxlen))
-            nn.add(LSTM(output_dim=17, activation='sigmoid', inner_activation='hard_sigmoid'))
+            #nn.add(Embedding(max_feat256, input_dim=200))
+            nn.add(LSTM(256, input_dim=200, output_dim=Y.shape[1], activation='sigmoid', inner_activation='hard_sigmoid'))
             nn.add(Dropout(0.5))
             nn.add(Dense(1))
             nn.add(Activation('sigmoid'))
@@ -151,6 +152,8 @@ def preprocess(filename, ids, labels, x, y, trainlabels=False):
     # Read in the feature vectors
     starttime = time.time()
     print "preprocessing features..."
+    f_encoders = {}
+    types = []
     with open(filename, 'r') as f:
         for line in f:
             vector = eval(line)
@@ -158,16 +161,31 @@ def preprocess(filename, ids, labels, x, y, trainlabels=False):
             for key in keys:
                 if key == 'MG_ID':
                     ids.append(vector[key])
-                    #print "ID: " + vector[key]
+                    print "ID: " + vector[key]
                 elif key == labelname:
                     labels.append(vector[key])
-                    val = vector[key]
+                elif key == "CL_type":
+                    print "CL_type: " + vector[key]
+                    types.append(vector[key])
                 else:
                     if vector.has_key(key):
                         features.append(vector[key])
                     else:
                         features.append('0')
             x.append(features)
+
+    # Convert type features to numerical features
+    if len(types) > 0:
+        if trainlabels:
+            typeencoder.fit(types)
+        enc_types = typeencoder.transform(types)
+
+        # Add the types back to the feature vector
+        for i in range(len(x)):
+            val = enc_types[i]
+            x[i].append(val)
+        keys.remove("CL_type")
+        keys.append("CL_type")
 
     # Convert ICD codes to numerical labels
     if trainlabels:
