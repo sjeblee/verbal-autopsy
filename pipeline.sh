@@ -3,17 +3,17 @@
 
 # Parameters
 trainname="all_cat" # all, adult, child, or neonate
-devname="neonate_cat"
+devname="child_cat"
 pre="spell" # spell, heidel
 labels="ICD_cat" # ICD_cat or Final_code
-featureset="kw" # Name of the feature set for feature file
-features="type,kw_count" # type, checklist, narr_bow, narr_tfidf, narr_count, kw_bow, kw_tfidf
-model="nn" # svm, knn, nn, lstm
-modelname="nn1a-all"
+featureset="narr_count" # Name of the feature set for feature file
+features="type,narr_count" # type, checklist, narr_bow, narr_tfidf, narr_count, kw_bow, kw_tfidf
+model="rf" # svm, knn, nn, lstm, nb, rf
+modelname="rf"
 
 # Location of data files
 dataloc="/u/sjeblee/research/va/data/datasets"
-resultsloc="/u/sjeblee/research/va/data/nn1_kw"
+resultsloc="/u/sjeblee/research/va/data/rf_narr"
 heideldir="/u/sjeblee/tools/heideltime/heideltime-standalone"
 scriptdir=$(pwd)
 
@@ -26,7 +26,7 @@ devfeatures="$resultsloc/dev_$devname.features.$featureset"
 devresults="$resultsloc/dev_$devname.results.$modelname.$featureset"
 
 # Preprocessing
-spname="sp"
+spname="spell"
 echo "Preprocessing..."
 if [[ $pre == *"spell"* ]]
 then
@@ -73,11 +73,11 @@ then
 fi
 
 # Model
-#if [[ "$model" -eq "svm" ]]
-#then
-#    echo "Running svm..."
-#    python svm.py --in $trainfeatures --test $devfeatures --out $devresults --labels $labels --model $model
-if [[ "$model" -eq "nn" || "$model" -eq "lstm" ]]
+if [[ "$model" -eq "svm" || "$model" -eq "nb" || "$model" -eq "rf" ]]
+then
+    echo "Running svm..."
+    python svm.py --in $trainfeatures --test $devfeatures --out $devresults --labels $labels --model $model
+elif [[ "$model" -eq "nn" || "$model" -eq "lstm" ]]
 then
     echo "Running nn..."
     python nn.py --in $trainfeatures --test $devfeatures --out $devresults --labels $labels --model $model --prefix $resultsloc --name $modelname

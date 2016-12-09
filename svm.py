@@ -8,7 +8,9 @@ from sklearn import metrics
 from sklearn import neighbors
 from sklearn import preprocessing
 from sklearn import svm
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_selection import SelectKBest, f_classif
+from sklearn.naive_bayes import GaussianNB
 from sklearn.pipeline import make_pipeline
 
 labelencoder = None
@@ -54,14 +56,23 @@ def main():
     stime = time.time()
     
     anova_filter = SelectKBest(f_classif, k=200)
+    clf = None
     if model == "svm":
+        print "svm model"
         clf = svm.SVC(kernel='rbf')
-        pipeline = make_pipeline(anova_filter, clf)
+        #pipeline = make_pipeline(anova_filter, clf)
     elif model == "knn":
-        print "k-nearest neighbor"
-        knn = neighbors.KNeighborsClassifier(n_neighbors=1, weights='distance', n_jobs=-1)
-        pipeline = make_pipeline(anova_filter, knn)
-        
+        print "k-nearest neighbor model"
+        clf = neighbors.KNeighborsClassifier(n_neighbors=1, weights='distance', n_jobs=-1)
+        #pipeline = make_pipeline(anova_filter, knn)
+    elif model == "nb":
+        print "naive bayes model"
+        clf = GaussianNB()
+    elif model == "rf":
+        print "random forest model"
+        clf = RandomForestClassifier(n_estimators=17, n_jobs=4)
+
+    pipeline = make_pipeline(anova_filter, clf)
     pipeline.fit(X, Y)
     etime = time.time()
     print "training took " + str(etime - stime) + " s"
@@ -110,12 +121,14 @@ def preprocess(filename, ids, labels, x, y, trainlabels=False):
     global labelencoder
 
     #TEMP
-    hivcodes = ["B20", "B21", "B22", "B23", "B24"]
-    printfeats = False
+    #hivcodes = ["B20", "B21", "B22", "B23", "B24"]
+    #printfeats = False
 
     # Read in the feature vectors
     starttime = time.time()
     print "preprocessing features..."
+
+    types = []
     with open(filename, 'r') as f:
         for line in f:
             vector = eval(line)
@@ -123,12 +136,12 @@ def preprocess(filename, ids, labels, x, y, trainlabels=False):
             for key in keys:
                 if key == 'MG_ID':
                     ids.append(vector[key])
-                    #print "ID: " + vector[key]
+                    print "ID: " + vector[key]
                 elif key == labelname:
                     labels.append(vector[key])
-                    val = vector[key]
-                    #if val in hivcodes:
-                    #    printfeats = True
+                elif key == "CL_type":
+                    print "CL_type: " + vector[key]
+                    types.append(vector[key])
                 else:
                     if vector.has_key(key):
                         features.append(vector[key])
@@ -136,16 +149,18 @@ def preprocess(filename, ids, labels, x, y, trainlabels=False):
                         features.append('0')
             x.append(features)
 
-            #TEMP
-            if printfeats:
-                print "HIV record: " + vector[labelname]
-                for key in keys:
-                    val = str(vector[key])
-                    if val != "0":
-                        print "- " + key + ": " + val
-                printfeats = False
+    # Convert type features to numerical features
+    if len(types) > 0:
+        if trainlabels:
+            typeencoder.fit(types)
+        enc_types = typeencoder.transform(types)
 
-#    print "trainlabels: " + str(labels)
+        # Add the types back to the feature vector
+        for i in range(len(x)):
+            val = enc_types[i]
+            x[i].append(val)
+            keys.remove("CL_type")
+            keys.append("CL_type")
 
     # Convert ICD codes to numerical labels
     if trainlabels:
