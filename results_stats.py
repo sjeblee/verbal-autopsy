@@ -98,7 +98,7 @@ def main():
     print "Metrics:\n"
     print "p: " + str(precision) + "\n"
     print "r: " + str(recall) + "\n"
-    print "total_r: " + str(total_recall) + "\n"
+    #print "total_r: " + str(total_recall) + "\n"
     print "f1: " + str(f1) + "\n"
     print "pccc: " + str(pccc) + "\n"
     print "csmf accuracy: " + str(csmf_accuracy) + "\n"

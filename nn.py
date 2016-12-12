@@ -152,7 +152,6 @@ def preprocess(filename, ids, labels, x, y, trainlabels=False):
     # Read in the feature vectors
     starttime = time.time()
     print "preprocessing features..."
-    f_encoders = {}
     types = []
     with open(filename, 'r') as f:
         for line in f:
