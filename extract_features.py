@@ -23,8 +23,11 @@ def main():
     if not (args.trainfile and args.testfile and args.trainoutfile and args.testoutfile):
         print "usage: ./extract_features.py --train [file.xml] --test [file.xml] ==trainfeats [train.feats] --testfeats [test.feats] --labels [labelname] --features [f1,f2,f3]"
         print "labels: Final_code, ICD_cat"
-        print "features: checklist, kw_bow, kw_tfidf, kw_phrase, narr_bow, narr_count, narr_tfidf, narr_ngram"
+        print "features: checklist, kw_bow, kw_tfidf, kw_phrase, kw_count, narr_bow, narr_count, narr_tfidf, narr_ngram, narr_vec"
         exit()
+
+    global vecfile
+    vecfile = "/u/sjeblee/research/va/data/datasets/narratives.vectors"
 
     # Timing
     starttime = time.time()
@@ -34,17 +37,19 @@ def main():
     if args.labelname:
         labelname = args.labelname
 
-    global featurenames, rec_type, checklist, dem, kw_bow, kw_tfidf, narr_bow, narr_count, narr_tfidf
+    global featurenames, rec_type, checklist, dem, kw_bow, kw_tfidf, narr_bow, kw_count, narr_count, narr_tfidf, narr_vec
     rec_type = "type"
     checklist = "checklist"
     dem = "dem"
     kw_phrase = "kw_phrase"
     kw_bow = "kw_bow"
+    kw_count = "kw_count"
     kw_tfidf ="kw_tfidf"
     narr_bow = "narr_bow"
     narr_count = "narr_count"
     narr_tfidf = "narr_tfidf"
-    featurenames = [checklist, kw_bow]
+    narr_vec = "narr_vec"
+    featurenames = [checklist, narr_bow]
     if args.featurenames:
         featurenames = args.featurenames.split(',')
     print "Features: " + str(featurenames)
@@ -59,8 +64,8 @@ def main():
     translate_table = dict((ord(char), None) for char in not_letters_or_digits)
 
     global kw_features, narr_features, stopwords
-    kw_features = kw_bow in featurenames or kw_tfidf in featurenames or kw_phrase in featurenames
-    narr_features = narr_bow in featurenames or narr_tfidf in featurenames or narr_count in featurenames
+    kw_features = kw_bow in featurenames or kw_tfidf in featurenames or kw_phrase in featurenames or kw_count in featurenames
+    narr_features = narr_bow in featurenames or narr_tfidf in featurenames or narr_count in featurenames or narr_vec in featurenames
     print "narr_features: " + str(narr_features)
     stopwords = []
 
@@ -79,6 +84,7 @@ def main():
 def extract(infile, outfile, dict_keys):
     train = False
     narratives = []
+    keywords = []
     
     # Get the xml from file
     root = etree.parse(infile).getroot()
@@ -93,16 +99,8 @@ def extract(infile, outfile, dict_keys):
         elif dem in featurenames:
             dict_keys = dict_keys + ["CL_DeathAge", "CL_DeceasedSex"]
         print "dict_keys: " + str(dict_keys)
-        keywords = set([])
-        narrwords = set([])
-
-    # KEYWORDS setup
-    if kw_features:
-        for child in root:
-            keyword_string = get_keywords(child)
-            add_keywords(keywords, keyword_string, translate_table, stopwords)
-
-        print "Keywords: " + str(len(keywords))
+        #keywords = set([])
+        #narrwords = set([])
 
     # Extract features
     matrix = []
@@ -110,7 +108,7 @@ def extract(infile, outfile, dict_keys):
         features = {}
 
         if rec_type in featurenames:
-            features[rec_type] = child.tag
+            features["CL_" + rec_type] = child.tag
 
         # CHECKLIST features
         for key in dict_keys:
@@ -137,14 +135,7 @@ def extract(infile, outfile, dict_keys):
                 words.remove(word)
                 for wx in w:
                     words.append(wx.strip().strip('–'))
-            for keyword in keywords:
-                value = 0
-                if keyword in words:
-                    if kw_bow in featurenames:
-                        value = 1
-                    elif kw_tfidf in featurenames:
-                        value = 1
-                features["KW_" + keyword] = value
+            keywords.append(" ".join(words))
                 
         # NARRATIVE features
         if narr_features:
@@ -153,62 +144,124 @@ def extract(infile, outfile, dict_keys):
             if item != None:
                 narr_string = item.text.encode("utf-8")
             narr_words = [w.strip() for w in narr_string.lower().translate(string.maketrans("",""), string.punctuation).split(' ')]
-            narratives.append(" ".join(narr_words))
+            narratives.append(narr_string.lower())
 
         # Save features
         matrix.append(features)
-        
-    print "narratives: " + str(len(narratives))
 
-    # Create count matrix
-    global count_vectorizer
-    if train:
-        print "training count_vectorizer"
-        count_vectorizer = sklearn.feature_extraction.text.CountVectorizer(ngram_range=(min_ngram,max_ngram),stop_words=stopwords)
-        count_vectorizer.fit(narratives)
-        dict_keys = dict_keys + count_vectorizer.get_feature_names()
-    print "transforming data with count_vectorizer"
-    count_matrix = count_vectorizer.transform(narratives)
-    matrix_keys = count_vectorizer.get_feature_names()
+    # Construct the feature matrix
 
-    print "writing count matrix to file"
-    out_matrix = open(infile + ".countmatrix", "w")
-    out_matrix.write(str(count_matrix))
-    out_matrix.close()
+    # COUNT or TFIDF features
+    if narr_count in featurenames or kw_count in featurenames or narr_tfidf in featurenames or kw_tfidf in featurenames:
+        documents = []
+        if narr_count in featurenames:
+            documents = narratives
+            print "narratives: " + str(len(narratives))
+        elif kw_count in featurenames:
+            documents = keywords
+            print "keywords: " + str(len(keywords))
 
-    # Add count features to the dictionary
-    for x in range(len(matrix)):
-        feat = matrix[x]
-        for i in range(len(matrix_keys)):
-            key = matrix_keys[i]
-            val = count_matrix[x,i]
-            feat[key] = val                                    
-
-    # Convert counts to TFIDF
-    if (narr_tfidf in featurenames) or (kw_tfidf in featurenames):
-        print "converting to tfidf..."
-        print "matrix_keys: " + str(len(matrix_keys))
-
-        tfidfTransformer = sklearn.feature_extraction.text.TfidfTransformer()
-
-        # Use the training count matrix for fitting
+        # Create count matrix
+        global count_vectorizer
         if train:
-            tfidfTransformer.fit(count_matrix)
+            print "training count_vectorizer"
+            count_vectorizer = sklearn.feature_extraction.text.CountVectorizer(ngram_range=(min_ngram,max_ngram),stop_words=stopwords)
+            count_vectorizer.fit(documents)
+            dict_keys = dict_keys + count_vectorizer.get_feature_names()
+        print "transforming data with count_vectorizer"
+        count_matrix = count_vectorizer.transform(documents)
+        matrix_keys = count_vectorizer.get_feature_names()
 
-        # Convert matrix to tfidf
-        tfidf_matrix = tfidfTransformer.transform(count_matrix)
-        print "count_matrix: " + str(len(count_matrix))
-        print "tfidf_matrix: " + str(tfidf_matrix.shape)
-            
-        # Replace features in matrix with tfidf
+        print "writing count matrix to file"
+        out_matrix = open(infile + ".countmatrix", "w")
+        out_matrix.write(str(count_matrix))
+        out_matrix.close()
+
+        # Add count features to the dictionary
         for x in range(len(matrix)):
             feat = matrix[x]
-            #values = tfidf_matrix[x,0:]
-            #print "values: " + str(values.shape[0])
             for i in range(len(matrix_keys)):
                 key = matrix_keys[i]
-                val = tfidf_matrix[x,i]
+                val = count_matrix[x,i]
                 feat[key] = val
+
+        # Convert counts to TFIDF
+        if (narr_tfidf in featurenames) or (kw_tfidf in featurenames):
+            print "converting to tfidf..."
+            print "matrix_keys: " + str(len(matrix_keys))
+
+            tfidfTransformer = sklearn.feature_extraction.text.TfidfTransformer()
+
+            # Use the training count matrix for fitting
+            if train:
+                tfidfTransformer.fit(count_matrix)
+
+            # Convert matrix to tfidf
+            tfidf_matrix = tfidfTransformer.transform(count_matrix)
+            print "count_matrix: " + str(len(count_matrix))
+            print "tfidf_matrix: " + str(tfidf_matrix.shape)
+
+            # Replace features in matrix with tfidf
+            for x in range(len(matrix)):
+                feat = matrix[x]
+                #values = tfidf_matrix[x,0:]
+                #print "values: " + str(values.shape[0])
+                for i in range(len(matrix_keys)):
+                    key = matrix_keys[i]
+                    val = tfidf_matrix[x,i]
+                    feat[key] = val
+
+    # WORD2VEC features
+    elif narr_vec in featurenames:
+        print "Warning: using word2vec features, ignoring all other features"
+
+        # Create word2vec mapping
+        word2vec = {}
+        with open(vecfile, "r") as f:
+            firstline = True
+            for line in f:
+                # Ignore the first line of the file
+                if firstline:
+                    firstline = False
+                else:
+                    #print "line: " + line
+                    tokens = line.strip().split(' ')
+                    vec = []
+                    word = tokens[0]
+                    for token in tokens[1:]:
+                        #print "token: " + token
+                        vec.append(float(token))
+                    word2vec[word] = vec
+
+        # Convert words to vectors and add to matrix
+        dict_keys.append(narr_vec)
+        maxlen = 0
+        zero_vec = []
+        for z in range(0, 200):
+            zero_vec.append(0)
+        for x in range(len(matrix)):
+            narr = narratives[x]
+            #print "narr: " + narr
+            vectors = []
+            for word in narr.split(' '):
+                if len(word) > 0:
+                    #if word == "didnt":
+                    #    word = "didn't"
+                    vec = word2vec[word]
+                    vectors.append(vec)
+            length = len(vectors)
+            if length > maxlen:
+                maxlen = length
+            (matrix[x])[narr_vec] = vectors
+
+        # Pad the narr_vecs with 0 vectors
+        print "padding vectors to reach maxlen " + str(maxlen)
+        for x in range(len(matrix)):
+            length = len(matrix[x][narr_vec])
+            if length < maxlen:
+                for k in range(0, maxlen-length):
+                    matrix[x][narr_vec].append(zero_vec)
+                
 
     # Write the features to file
     print "writing " + str(len(matrix)) + " feature vectors to file..."
@@ -217,16 +270,10 @@ def extract(infile, outfile, dict_keys):
         #print "ICD_cat: " + feat["ICD_cat"]
         output.write(str(feat) + "\n")
     output.close()
-    
-    # Save feature keys
-    
-    if kw_features:
-        for kw in keywords:
-            dict_keys.append("KW_" + kw)
 
-    kw_output = open(outfile + ".keys", "w")
-    kw_output.write(str(dict_keys))
-    kw_output.close() 
+    key_output = open(outfile + ".keys", "w")
+    key_output.write(str(dict_keys))
+    key_output.close() 
 
 def get_keywords(elem):
     keyword_string = ""
