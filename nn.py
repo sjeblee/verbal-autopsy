@@ -11,6 +11,7 @@ from keras.layers import Dense, Dropout, Activation
 from keras.layers import Embedding
 from keras.layers import LSTM
 from keras.utils.np_utils import to_categorical
+#from keras.utils.visualize_util import plot
 from sklearn import metrics
 from sklearn import neighbors
 from sklearn import preprocessing
@@ -35,6 +36,8 @@ def main():
         print "usage: python svm.py --in [train.features] --test [test.features] --out [test.results] --labels [ICD_cat/Final_code] --model [nn] --name [rnn_ngram3] --prefix [/sjeblee/research/models]"
         exit()
 
+    total_start_time = time.time()
+
     # Params
     num_feats = 200
 
@@ -52,6 +55,7 @@ def main():
     Y = []
     
     # Read in feature keys
+    print "reading feature keys..."
     global keys
     with open(args.infile + ".keys", "r") as kfile:
         keys = eval(kfile.read())
@@ -65,10 +69,16 @@ def main():
     # Train model
     print "training model..."
     stime = time.time()
-    
+
     anova_filter = SelectKBest(f_classif, k=num_feats)
-    anova_filter.fit(X, Y)
-    X = anova_filter.transform(X)
+    if not model == "lstm":
+        anova_filter.fit(X, Y)
+        X = anova_filter.transform(X)
+        selected = anova_filter.get_support(True)
+        print "features selected: "
+        for i in selected:
+            print "\t" + keys[i+2]
+
     Y = to_categorical(Y)
     modelfile = args.prefix + "/" + args.name + ".model"
     if os.path.exists(modelfile):
@@ -89,25 +99,22 @@ def main():
         elif model == "lstm":
             nn = Sequential()
             #nn.add(Embedding(max_feat256, input_dim=200))
-            nn.add(LSTM(256, input_dim=200, output_dim=Y.shape[1], activation='sigmoid', inner_activation='hard_sigmoid'))
+            nn.add(LSTM(256, input_dim=200, activation='sigmoid', inner_activation='hard_sigmoid'))
             nn.add(Dropout(0.5))
-            nn.add(Dense(1))
+            nn.add(Dense(Y.shape[1]))
             nn.add(Activation('sigmoid'))
             nn.compile(loss='binary_crossentropy', optimizer='rmsprop', metrics=['accuracy'])
-            nn.fit(X, Y, batch_size=16, nb_epoch=10)
+            nn.fit(numpy.array(X), Y, batch_size=16, nb_epoch=10)
             #score = model.evaluate(X_test, Y_test, batch_size=16)
 
         # Save the model
         print "saving the model..."
         nn.save(modelfile)
+        #plotname = modelfile + ".png"
+        #plot(nn, to_file=plotname)
     
     etime = time.time()
     print "training took " + str(etime - stime) + " s"
-
-    selected = anova_filter.get_support(True)
-    print "features selected: "
-    for i in selected:
-        print "\t" + keys[i+2]
 
     # Test
     print "testing..."
@@ -117,7 +124,8 @@ def main():
     testX = []
     testY = []
     testYenc = preprocess(args.testfile, testids, testlabels, testX, testY)
-    testX = anova_filter.transform(testX)
+    if not model == "lstm":
+        testX = anova_filter.transform(testX)
     testY = to_categorical(testYenc)
     predictedY = nn.predict(testX)
     results = map_back(predictedY)
@@ -146,6 +154,9 @@ def main():
         output.write(str(out) + "\n")
     output.close()
 
+    total_time = (time.time() - total_start_time) / 60
+    print "total time: " + str(total_time) + " mins"
+
 def preprocess(filename, ids, labels, x, y, trainlabels=False):
     global labelencoder
 
@@ -153,6 +164,7 @@ def preprocess(filename, ids, labels, x, y, trainlabels=False):
     starttime = time.time()
     print "preprocessing features..."
     types = []
+    vec_feats = False
     with open(filename, 'r') as f:
         for line in f:
             vector = eval(line)
@@ -160,12 +172,17 @@ def preprocess(filename, ids, labels, x, y, trainlabels=False):
             for key in keys:
                 if key == 'MG_ID':
                     ids.append(vector[key])
-                    print "ID: " + vector[key]
+                    #print "ID: " + vector[key]
                 elif key == labelname:
                     labels.append(vector[key])
                 elif key == "CL_type":
                     print "CL_type: " + vector[key]
                     types.append(vector[key])
+                elif key == "narr_vec":
+                    # The feature matrix for word2vec can't have other features
+                    features = vector[key]
+                    #print "narr_vec shape: " + str(len(features)) + " " + str(len(features[0]))
+                    vec_feats = True
                 else:
                     if vector.has_key(key):
                         features.append(vector[key])
@@ -191,8 +208,9 @@ def preprocess(filename, ids, labels, x, y, trainlabels=False):
         labelencoder.fit(labels)
     y = labelencoder.transform(labels)
 
-    # Normalize features to 0 to 1
-    preprocessing.minmax_scale(x, copy=False)
+    # Normalize features to 0 to 1 (if not word vectors)
+    if not vec_feats:
+        preprocessing.minmax_scale(x, copy=False)
     endtime = time.time()
     print "preprocessing took " + str(endtime - starttime) + " s"
     return y

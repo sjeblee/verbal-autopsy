@@ -10,7 +10,7 @@ from sklearn import preprocessing
 from sklearn import svm
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_selection import SelectKBest, f_classif
-from sklearn.naive_bayes import GaussianNB
+from sklearn.naive_bayes import MultinomialNB
 from sklearn.pipeline import make_pipeline
 
 labelencoder = None
@@ -67,7 +67,7 @@ def main():
         #pipeline = make_pipeline(anova_filter, knn)
     elif model == "nb":
         print "naive bayes model"
-        clf = GaussianNB()
+        clf = MultinomialNB()
     elif model == "rf":
         print "random forest model"
         clf = RandomForestClassifier(n_estimators=17, n_jobs=4)
@@ -144,9 +144,9 @@ def preprocess(filename, ids, labels, x, y, trainlabels=False):
                     types.append(vector[key])
                 else:
                     if vector.has_key(key):
-                        features.append(vector[key])
+                        features.append(int(vector[key]))
                     else:
-                        features.append('0')
+                        features.append(0)
             x.append(features)
 
     # Convert type features to numerical features
