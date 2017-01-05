@@ -21,7 +21,10 @@ def main():
         print "usage: ./spellcorrect.py --in [file.xml] --out [outfile.xml] (--lm)"
         exit()
 
-    d = enchant.DictWithPWL("en_CA", "dictionary.txt")
+    run(args.infile, args.outfile)
+
+def run(infile, outfile):
+    d = enchant.DictWithPWL("en_CA", "/u/sjeblee/research/va/git/verbal-autopsy/dictionary.txt")
     mapping = {'labor':'labour', 'laborer':'labourer', 'color':'colour', 'yeras':'years', 'elergies':'allergies', 'around12':'around 12', 'learnt':'learned', 'rigor':'rigour', 'couldn':'couldn\'t', 'didnt':'didn\'t', 'didn':'didn\'t', 'neighbor':'neighbour', 'enjury':'injury'}
 
     # Language model
@@ -29,7 +32,7 @@ def main():
     lm = kenlm.Model(lmfile)
 
     # Get the xml from file
-    tree = etree.parse(args.infile)
+    tree = etree.parse(infile)
     root = tree.getroot()
     
     for child in root:
@@ -101,7 +104,7 @@ def main():
         #child.append(narr_spell)
         
     # write the xml to file
-    tree.write(args.outfile)
+    tree.write(outfile)
 
 def get_ngram(word, prevwords):
     ngram = ""

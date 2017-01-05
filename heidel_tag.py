@@ -18,8 +18,11 @@ def main():
         print "usage: ./heidel_tag.py --in [file.xml] --out [outfile.xml]"
         exit()
 
+    run(args.infile, args.outfile)
+
+def run(infile, outfile):
     # Get the xml from file
-    tree = etree.parse(args.infile)
+    tree = etree.parse(infile)
     root = tree.getroot()
     
     for child in root:
@@ -39,7 +42,7 @@ def main():
             child.append(newnode)
         
     # write the stats to file
-    tree.write(args.outfile)
+    tree.write(outfile)
     
 
 if __name__ == "__main__":main()

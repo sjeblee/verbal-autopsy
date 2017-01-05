@@ -19,17 +19,24 @@ def main():
         print "usage: ./results_stats.py --in [file.results] --out [outfile.csv]"
         exit()
 
+    rank = 1
+    if args.rank:
+        rank = args.rank
+
+    run(args.infile, args.outfile, rank)
+
+def run(arg_infile, arg_outfile, arg_rank=1):
     labels_correct = {}
     labels_pred = {}
     correct = []
     predicted = []
-    k = 1     # Cat is considered correct if it's in the top k predicted categories
+    k = arg_rank     # Cat is considered correct if it's in the top k predicted categories
 
     if args.rank:
         k = int(args.rank)
 
     # Get the xml from file
-    with open(args.infile, 'r') as f:
+    with open(arg_infile, 'r') as f:
         for line in f:
             res = eval(line)
             pred = res['Predicted_ICD']
@@ -104,7 +111,7 @@ def main():
     print "csmf accuracy: " + str(csmf_accuracy) + "\n"
         
     # write the stats to file
-    output = open(args.outfile, "w")
+    output = open(arg_outfile, "w")
     output.write("precision," + str(precision) + "\nrecall," + str(recall) + "\nf1," + str(f1) + "\npccc," + str(pccc) + "\ncsmf_accuracy," + str(csmf_accuracy) + "\n")
 
     output.write("confusion_matrix")
