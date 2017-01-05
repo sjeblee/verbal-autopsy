@@ -21,21 +21,25 @@ def main():
     args = argparser.parse_args()
 
     if not (args.trainfile and args.testfile and args.trainoutfile and args.testoutfile):
-        print "usage: ./extract_features.py --train [file.xml] --test [file.xml] ==trainfeats [train.feats] --testfeats [test.feats] --labels [labelname] --features [f1,f2,f3]"
+        print "usage: ./extract_features.py --train [file.xml] --test [file.xml] --trainfeats [train.feats] --testfeats [test.feats] --labels [labelname] --features [f1,f2,f3]"
         print "labels: Final_code, ICD_cat"
         print "features: checklist, kw_bow, kw_tfidf, kw_phrase, kw_count, narr_bow, narr_count, narr_tfidf, narr_ngram, narr_vec"
         exit()
 
-    global vecfile
-    vecfile = "/u/sjeblee/research/va/data/datasets/narratives.vectors"
+    if args.labelname:
+        run(args.trainfile, args.trainoutfile, args.testfile, args.testoutfile, args.featurenames, args.labelname)
+    else:
+        run(args.trainfile, args.trainoutfile, args.testfile, args.testoutfile, args.featurenames)
+
+def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames="narr_count", arg_labelname="Final_Code"):
+    print "extract_features"
 
     # Timing
     starttime = time.time()
 
-    global labelname
-    labelname = "Final_code"
-    if args.labelname:
-        labelname = args.labelname
+    global vecfile, labelname
+    vecfile = "/u/sjeblee/research/va/data/datasets/narratives.vectors"
+    labelname = arg_labelname
 
     global featurenames, rec_type, checklist, dem, kw_bow, kw_tfidf, narr_bow, kw_count, narr_count, narr_tfidf, narr_vec
     rec_type = "type"
@@ -49,9 +53,7 @@ def main():
     narr_count = "narr_count"
     narr_tfidf = "narr_tfidf"
     narr_vec = "narr_vec"
-    featurenames = [checklist, narr_bow]
-    if args.featurenames:
-        featurenames = args.featurenames.split(',')
+    featurenames = arg_featurenames.split(',')
     print "Features: " + str(featurenames)
 
     # Ngram feature params
@@ -74,8 +76,8 @@ def main():
             for line in f:
                 stopwords.append(line.strip())                                    
 
-    keys = extract(args.trainfile, args.trainoutfile, None)
-    extract(args.testfile, args.testoutfile, keys)
+    keys = extract(arg_train_in, arg_train_out, None)
+    extract(arg_test_in, arg_test_out, keys)
 
     endtime = time.time()
     totaltime = endtime - starttime
