@@ -32,9 +32,6 @@ def run(arg_infile, arg_outfile, arg_rank=1):
     predicted = []
     k = arg_rank     # Cat is considered correct if it's in the top k predicted categories
 
-    if args.rank:
-        k = int(args.rank)
-
     # Get the xml from file
     with open(arg_infile, 'r') as f:
         for line in f:
