@@ -6,6 +6,8 @@ import argparse
 import numpy
 import os
 import time
+#import hyperopt.pyll
+#from hyperopt.pyll import scope
 from hyperopt import hp, fmin, tpe
 from keras.models import Sequential, load_model
 from keras.layers import Dense, Dropout, Activation
@@ -51,30 +53,44 @@ def hyperopt(arg_model, arg_train_feats, arg_test_feats, arg_result_file, arg_pr
     print "hyperopt"
 
     # Set up data file references
-    global h_model, h_train, h_test, h_result, h_prefix, h_labelname
+    global h_model, h_train, h_test, h_result, h_prefix, labelname
     h_model = arg_model
     h_train = arg_train_feats
     h_test = arg_test_feats
     h_result = arg_result_file
     h_prefix = arg_prefix
-    h_labelname = arg_labelname
+    labelname = arg_labelname
 
     global activation, n_feats
     activation = 'relu'
     n_feats = 200
 
-    # TODO: Define parameter space
-    space = hp.uniform('n', 50, 300)
-    #space = hp.choice('a', [('N_100', 1 + hp.lognormal('c1', 0, 1)),
-    #                    ('case 2', hp.uniform('c2', -10, 10)) ])
+    # Define parameter space
+    #space = hp.choice('params', [
+    space = {
+        'activation':hp.choice('activation', [('relu', 'relu'), ('tanh', 'tanh'), ('sigmoid','sigmoid')]),
+        'n_nodes':hp.uniform('n_nodes', 50, 300),
+        'n_feats':hp.uniform('n_feats', 100, 400),
+        'anova_name':hp.choice('anova_name', [('f_classif', 'f_classif'), ('chi2', 'chi2')])
+        }
     
-    # TODO: run hyperopt
+    # Run hyperopt
     best = fmin(obj_nn, space, algo=tpe.suggest, max_evals=100)
     print best
     print hyperopt.space_eval(space, best)
 
-def obj_nn(n_nodes):
-    print "obj_nn"
+def obj_nn(params):
+    activation = params['activation'][0]
+    n_nodes = int(params['n_nodes'])
+    n_feats = int(params['n_feats'])
+    anova_name = params['anova_name'][0]
+    print "obj_nn: " + str(activation) + ", nodes:" + str(n_nodes) + ", feats:" + str(n_feats) + ", anova: " + str(anova_name)
+
+    anova_function = None
+    if anova_name == 'chi2':
+        anova_function = chi2
+    elif anova_name == 'f_classif':
+        anova_function = f_classif
 
     # Read in feature keys
     global keys
@@ -84,14 +100,19 @@ def obj_nn(n_nodes):
     global labelencoder, typeencoder
     labelencoder = preprocessing.LabelEncoder() # Transforms ICD codes to numbers
     typeencoder = preprocessing.LabelEncoder()
-    Y = preprocess(args.infile, trainids, trainlabels, X, Y, True)
+    trainids = []
+    trainlabels = []
+    X = []
+    Y = []
+    Y = preprocess(h_train, trainids, trainlabels, X, Y, True)
     #print "X: " + str(len(X)) + "\nY: " + str(len(Y))
 
-    model = create_nn_model(X, Y, anova_function, n_feats, n_nodes, activation)
+    model, X, Y = create_nn_model(X, Y, anova_function, n_feats, n_nodes, activation)
 
     # Run test
     testids, testlabels, predictedlabels = test('nn', model, h_test)
     f1score = metrics.f1_score(testlabels, predictedlabels)
+    print "F1: " + str(f1score)
 
     # Return a score to minimize
     return 1 - f1score
@@ -128,7 +149,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     stime = time.time()
 
     global anova_filter
-    anova_function = chi2
+    anova_function = f_classif
     if not is_nn:
         anova_filter, X = create_anova_filter(X, Y, anova_function, num_feats)
 
