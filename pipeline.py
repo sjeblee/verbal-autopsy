@@ -17,7 +17,8 @@ def main():
     argparser = argparse.ArgumentParser()
     argparser.add_argument('-t', '--train', action="store", dest="train")
     argparser.add_argument('-e', '--ex', action="store", dest="experiment")
-    argparser.add_argument('-d', '--test', action="store", dest="test")
+    argparser.add_argument('-d', '--dev', action="store", dest="dev")
+    argparser.add_argument('-s', '--test', action="store", dest="test")
     argparser.add_argument('-l', '--labels', action="store", dest="labels")
     argparser.add_argument('-m', '--model', action="store", dest="model")
     argparser.add_argument('-v', '--modelname', action="store", dest="modelname")
@@ -27,7 +28,7 @@ def main():
     argparser.add_argument('-f', '--features', action="store", dest="feaures")
     args = argparser.parse_args()
 
-    if not (args.train and args.model):
+    if not (args.train and args.model and (args.dev or args.test)):
         print "usage: python svm.py"
         print "--in [train.features]"
         print "--test [test.features]"
@@ -38,15 +39,15 @@ def main():
         print "--modelname [nn1_all] (optional)"
         print "--name [rnn_ngram3]"
         print "--preprocess [spell/heidel] (optional, default: spell)"
-        print "--experiment [traintest/hyperopt] (optional, default: traintest)"
+        print "--ex [traintest/hyperopt] (optional, default: traintest)"
         exit()
 
     # Parameters
     experiment = "traintest"
     if args.experiment:
         experiment = args.experiment
-    if experiment == "traintest" and not args.test:
-        print "Error: --test [testfile] require for traintest"
+    if experiment == "traintest" and not (args.test or args.dev):
+        print "Error: --test [testfile] or --dev [devfile] require for traintest"
         exit(1)
 
     pre = "spell"
@@ -62,12 +63,19 @@ def main():
     else:
         modelname = args.model
 
-    if experiment == "traintest":
-        run(args.model, modelname, args.train, args.test, args.name, pre, labels)
-    if experiment == "hyperopt":
-        run(args.model, modelname, args.train, args.test, args.name, pre, labels, arg_hyperopt=True)
+    dev = True
+    if args.test:
+        testset = args.test
+        dev = False
+    else:
+        testset = args.dev
 
-def run(arg_model, arg_modelname, arg_train, arg_test, arg_name, arg_preprocess, arg_labels, arg_hyperopt=False):        
+    if experiment == "traintest":
+        run(args.model, modelname, args.train, testset, args.name, pre, labels, arg_dev=dev)
+    if experiment == "hyperopt":
+        run(args.model, modelname, args.train, testset, args.name, pre, labels, arg_dev=dev, arg_hyperopt=True)
+
+def run(arg_model, arg_modelname, arg_train, arg_test, arg_name, arg_preprocess, arg_labels, arg_dev=True, arg_hyperopt=False):        
     trainname = arg_train + "_cat" # all, adult, child, or neonate
     devname = arg_test + "_cat"
     pre = arg_preprocess
@@ -88,22 +96,34 @@ def run(arg_model, arg_modelname, arg_train, arg_test, arg_name, arg_preprocess,
     if not os.path.exists(resultsloc):
         os.mkdir(resultsloc)
     trainset = dataloc + "/train_" + trainname + ".xml"
-    devset = dataloc + "/dev_" + devname + ".xml"
+    devset = ""
+    devfeatures = ""
+    devresults = ""
+    if arg_dev:
+        devset = dataloc + "/dev_" + devname + ".xml"
+        devfeatures = resultsloc + "/dev_" + devname + ".features." + featureset
+        devresults = resultsloc + "/dev_" + devname + ".results." + modelname + "." + featureset
+    else:
+        devset = dataloc + "/test_" + devname + ".xml"
+        devfeatures = resultsloc + "/test_" + devname + ".features." + featureset
+        devresults = resultsloc + "/test_" + devname + ".results." + modelname + "." + featureset
     trainfeatures = resultsloc + "/train_" + trainname + ".features." + featureset
-    devfeatures = resultsloc + "/dev_" + devname + ".features." + featureset
-    devresults = resultsloc + "/dev_" + devname + ".results." + modelname + "." + featureset
 
     # Preprocessing
     spname = "spell"
     print "Preprocessing..."
     if "spell" in pre:
         trainsp = dataloc + "/train_" + trainname + "_" + spname + ".xml"
-        devsp = dataloc + "/dev_" + devname + "_" + spname + ".xml"
+        devsp = ""
+        if arg_dev:
+            devsp = dataloc + "/dev_" + devname + "_" + spname + ".xml"
+        else:
+            devsp = dataloc + "/test_" + devname + "_" + spname + ".xml"
         if not os.path.exists(trainsp):
             print "spellcorrect on train data..."
             spellcorrect.run(trainset, trainsp)
         if not os.path.exists(devsp):
-            print "spellcorrect on dev data..."
+            print "spellcorrect on test data..."
             spellcorrect.run(devset, devsp)
 
         trainset = trainsp
@@ -117,7 +137,11 @@ def run(arg_model, arg_modelname, arg_train, arg_test, arg_name, arg_preprocess,
                 heidel_tag.run(trainset, trainh)
 	        fixtags(trainh)
             trainset = trainh
-            devh = dataloc + "/dev_" + devname + "_ht.xml"
+            devh = ""
+            if arg_dev:
+                devh = dataloc + "/dev_" + devname + "_ht.xml"
+            else:
+                devh = dataloc + "/test_" + devname + "_ht.xml"
             if not os.path.exists(devh):
                 heidel_tag.run(devset, devh)
 	        fixtags(devh)
@@ -138,9 +162,9 @@ def run(arg_model, arg_modelname, arg_train, arg_test, arg_name, arg_preprocess,
         print "Creating model..."
         model.run(modeltype, modelname, trainfeatures, devfeatures, devresults, resultsloc, labels)
 
-    # Results statistics
-    print "Calculating scores..."
-    results_stats.run(devresults, devresults + ".stats")
+        # Results statistics
+        print "Calculating scores..."
+        results_stats.run(devresults, devresults + ".stats")
 
     print "Done"
 

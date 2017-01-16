@@ -21,9 +21,12 @@ def main():
         print "usage: ./spellcorrect.py --in [file.xml] --out [outfile.xml] (--lm)"
         exit()
 
-    run(args.infile, args.outfile)
+    if args.lm:
+        run(args.infile, args.outfile, args.lm)
+    else:
+        run(args.infile, args.outfile)
 
-def run(infile, outfile):
+def run(infile, outfile, arg_lm=False):
     d = enchant.DictWithPWL("en_CA", "/u/sjeblee/research/va/git/verbal-autopsy/dictionary.txt")
     mapping = {'labor':'labour', 'laborer':'labourer', 'color':'colour', 'yeras':'years', 'elergies':'allergies', 'around12':'around 12', 'learnt':'learned', 'rigor':'rigour', 'couldn':'couldn\'t', 'didnt':'didn\'t', 'didn':'didn\'t', 'neighbor':'neighbour', 'enjury':'injury'}
 
@@ -75,7 +78,7 @@ def run(infile, outfile):
                     bested = 3
                     print "orig: " + ngram + " : " + str(bestp)
 
-                    if args.lm:
+                    if arg_lm:
                         for s in sugg:
                             ed = editdistance.eval(word, s)
                             if (len(s) > 0) and (ed <= bested):

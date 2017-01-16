@@ -8,7 +8,7 @@ import os
 import time
 #import hyperopt.pyll
 #from hyperopt.pyll import scope
-from hyperopt import hp, fmin, tpe
+from hyperopt import hp, fmin, tpe, space_eval
 from keras.models import Sequential, load_model
 from keras.layers import Dense, Dropout, Activation
 from keras.layers import Embedding
@@ -121,7 +121,8 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     total_start_time = time.time()
 
     # Params
-    num_feats = 200
+    num_feats = 227
+    num_nodes = 192
 
     global labelname
     labelname = arg_labelname
@@ -149,7 +150,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     stime = time.time()
 
     global anova_filter
-    anova_function = f_classif
+    anova_function = chi2
     if not is_nn:
         anova_filter, X = create_anova_filter(X, Y, anova_function, num_feats)
 
@@ -167,7 +168,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
         else:
             print "creating a new neural network model"
             if arg_model == "nn":
-                model, X, Y = create_nn_model(X, Y, anova_function, num_feats, 128, 'relu')
+                model, X, Y = create_nn_model(X, Y, anova_function, num_feats, num_nodes, 'relu')
             elif arg_model == "lstm":
                 Y = to_categorical(Y)
                 model = Sequential()
