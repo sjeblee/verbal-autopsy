@@ -6,8 +6,6 @@ import argparse
 import numpy
 import os
 import time
-#import hyperopt.pyll
-#from hyperopt.pyll import scope
 from hyperopt import hp, fmin, tpe, space_eval
 from keras.models import Sequential, load_model
 from keras.layers import Dense, Dropout, Activation
@@ -19,7 +17,9 @@ from sklearn import metrics
 from sklearn import neighbors
 from sklearn import preprocessing
 from sklearn import svm
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_selection import SelectKBest, f_classif, chi2
+from sklearn.naive_bayes import MultinomialNB
 from sklearn.pipeline import make_pipeline
 
 labelencoder = None
@@ -61,23 +61,49 @@ def hyperopt(arg_model, arg_train_feats, arg_test_feats, arg_result_file, arg_pr
     h_prefix = arg_prefix
     labelname = arg_labelname
 
-    global activation, n_feats
-    activation = 'relu'
+    global n_feats
     n_feats = 200
+    space = None
+    objective = None
 
-    # Define parameter space
-    #space = hp.choice('params', [
-    space = {
-        'activation':hp.choice('activation', [('relu', 'relu'), ('tanh', 'tanh'), ('sigmoid','sigmoid')]),
-        'n_nodes':hp.uniform('n_nodes', 50, 300),
-        'n_feats':hp.uniform('n_feats', 100, 400),
-        'anova_name':hp.choice('anova_name', [('f_classif', 'f_classif'), ('chi2', 'chi2')])
+    if h_model == "nn":
+        objective = obj_nn
+        global activation
+        activation = 'relu'
+
+        # Define parameter space
+        space = {
+            'activation':hp.choice('activation', [('relu', 'relu'), ('tanh', 'tanh'), ('sigmoid','sigmoid')]),
+            'n_nodes':hp.uniform('n_nodes', 50, 300),
+            'n_feats':hp.uniform('n_feats', 100, 400),
+            'anova_name':hp.choice('anova_name', [('f_classif', 'f_classif'), ('chi2', 'chi2')])
         }
     
+    elif h_model == "svm":
+        objective = obj_svm
+        space = {
+            'kernel':hp.choice('kernel', [('rbf', 'rbf'), ('linear', 'linear'), ('poly','poly'), ('sigmoid','sigmoid')]),
+            'n_feats':hp.uniform('n_feats', 100, 500),
+            'anova_name':hp.choice('anova_name', [('f_classif', 'f_classif'), ('chi2', 'chi2')]),
+            'prob':hp.choice('prob', [('True', True), ('False', False)]),
+            'weight_classes':hp.choice('weight_classes', [('True', True), ('False', False)])
+        }
+
+    elif h_model =="rf":
+        objective = obj_rf
+        space = {
+            'trees':hp.uniform('trees', 3, 30),
+            'criterion':hp.choice('criterion', [('gini', 'gini'), ('entropy', 'entropy')]),
+            'n_feats':hp.uniform('n_feats', 100, 500),
+            'anova_name':hp.choice('anova_name', [('f_classif', 'f_classif'), ('chi2', 'chi2')]),
+            'max_feats':hp.uniform('max_feats', 0.0, 1.0),
+            'mss':hp.uniform('mss', 1, 5),
+            'weight_classes':hp.choice('weight_classes', [('True', True), ('False', False)])
+        }
+
     # Run hyperopt
-    best = fmin(obj_nn, space, algo=tpe.suggest, max_evals=100)
+    best = fmin(objective, space, algo=tpe.suggest, max_evals=100)
     print best
-    print hyperopt.space_eval(space, best)
 
 def obj_nn(params):
     activation = params['activation'][0]
@@ -117,12 +143,105 @@ def obj_nn(params):
     # Return a score to minimize
     return 1 - f1score
 
-def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_file, arg_prefix, arg_labelname):
+def obj_svm(params):
+    kern = params['kernel'][1]
+    n_feats = int(params['n_feats'])
+    anova_name = params['anova_name'][1]
+    prob = params['prob'][1]
+    weight_classes = params['weight_classes'][1]
+    print "obj_svm: " + str(kern) + ", prob:" + str(prob) + ", feats:" + str(n_feats) + ", anova: " + str(anova_name)
+
+    anova_function = None
+    if anova_name == 'chi2':
+        anova_function = chi2
+    elif anova_name == 'f_classif':
+        anova_function = f_classif
+
+    # Read in feature keys
+    global keys
+    with open(h_train + ".keys", "r") as kfile:
+        keys = eval(kfile.read())
+
+    global labelencoder, typeencoder
+    labelencoder = preprocessing.LabelEncoder() # Transforms ICD codes to numbers
+    typeencoder = preprocessing.LabelEncoder()
+    trainids = []
+    trainlabels = []
+    X = []
+    Y = []
+    Y = preprocess(h_train, trainids, trainlabels, X, Y, True)
+
+    global anova_filter
+    anova_filter, X = create_anova_filter(X, Y, anova_function, n_feats)
+    model = None
+    if weight_classes:
+        model = svm.SVC(kernel=kern, probability=prob, decision_function_shape='ovr', class_weight='balanced')
+    else:
+        model = svm.SVC(kernel=kern, probability=prob, decision_function_shape='ovr')
+    model.fit(X, Y)
+
+    # Run test
+    testids, testlabels, predictedlabels = test('svm', model, h_test)
+    f1score = metrics.f1_score(testlabels, predictedlabels)
+    print "F1: " + str(f1score)
+
+    # Return a score to minimize
+    return 1 - f1score
+
+def obj_rf(params):
+    trees = int(params['trees'])
+    crit = params['criterion'][1]
+    n_feats = int(params['n_feats'])
+    anova_name = params['anova_name'][1]
+    max_feats = float(params['max_feats'])
+    mss = int(params['mss'])
+    weight_classes = params['weight_classes'][1]
+    print "obj_rf: " + str(trees) + ", crit:" + crit + ", n_feats:" + str(n_feats) + ", anova: " + str(anova_name) + " max_feats: " + str(max_feats) + " mss: " + str(mss) + " weight_classes: " + str(weight_classes)
+
+    anova_function = None
+    if anova_name == 'chi2':
+        anova_function = chi2
+    elif anova_name == 'f_classif':
+        anova_function = f_classif
+
+    # Read in feature keys
+    global keys
+    with open(h_train + ".keys", "r") as kfile:
+        keys = eval(kfile.read())
+
+    global labelencoder, typeencoder
+    labelencoder = preprocessing.LabelEncoder() # Transforms ICD codes to numbers
+    typeencoder = preprocessing.LabelEncoder()
+    trainids = []
+    trainlabels = []
+    X = []
+    Y = []
+    Y = preprocess(h_train, trainids, trainlabels, X, Y, True)
+
+    global anova_filter
+    anova_filter, X = create_anova_filter(X, Y, anova_function, n_feats)
+    model = None
+    if weight_classes:
+        model = RandomForestClassifier(n_estimators=trees, criterion=crit, max_features=max_feats, min_samples_split=mss, class_weight='balanced', n_jobs=-1)
+    else:
+        model = RandomForestClassifier(n_estimators=trees, criterion=crit, max_features=max_feats, min_samples_split=mss, n_jobs=-1)
+    model.fit(X, Y)
+
+    # Run test
+    testids, testlabels, predictedlabels = test('rf', model, h_test)
+    f1score = metrics.f1_score(testlabels, predictedlabels)
+    print "F1: " + str(f1score)
+
+    # Return a score to minimize
+    return 1 - f1score
+
+
+def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_file, arg_prefix, arg_labelname, arg_n_feats=200, arg_anova="f_classif", arg_nodes=297):
     total_start_time = time.time()
 
     # Params
-    num_feats = 227
-    num_nodes = 192
+    num_feats = arg_n_feats
+    num_nodes = arg_nodes
 
     global labelname
     labelname = arg_labelname
@@ -150,7 +269,9 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     stime = time.time()
 
     global anova_filter
-    anova_function = chi2
+    anova_function = f_classif
+    if arg_anova == "chi2":
+        anova_function = chi2
     if not is_nn:
         anova_filter, X = create_anova_filter(X, Y, anova_function, num_feats)
 
@@ -191,7 +312,8 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     else:
          if arg_model == "svm":
              print "svm model"
-             model = svm.SVC(kernel='rbf')
+             #model = svm.SVC(kernel='rbf', decision_function_shape='ovr')
+             model = svm.SVC(kernel='linear', decision_function_shape='ovr', probability=True)
          elif arg_model == "knn":
              print "k-nearest neighbor model"
              model = neighbors.KNeighborsClassifier(n_neighbors=1, weights='distance', n_jobs=-1)
@@ -200,7 +322,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
              model = MultinomialNB()
          elif arg_model == "rf":
              print "random forest model"
-             model = RandomForestClassifier(n_estimators=17, n_jobs=4)
+             model = RandomForestClassifier(n_estimators=26, max_features=0.0485, min_samples_split=4, class_weight='balanced', n_jobs=-1)
 
          model.fit(X, Y)
 
@@ -260,6 +382,7 @@ def create_nn_model(X, Y, anova_function, num_feats, num_nodes, activation):
         
     nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
     nn.fit(X, Y)
+    nn.summary()
     return nn, X, Y
 
 def create_anova_filter(X, Y, function, num_feats):

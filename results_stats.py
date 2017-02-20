@@ -54,7 +54,9 @@ def run(arg_infile, arg_outfile, arg_rank=1):
     tp = 0    # True positives
     fn = 0    # False negatives
     n = len(correct)
+    num_classes = len(labels_correct.keys())
     print "n: " + str(n)
+    print "num_classes: " + str(num_classes)
 
     # Calculate tp
     for x in range(n):
@@ -93,7 +95,7 @@ def run(arg_infile, arg_outfile, arg_rank=1):
     f1 = metrics.f1_score(correct, predicted, average="weighted")
 
     # PCCC
-    pccc = ((tp/n) - (k/n)) / (1 - (k/n))
+    pccc = ((tp/n) - (k/num_classes)) / (1 - (k/num_classes))
 
     # Confusion matrix
     confusion = metrics.confusion_matrix(correct, predicted, sorted(labels_correct.keys()))

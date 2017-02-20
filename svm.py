@@ -28,27 +28,34 @@ def main():
         print "usage: python svm.py --in [train.features] --test [test.features] --output [test.results] --labels [ICD_cat/Final_code] --model [svm/knn]"
         exit()
 
-    global labelname
+    
     labelname = "Final_code"
     if args.labelname:
         labelname = args.labelname
     model = "svm"
     if args.model:
         model = args.model
-        
+
+    run(model, args.infile, args.testfile, args.outfile, labelname)
+
+def run(arg_model, arg_train, arg_test, arg_results, arg_labels):
     trainids = []             # VA record id
     trainlabels = []   # Correct ICD codes
     X = []               # Feature vectors
     Y = []
+    model = arg_model
+
+    global labelname
+    labelname = arg_labels
     
     # Read in feature keys
     global keys
-    with open(args.infile + ".keys", "r") as kfile:
+    with open(arg_train + ".keys", "r") as kfile:
         keys = eval(kfile.read())
         
     global labelencoder
     labelencoder = preprocessing.LabelEncoder() # Transforms ICD codes to numbers
-    Y = preprocess(args.infile, trainids, trainlabels, X, Y, True)
+    Y = preprocess(arg_train, trainids, trainlabels, X, Y, True)
     print "X: " + str(len(X)) + "\nY: " + str(len(Y))
 
     # Train model
@@ -92,7 +99,7 @@ def main():
     testlabels = []
     testX = []
     testY = []
-    testY = preprocess(args.testfile, testids, testlabels, testX, testY)
+    testY = preprocess(arg_test, testids, testlabels, testX, testY)
     results = pipeline.predict(testX)
     predictedlabels = labelencoder.inverse_transform(results)
     etime = time.time()
@@ -108,7 +115,7 @@ def main():
     print "f1: " + str(f1score)
 
     # Write results to a file
-    output = open(args.outfile, 'w')
+    output = open(arg_results, 'w')
     for i in range(len(testids)):
         out = {}
         out['MG_ID'] = testids[i]
