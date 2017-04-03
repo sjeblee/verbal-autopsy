@@ -4,6 +4,7 @@
 # Feature names: keyword_bow, keyword_tfidf, narr_bow, narr_tfidf
 
 from lxml import etree
+from sklearn.decomposition import LatentDirichletAllocation
 import sklearn.feature_extraction
 import argparse
 import os
@@ -23,7 +24,7 @@ def main():
     if not (args.trainfile and args.testfile and args.trainoutfile and args.testoutfile):
         print "usage: ./extract_features.py --train [file.xml] --test [file.xml] --trainfeats [train.feats] --testfeats [test.feats] --labels [labelname] --features [f1,f2,f3]"
         print "labels: Final_code, ICD_cat"
-        print "features: checklist, kw_bow, kw_tfidf, kw_phrase, kw_count, narr_bow, narr_count, narr_tfidf, narr_ngram, narr_vec"
+        print "features: checklist, kw_bow, kw_tfidf, kw_phrase, kw_count, narr_bow, narr_count, narr_tfidf, narr_ngram, narr_vec, lda"
         exit()
 
     if args.labelname:
@@ -41,7 +42,7 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
     vecfile = "/u/sjeblee/research/va/data/datasets/narratives.vectors"
     labelname = arg_labelname
 
-    global featurenames, rec_type, checklist, dem, kw_bow, kw_tfidf, narr_bow, kw_count, narr_count, narr_tfidf, narr_vec
+    global featurenames, rec_type, checklist, dem, kw_bow, kw_tfidf, narr_bow, kw_count, narr_count, narr_tfidf, narr_vec, lda
     rec_type = "type"
     checklist = "checklist"
     dem = "dem"
@@ -53,6 +54,7 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
     narr_count = "narr_count"
     narr_tfidf = "narr_tfidf"
     narr_vec = "narr_vec"
+    lda = "lda"
     featurenames = arg_featurenames.split(',')
     print "Features: " + str(featurenames)
 
@@ -61,13 +63,17 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
     min_ngram = 1
     max_ngram = 1
 
+    # LDA feature params
+    global num_topics
+    num_topics = 200
+
     global translate_table
     not_letters_or_digits = u'!"#%\'()*+,-./:;<=>?@[\]^_`{|}~'
     translate_table = dict((ord(char), None) for char in not_letters_or_digits)
 
     global kw_features, narr_features, stopwords
     kw_features = kw_bow in featurenames or kw_tfidf in featurenames or kw_phrase in featurenames or kw_count in featurenames
-    narr_features = narr_bow in featurenames or narr_tfidf in featurenames or narr_count in featurenames or narr_vec in featurenames
+    narr_features = narr_bow in featurenames or narr_tfidf in featurenames or narr_count in featurenames or narr_vec in featurenames or lda in featurenames
     print "narr_features: " + str(narr_features)
     stopwords = []
 
@@ -75,6 +81,9 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
         with open("stopwords_small.txt", "r") as f:
             for line in f:
                 stopwords.append(line.strip())                                    
+
+    global tfidfVectorizer
+    global ldaModel
 
     keys = extract(arg_train_in, arg_train_out, None)
     extract(arg_test_in, arg_test_out, keys)
@@ -154,12 +163,12 @@ def extract(infile, outfile, dict_keys):
     # Construct the feature matrix
 
     # COUNT or TFIDF features
-    if narr_count in featurenames or kw_count in featurenames or narr_tfidf in featurenames or kw_tfidf in featurenames:
+    if narr_count in featurenames or kw_count in featurenames or narr_tfidf in featurenames or kw_tfidf in featurenames or lda in featurenames:
         documents = []
-        if narr_count in featurenames:
+        if narr_count in featurenames or narr_tfidf in featurenames or lda in featurenames:
             documents = narratives
             print "narratives: " + str(len(narratives))
-        elif kw_count in featurenames:
+        elif kw_count in featurenames or kw_tfidf in featurenames:
             documents = keywords
             print "keywords: " + str(len(keywords))
 
@@ -192,15 +201,15 @@ def extract(infile, outfile, dict_keys):
             print "converting to tfidf..."
             print "matrix_keys: " + str(len(matrix_keys))
 
-            tfidfTransformer = sklearn.feature_extraction.text.TfidfTransformer()
-
             # Use the training count matrix for fitting
             if train:
+                global tfidfTransformer
+                tfidfTransformer = sklearn.feature_extraction.text.TfidfTransformer()
                 tfidfTransformer.fit(count_matrix)
 
             # Convert matrix to tfidf
             tfidf_matrix = tfidfTransformer.transform(count_matrix)
-            print "count_matrix: " + str(len(count_matrix))
+            print "count_matrix: " + str(count_matrix.shape)
             print "tfidf_matrix: " + str(tfidf_matrix.shape)
 
             # Replace features in matrix with tfidf
@@ -212,6 +221,22 @@ def extract(infile, outfile, dict_keys):
                     key = matrix_keys[i]
                     val = tfidf_matrix[x,i]
                     feat[key] = val
+
+        # LDA topic modeling features
+        if lda in featurenames:
+            global ldaModel
+            if train:
+                ldaModel = LatentDirichletAllocation(n_topics=num_topics)
+                ldaModel.fit(count_matrix)
+            lda_matrix = ldaModel.transform(count_matrix)
+            for t in range(0,num_topics):
+                dict_keys.append("lda_topic_" + str(t))
+            for x in range(len(matrix)):
+                for y in range(len(lda_matrix[x])):
+                    val = lda_matrix[x][y]
+                    matrix[x]["lda_topic_" + str(y)] = val
+
+            # TODO: Print LDA topics
 
     # WORD2VEC features
     elif narr_vec in featurenames:

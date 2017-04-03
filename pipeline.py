@@ -27,7 +27,8 @@ def main():
     argparser.add_argument('-v', '--modelname', action="store", dest="modelname")
     argparser.add_argument('-n', '--name', action="store", dest="name")
     argparser.add_argument('-p', '--preprocess', action="store", dest="preprocess")
-    argparser.add_argument('-f', '--features', action="store", dest="feaures")
+    argparser.add_argument('-f', '--features', action="store", dest="features")
+    argparser.add_argument('-z', '--featurename', action="store", dest="featurename")
     args = argparser.parse_args()
 
     if not (args.train and args.name):
@@ -36,7 +37,8 @@ def main():
         print "--test [test.features]"
         print "--out [test.results]"
         print "--labels [ICD_cat/Final_code] (optional)"
-        print "--features [type/dem/narr_count/narr_vec/narr_tfidf/kw_count/kw_tfidf]"
+        print "--features [type/dem/narr_count/narr_vec/narr_tfidf/kw_count/kw_tfidf,lda]"
+        print "--featurename [feature_set_name]"
         print "--model [nn/lstm/svm/rf/nb]"
         print "--modelname [nn1_all] (optional)"
         print "--name [rnn_ngram3]"
@@ -74,14 +76,36 @@ def main():
     else:
         testset = args.dev
 
-    if experiment == "traintest":
-        run(args.model, modelname, args.train, testset, args.name, pre, labels, arg_dev=dev)
-    elif experiment == "hyperopt":
-        run(args.model, modelname, args.train, testset, args.name, pre, labels, arg_dev=dev, arg_hyperopt=True)
-    elif experiment == "crossval":
-        crossval(modelname, args.train, args.name, pre, labels)
+    fn = "feats"
+    if args.featurename:
+        fn = args.featurename
 
-def crossval(arg_modelname, arg_train, arg_name, arg_preprocess, arg_labels):
+    # Model parameters
+    n_feats = 200
+    anova = "f_classif"
+    nodes = 297
+    if args.model == "rf":
+        n_feats = 414
+        anova = "chi2"
+    elif args.model == "svm":
+        n_feats = 378
+        anova = "chi2"
+    elif args.model == "nn":
+        if args.train == "neonate":
+            n_feats = 227
+            nodes = 192
+            anova = "chi2"
+        else:
+            n_feats = 398
+
+    if experiment == "traintest":
+        run(args.model, modelname, args.train, testset, args.features, fn, args.name, pre, labels, arg_dev=dev, arg_hyperopt=False, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes)
+    elif experiment == "hyperopt":
+        run(args.model, modelname, args.train, testset, args.features, fn, args.name, pre, labels, arg_dev=dev, arg_hyperopt=True)
+    elif experiment == "crossval":
+        crossval(modelname, args.train, args.features, args.name, pre, labels)
+
+def crossval(arg_modelname, arg_train, arg_features, arg_name, arg_preprocess, arg_labels):
     print "10-fold cross-validation"
     models = ['nb', 'rf', 'svm', 'nn']
     dataloc = "/u/sjeblee/research/va/data/datasets"
@@ -221,13 +245,14 @@ def crossval(arg_modelname, arg_train, arg_name, arg_preprocess, arg_labels):
             
             run(m, modelname, trainname, trainname, name, arg_preprocess, arg_labels, arg_dev=False, arg_hyperopt=False, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes)
 
-def run(arg_model, arg_modelname, arg_train, arg_test, arg_name, arg_preprocess, arg_labels, arg_dev=True, arg_hyperopt=False, arg_n_feats=200, arg_anova="f_classif", arg_nodes=297):        
+def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev=True, arg_hyperopt=False, arg_n_feats=200, arg_anova="f_classif", arg_nodes=297):
+
     trainname = arg_train + "_cat" # all, adult, child, or neonate
     devname = arg_test + "_cat"
     pre = arg_preprocess
     labels = arg_labels
-    featureset="narr_count" # Name of the feature set for feature file
-    features="type,narr_count" # type, checklist, narr_bow, narr_tfidf, narr_count, narr_vec, kw_bow, kw_tfidf
+    featureset = arg_featurename # Name of the feature set for feature file
+    features = arg_features # type, checklist, narr_bow, narr_tfidf, narr_count, narr_vec, kw_bow, kw_tfidf
     modeltype = arg_model # svm, knn, nn, lstm, nb, rf
     modelname = arg_modelname
     #resultsloc_name = arg_name
