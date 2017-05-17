@@ -42,7 +42,7 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
     vecfile = "/u/sjeblee/research/va/data/datasets/narratives.vectors"
     labelname = arg_labelname
 
-    global featurenames, rec_type, checklist, dem, kw_bow, kw_tfidf, narr_bow, kw_count, narr_count, narr_tfidf, narr_vec, lda
+    global featurenames, rec_type, checklist, dem, kw_bow, kw_tfidf, narr_bow, kw_count, narr_count, narr_tfidf, narr_vec, lda, symp_train
     rec_type = "type"
     checklist = "checklist"
     dem = "dem"
@@ -55,6 +55,7 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
     narr_tfidf = "narr_tfidf"
     narr_vec = "narr_vec"
     lda = "lda"
+    symp_train = "symp_train"
     featurenames = arg_featurenames.split(',')
     print "Features: " + str(featurenames)
 
@@ -86,6 +87,7 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
     global ldaModel
 
     keys = extract(arg_train_in, arg_train_out, None)
+    print "dict_keys: " + str(keys)
     extract(arg_test_in, arg_test_out, keys)
 
     endtime = time.time()
@@ -113,6 +115,7 @@ def extract(infile, outfile, dict_keys):
         #keywords = set([])
         #narrwords = set([])
 
+    print "train: " + str(train)
     # Extract features
     matrix = []
     for child in root:
@@ -149,13 +152,26 @@ def extract(infile, outfile, dict_keys):
             keywords.append(" ".join(words))
                 
         # NARRATIVE features
-        if narr_features:
+        if narr_features or ((not train) and (symp_train in featurenames)):
             narr_string = ""
             item = child.find("narrative")
             if item != None:
                 narr_string = item.text.encode("utf-8")
             narr_words = [w.strip() for w in narr_string.lower().translate(string.maketrans("",""), string.punctuation).split(' ')]
             narratives.append(narr_string.lower())
+            print "Adding narr: " + narr_string.lower()
+
+        # SYMPTOM features
+        elif train and (symp_train in featurenames):
+            narr_string = ""
+            item = child.find("narrative_symptoms")
+            if item != None:
+                item_text = item.text
+                if item_text != None and len(item_text) > 0:
+                    narr_string = item.text.encode("utf-8")
+                    #narr_words = [w.strip() for w in narr_string.lower().translate(string.maketrans("",""), string.punctuation).split(' ')]
+            narratives.append(narr_string.lower())
+            print "Adding symp_narr: " + narr_string.lower()
 
         # Save features
         matrix.append(features)
@@ -163,9 +179,9 @@ def extract(infile, outfile, dict_keys):
     # Construct the feature matrix
 
     # COUNT or TFIDF features
-    if narr_count in featurenames or kw_count in featurenames or narr_tfidf in featurenames or kw_tfidf in featurenames or lda in featurenames:
+    if narr_count in featurenames or kw_count in featurenames or narr_tfidf in featurenames or kw_tfidf in featurenames or lda in featurenames or symp_train in featurenames:
         documents = []
-        if narr_count in featurenames or narr_tfidf in featurenames or lda in featurenames:
+        if narr_count in featurenames or narr_tfidf in featurenames or lda in featurenames or symp_train in featurenames:
             documents = narratives
             print "narratives: " + str(len(narratives))
         elif kw_count in featurenames or kw_tfidf in featurenames:
@@ -300,7 +316,8 @@ def extract(infile, outfile, dict_keys):
 
     key_output = open(outfile + ".keys", "w")
     key_output.write(str(dict_keys))
-    key_output.close() 
+    key_output.close()
+    return dict_keys
 
 def get_keywords(elem):
     keyword_string = ""

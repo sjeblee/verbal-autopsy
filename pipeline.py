@@ -11,6 +11,7 @@ import results_stats
 import spellcorrect
 import subprocess
 import svm
+import tag_symptoms
 
 from contextlib import contextmanager
 from lxml import etree
@@ -37,12 +38,12 @@ def main():
         print "--test [test.features]"
         print "--out [test.results]"
         print "--labels [ICD_cat/Final_code] (optional)"
-        print "--features [type/dem/narr_count/narr_vec/narr_tfidf/kw_count/kw_tfidf,lda]"
+        print "--features [type/dem/narr_count/narr_vec/narr_tfidf/kw_count/kw_tfidf/lda/symp_train]"
         print "--featurename [feature_set_name]"
         print "--model [nn/lstm/svm/rf/nb]"
         print "--modelname [nn1_all] (optional)"
         print "--name [rnn_ngram3]"
-        print "--preprocess [spell/heidel] (optional, default: spell)"
+        print "--preprocess [spell/heidel/symp] (optional, default: spell)"
         print "--ex [traintest/hyperopt] (optional, default: traintest)"
         exit()
 
@@ -252,7 +253,7 @@ def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_feature
     pre = arg_preprocess
     labels = arg_labels
     featureset = arg_featurename # Name of the feature set for feature file
-    features = arg_features # type, checklist, narr_bow, narr_tfidf, narr_count, narr_vec, kw_bow, kw_tfidf
+    features = arg_features # type, checklist, narr_bow, narr_tfidf, narr_count, narr_vec, kw_bow, kw_tfidf, symp_train
     modeltype = arg_model # svm, knn, nn, lstm, nb, rf
     modelname = arg_modelname
     #resultsloc_name = arg_name
@@ -299,6 +300,8 @@ def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_feature
 
         trainset = trainsp
         devset = devsp
+        devname = devname + "_" + spname
+        trainname = trainname + "_" + spname
 
     if "heidel" in pre:
         print "Running Heideltime..."
@@ -317,6 +320,31 @@ def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_feature
                 heidel_tag.run(devset, devh)
 	        fixtags(devh)
             devset = devh
+        devname = devname + "_ht"
+        trainname = trainname + "_ht"
+
+    if "symp" in pre:
+        print "Tagging symptoms..."
+        sympname = "symp"
+        trainsp = dataloc + "/train_" + trainname + "_" + sympname + ".xml"
+        #devsp = ""
+        #if arg_dev:
+        #    devsp = dataloc + "/dev_" + devname + "_" + sympname + ".xml"
+        #else:
+        #    devsp = dataloc + "/test_" + devname + "_" + sympname + ".xml"
+        if not os.path.exists(trainsp):
+            print "tag_symptoms on train data..."
+            tag_symptoms.run(trainset, trainsp)
+            #fixtags(trainsp)
+        #if not os.path.exists(devsp):
+        #    print "tag_symptoms on test data..."
+        #    tag_symptoms.run(devset, devsp)
+        #    fixtags(devsp)
+
+        trainset = trainsp
+        #devset = devsp
+        #devname = devname + "_" + spname
+        trainname = trainname + "_" + spname
 
     # Feature Extraction
     print "trainfeatures: " + trainfeatures
