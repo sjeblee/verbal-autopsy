@@ -8,6 +8,7 @@ from sklearn.decomposition import LatentDirichletAllocation
 import sklearn.feature_extraction
 import argparse
 import os
+from porter_stemmer import PorterStemmer
 import string
 import time
 
@@ -32,7 +33,7 @@ def main():
     else:
         run(args.trainfile, args.trainoutfile, args.testfile, args.testoutfile, args.featurenames)
 
-def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames="narr_count", arg_labelname="Final_Code"):
+def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames="narr_count", arg_labelname="Final_Code", stem=False):
     print "extract_features"
 
     # Timing
@@ -86,15 +87,15 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
     global tfidfVectorizer
     global ldaModel
 
-    keys = extract(arg_train_in, arg_train_out, None)
+    keys = extract(arg_train_in, arg_train_out, None, stem)
     print "dict_keys: " + str(keys)
-    extract(arg_test_in, arg_test_out, keys)
+    extract(arg_test_in, arg_test_out, keys, stem)
 
     endtime = time.time()
     totaltime = endtime - starttime
     print "feature extraction took " + str(totaltime/60) + " mins"
 
-def extract(infile, outfile, dict_keys):
+def extract(infile, outfile, dict_keys, stem=False):
     train = False
     narratives = []
     keywords = []
@@ -116,6 +117,7 @@ def extract(infile, outfile, dict_keys):
         #narrwords = set([])
 
     print "train: " + str(train)
+    print "stem: " + str(stem)
     # Extract features
     matrix = []
     for child in root:
@@ -157,8 +159,16 @@ def extract(infile, outfile, dict_keys):
             item = child.find("narrative")
             if item != None:
                 narr_string = item.text.encode("utf-8")
-            narr_words = [w.strip() for w in narr_string.lower().translate(string.maketrans("",""), string.punctuation).split(' ')]
-            narratives.append(narr_string.lower())
+                narr_words = [w.strip() for w in narr_string.lower().translate(string.maketrans("",""), string.punctuation).split(' ')]
+                narr_string = ""
+                if stem:
+                    stemmer = PorterStemmer()
+                    for nw in narr_words:
+                        print "stem( " + nw + ", " + str(len(nw)) + ")"
+                        newword = stemmer.stem(nw, 0, len(nw)-1)
+                        print "stem: " + nw + " -> " + newword
+                        narr_string = narr_string + " " + newword
+            narratives.append(narr_string.strip().lower())
             print "Adding narr: " + narr_string.lower()
 
         # SYMPTOM features

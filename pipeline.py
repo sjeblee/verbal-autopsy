@@ -43,7 +43,7 @@ def main():
         print "--model [nn/lstm/svm/rf/nb]"
         print "--modelname [nn1_all] (optional)"
         print "--name [rnn_ngram3]"
-        print "--preprocess [spell/heidel/symp] (optional, default: spell)"
+        print "--preprocess [spell/heidel/symp/stem] (optional, default: spell)"
         print "--ex [traintest/hyperopt] (optional, default: traintest)"
         exit()
 
@@ -246,11 +246,12 @@ def crossval(arg_modelname, arg_train, arg_features, arg_name, arg_preprocess, a
             
             run(m, modelname, trainname, trainname, name, arg_preprocess, arg_labels, arg_dev=False, arg_hyperopt=False, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes)
 
-def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev=True, arg_hyperopt=False, arg_n_feats=200, arg_anova="f_classif", arg_nodes=297):
+def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev=True, arg_hyperopt=False, arg_n_feats=398, arg_anova="f_classif", arg_nodes=297):
 
     trainname = arg_train + "_cat" # all, adult, child, or neonate
     devname = arg_test + "_cat"
     pre = arg_preprocess
+    print "pre: " + pre
     labels = arg_labels
     featureset = arg_featurename # Name of the feature set for feature file
     features = arg_features # type, checklist, narr_bow, narr_tfidf, narr_count, narr_vec, kw_bow, kw_tfidf, symp_train
@@ -349,9 +350,13 @@ def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_feature
     # Feature Extraction
     print "trainfeatures: " + trainfeatures
     print "devfeatures: " + devfeatures
+    stem = False
+    if "stem" in pre:
+        stem = True
+    print "stem: " + str(stem)
     if not (os.path.exists(trainfeatures) and os.path.exists(devfeatures)):
         print "Extracting features..."
-        extract_features.run(trainset, trainfeatures, devset, devfeatures, features, labels)
+        extract_features.run(trainset, trainfeatures, devset, devfeatures, features, labels, stem)
 
     # Model
     if arg_hyperopt:

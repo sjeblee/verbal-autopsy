@@ -377,6 +377,8 @@ def create_nn_model(X, Y, anova_function, num_feats, num_nodes, activation):
 
     nn = Sequential([Dense(num_nodes, input_dim=num_feats),
                     Activation(activation),
+                    #Dense(num_nodes, input_dim=num_feats),
+                    #Activation(activation),
                     Dense(Y.shape[1]),
                     Activation('softmax'),])
         
