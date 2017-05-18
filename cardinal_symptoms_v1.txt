@@ -1,0 +1,54 @@
+fever
+chills
+sweating
+shaking
+muscle pain
+cough
+dry cough
+sputum
+night sweats
+vomiting
+hoarseness of voice
+breathlessness
+thirsty
+dehydration
+weight loss
+loss of appetite
+swelling
+diarrhoea
+itching
+rash
+chest pain
+paralysis
+headache
+loss of memory
+memory loss
+loss of vision
+neck stiffness
+urine
+pale
+nausea
+drowsy
+unconciousness
+abdominal pain
+pain in abdomen
+black stools
+constipation
+alcohol
+cancer
+jaundice
+yellow
+seizures
+frothing
+bed wetting
+confusion
+head injury
+discoloration
+spasm
+fatigue
+liver
+pregnant
+fall
+truck
+car
+motorcycle
