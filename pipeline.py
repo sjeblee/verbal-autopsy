@@ -12,6 +12,7 @@ import spellcorrect
 import subprocess
 import svm
 import tag_symptoms
+import time
 
 from contextlib import contextmanager
 from lxml import etree
@@ -46,6 +47,9 @@ def main():
         print "--preprocess [spell/heidel/symp/stem] (optional, default: spell)"
         print "--ex [traintest/hyperopt] (optional, default: traintest)"
         exit()
+
+    # Timing
+    start_time = time.time()
 
     # Parameters
     experiment = "traintest"
@@ -92,7 +96,7 @@ def main():
         n_feats = 378
         anova = "chi2"
     elif args.model == "nn":
-        if args.train == "neonate":
+        if args.train == "neonate" or args.train == "child_neo":
             n_feats = 227
             nodes = 192
             anova = "chi2"
@@ -105,6 +109,13 @@ def main():
         run(args.model, modelname, args.train, testset, args.features, fn, args.name, pre, labels, arg_dev=dev, arg_hyperopt=True)
     elif experiment == "crossval":
         crossval(modelname, args.train, args.features, args.name, pre, labels)
+
+    end_time = time.time()
+    total_time = end_time - start_time
+    if total_time > 3600:
+        print "Total time: " + str((total_time/60)/60) + " hours"
+    else:
+        print "Total time: " + str(total_time/60) + " mins"
 
 def crossval(arg_modelname, arg_train, arg_features, arg_name, arg_preprocess, arg_labels):
     print "10-fold cross-validation"
@@ -246,7 +257,7 @@ def crossval(arg_modelname, arg_train, arg_features, arg_name, arg_preprocess, a
             
             run(m, modelname, trainname, trainname, name, arg_preprocess, arg_labels, arg_dev=False, arg_hyperopt=False, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes)
 
-def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev=True, arg_hyperopt=False, arg_n_feats=398, arg_anova="f_classif", arg_nodes=297):
+def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev=True, arg_hyperopt=False, arg_n_feats=227, arg_anova="f_classif", arg_nodes=192):
 
     trainname = arg_train + "_cat" # all, adult, child, or neonate
     devname = arg_test + "_cat"
