@@ -44,7 +44,7 @@ def main():
         print "--model [nn/lstm/svm/rf/nb]"
         print "--modelname [nn1_all] (optional)"
         print "--name [rnn_ngram3]"
-        print "--preprocess [spell/heidel/symp/stem] (optional, default: spell)"
+        print "--preprocess [spell/heidel/symp/stem/lemma] (optional, default: spell)"
         print "--ex [traintest/hyperopt] (optional, default: traintest)"
         exit()
 
@@ -108,7 +108,7 @@ def main():
     elif experiment == "hyperopt":
         run(args.model, modelname, args.train, testset, args.features, fn, args.name, pre, labels, arg_dev=dev, arg_hyperopt=True)
     elif experiment == "crossval":
-        crossval(modelname, args.train, args.features, args.name, pre, labels)
+        crossval(modelname, args.train, args.features, fn, args.name, pre, labels)
 
     end_time = time.time()
     total_time = end_time - start_time
@@ -117,7 +117,7 @@ def main():
     else:
         print "Total time: " + str(total_time/60) + " mins"
 
-def crossval(arg_modelname, arg_train, arg_features, arg_name, arg_preprocess, arg_labels):
+def crossval(arg_modelname, arg_train, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels):
     print "10-fold cross-validation"
     models = ['nb', 'rf', 'svm', 'nn']
     dataloc = "/u/sjeblee/research/va/data/datasets"
@@ -213,8 +213,9 @@ def crossval(arg_modelname, arg_train, arg_features, arg_name, arg_preprocess, a
 
         # Write train and test sets to file
         trainname = arg_train + "_" + str(z)
-        trainfile = "/u/sjeblee/research/va/data/" + arg_name + "/train_" + trainname +  "_cat_spell.xml"
-        testfile = "/u/sjeblee/research/va/data/" + arg_name + "/test_" + trainname + "_cat_spell.xml"
+        datadir = "/u/sjeblee/research/va/data/" + arg_name
+        trainfile = datadir + "/train_" + trainname +  "_cat_spell.xml"
+        testfile = datadir + "/test_" + trainname + "_cat_spell.xml"
         outfile = open(trainfile, 'w')
         outfile.write(xml_header + "\n")
         for item in trainset:
@@ -255,9 +256,9 @@ def crossval(arg_modelname, arg_train, arg_features, arg_name, arg_preprocess, a
                 else:
                     n_feats = 398
             
-            run(m, modelname, trainname, trainname, name, arg_preprocess, arg_labels, arg_dev=False, arg_hyperopt=False, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes)
+            run(m, modelname, trainname, trainname, arg_features, arg_featurename, name, arg_preprocess, arg_labels, arg_dev=False, arg_hyperopt=False, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes, dataloc=datadir)
 
-def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev=True, arg_hyperopt=False, arg_n_feats=227, arg_anova="f_classif", arg_nodes=192):
+def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev=True, arg_hyperopt=False, arg_n_feats=398, arg_anova="f_classif", arg_nodes=297, dataloc="/u/sjeblee/research/va/data/datasets"):
 
     trainname = arg_train + "_cat" # all, adult, child, or neonate
     devname = arg_test + "_cat"
@@ -271,7 +272,7 @@ def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_feature
     #resultsloc_name = arg_name
 
     # Location of data files
-    dataloc="/u/sjeblee/research/va/data/datasets"
+    #dataloc="/u/sjeblee/research/va/data/datasets"
     resultsloc="/u/sjeblee/research/va/data/" + arg_name
     heideldir="/u/sjeblee/tools/heideltime/heideltime-standalone"
     scriptdir="/u/sjeblee/research/va/git/verbal-autopsy"
@@ -362,12 +363,15 @@ def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_feature
     print "trainfeatures: " + trainfeatures
     print "devfeatures: " + devfeatures
     stem = False
+    lemma = False
     if "stem" in pre:
         stem = True
-    print "stem: " + str(stem)
+    if "lemma" in pre:
+        lemma = True
+    print "stem: " + str(stem) + " lemma: " + str(lemma)
     if not (os.path.exists(trainfeatures) and os.path.exists(devfeatures)):
         print "Extracting features..."
-        extract_features.run(trainset, trainfeatures, devset, devfeatures, features, labels, stem)
+        extract_features.run(trainset, trainfeatures, devset, devfeatures, features, labels, stem, lemma)
 
     # Model
     if arg_hyperopt:

@@ -5,10 +5,11 @@
 
 from lxml import etree
 from sklearn.decomposition import LatentDirichletAllocation
+from nltk.stem import WordNetLemmatizer
+from nltk.stem.porter import PorterStemmer
 import sklearn.feature_extraction
 import argparse
 import os
-from porter_stemmer import PorterStemmer
 import string
 import time
 
@@ -33,7 +34,7 @@ def main():
     else:
         run(args.trainfile, args.trainoutfile, args.testfile, args.testoutfile, args.featurenames)
 
-def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames="narr_count", arg_labelname="Final_Code", stem=False):
+def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames="narr_count", arg_labelname="Final_Code", stem=False, lemma=False):
     print "extract_features"
 
     # Timing
@@ -164,9 +165,14 @@ def extract(infile, outfile, dict_keys, stem=False):
                 if stem:
                     stemmer = PorterStemmer()
                     for nw in narr_words:
-                        print "stem( " + nw + ", " + str(len(nw)) + ")"
-                        newword = stemmer.stem(nw, 0, len(nw)-1)
+                        #print "stem( " + nw + ", " + str(len(nw)) + ")"
+                        newword = stemmer.stem(nw)
                         print "stem: " + nw + " -> " + newword
+                        narr_string = narr_string + " " + newword
+                elif lemma:
+                    lemmatizer = WordNetLemmatizer()
+                    for nw in narr_words:
+                        newword = lemmatizer.lemmatize(nw)
                         narr_string = narr_string + " " + newword
             narratives.append(narr_string.strip().lower())
             print "Adding narr: " + narr_string.lower()
