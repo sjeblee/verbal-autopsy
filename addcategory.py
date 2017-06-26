@@ -29,17 +29,33 @@ def main():
     # Get the xml from file
     tree = etree.parse(args.infile)
     root = tree.getroot()
+    removed = 0
     
     for child in root:
+        id_node = child.find("MG_ID")
+        rec_id = id_node.text
+        print "ID: " + rec_id
         icd = "R99"
         node = child.find("Final_code")
         if node != None:
             icd = node.text
+        if icd == "NULL":
+            print "Removing record!"
+            root.remove(child)
+            removed = removed + 1
+            continue
+        elif icd == None:
+            print "ICD was None, set to R99"
+            icd = "R99"
+        else:
+            print "ICD: " + icd
         icdcat = etree.Element("ICD_cat")
         icdcat.text = icdmap[icd]
         child.append(icdcat)
         
     # write the xml to file
     tree.write(args.outfile)
+
+    print "Removed " + str(removed) + " records with NULL ICD codes"
 
 if __name__ == "__main__":main()
