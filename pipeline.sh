@@ -3,14 +3,15 @@
 
 name="crossval_bmc"
 fname="narrc"
-trainset="child"
-devset="adult"
+dataset="mds_one+tr"
+trainset="neonate"
+devset="neonate"
 mkdir -p ../../data/$name
 
 #python pipeline.py --name $name --model "nn" --modelname ${name}_${trainset}_${fname} --train $trainset --dev $devset --preprocess "spell,lemma" --features "type,narr_count", --featurename $fname | tee ../../data/$name/out-$devset-$fname.txt
 
 #python pipeline.py --name "rf_hyperopt" --model "rf" --modelname "rf_h" --train "all" --dev "all" --features "type,narr_count" --ex "hyperopt" | tee ../../data/rf_hyperopt/out-hyperopt.txt
 
-python pipeline.py --name $name --train $trainset --features "type,narr_count" --featurename $fname --ex "crossval" --preprocess "spell,stem" | tee ../../data/${name}/out-$trainset.txt
+python pipeline.py --name $name --dataset $dataset --train $trainset --features "type,narr_count" --featurename $fname --ex "crossval" --preprocess "spell,stem" | tee ../../data/${name}/out-$trainset.txt
 
 echo "Done"

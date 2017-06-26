@@ -24,6 +24,7 @@ def main():
     argparser.add_argument('-e', '--ex', action="store", dest="experiment")
     argparser.add_argument('-d', '--dev', action="store", dest="dev")
     argparser.add_argument('-s', '--test', action="store", dest="test")
+    argparser.add_argument('-g', '--dataset', action="store", dest="data")
     argparser.add_argument('-l', '--labels', action="store", dest="labels")
     argparser.add_argument('-m', '--model', action="store", dest="model")
     argparser.add_argument('-v', '--modelname', action="store", dest="modelname")
@@ -46,6 +47,7 @@ def main():
         print "--name [rnn_ngram3]"
         print "--preprocess [spell/heidel/symp/stem/lemma] (optional, default: spell)"
         print "--ex [traintest/hyperopt] (optional, default: traintest)"
+        print "--dataset [mds_one/mds_tr/mds_one+tr] (optional, default: mds_one)"
         exit()
 
     # Timing
@@ -108,7 +110,7 @@ def main():
     elif experiment == "hyperopt":
         run(args.model, modelname, args.train, testset, args.features, fn, args.name, pre, labels, arg_dev=dev, arg_hyperopt=True)
     elif experiment == "crossval":
-        crossval(modelname, args.train, args.features, fn, args.name, pre, labels)
+        crossval(modelname, args.train, args.features, fn, args.name, pre, labels, args.data)
 
     end_time = time.time()
     total_time = end_time - start_time
@@ -117,18 +119,23 @@ def main():
     else:
         print "Total time: " + str(total_time/60) + " mins"
 
-def crossval(arg_modelname, arg_train, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels):
+def crossval(arg_modelname, arg_train, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dataset="mds_one"):
     print "10-fold cross-validation"
     models = ['nb', 'rf', 'svm', 'nn']
     dataloc = "/u/sjeblee/research/va/data/datasets"
-    datafile_child = dataloc + "/all_child_cat_spell.txt"
-    datafile_neo = dataloc + "/all_neonate_cat_spell.txt"
-    datafile_adult = dataloc + "/all_adult_cat_spell.txt"
-    datafile = dataloc + "/all_" + arg_train + "_cat_spell.txt"
+
+    # Records should be one per line, no xml header or footer
+    dset = arg_dataset
+    datafile_child = dataloc + "/" + dset + "/all_child_cat_spell.txt"
+    datafile_neo = dataloc + "/" + dset + "/all_neonate_cat_spell.txt"
+    datafile_adult = dataloc + "/" + dset + "/all_adult_cat_spell.txt"
+    datafile = dataloc + "/" + dset + "/all_" + arg_train + "_cat_spell.txt"
     records = []
     data = {}
     datasets = []
     train_extra = []
+
+    # TODO: check for spell version if spell in preprocessing
 
     xml_header = '<dataroot xmlns:od="urn:schemas-microsoft-com:officedata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="Adult_Anonymous_23Sept2016.xsd" generated="2016-09-23T12:57:36">'
     xml_footer = '</dataroot>'
