@@ -35,7 +35,7 @@ def main():
         run(args.trainfile, args.trainoutfile, args.testfile, args.testoutfile, args.featurenames)
 
 def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames="narr_count", arg_labelname="Final_Code", stem=False, lemma=False):
-    print "extract_features"
+    print "extract_features from " + arg_train_in + " and " + arg_test_in
 
     # Timing
     starttime = time.time()
@@ -96,7 +96,7 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
     totaltime = endtime - starttime
     print "feature extraction took " + str(totaltime/60) + " mins"
 
-def extract(infile, outfile, dict_keys, stem=False):
+def extract(infile, outfile, dict_keys, stem=False, lemma=False):
     train = False
     narratives = []
     keywords = []
@@ -140,6 +140,7 @@ def extract(infile, outfile, dict_keys, stem=False):
                 if value == 'N':
                     value = 9
             features[key] = value
+            #print "-- value: " + value
 
         # KEYWORD features
         if kw_features:
@@ -159,23 +160,29 @@ def extract(infile, outfile, dict_keys, stem=False):
             narr_string = ""
             item = child.find("narrative")
             if item != None:
-                narr_string = item.text.encode("utf-8")
-                narr_words = [w.strip() for w in narr_string.lower().translate(string.maketrans("",""), string.punctuation).split(' ')]
                 narr_string = ""
+                if item.text != None:
+                    narr_string = item.text.encode("utf-8")
+                else:
+                    print "warning: empty narrative"
+                narr_words = [w.strip() for w in narr_string.lower().translate(string.maketrans("",""), string.punctuation).split(' ')]
+
                 if stem:
                     stemmer = PorterStemmer()
+                    narr_string = ""
                     for nw in narr_words:
                         #print "stem( " + nw + ", " + str(len(nw)) + ")"
                         newword = stemmer.stem(nw)
-                        print "stem: " + nw + " -> " + newword
+                        #print "stem: " + nw + " -> " + newword
                         narr_string = narr_string + " " + newword
                 elif lemma:
                     lemmatizer = WordNetLemmatizer()
+                    narr_string = ""
                     for nw in narr_words:
                         newword = lemmatizer.lemmatize(nw)
                         narr_string = narr_string + " " + newword
             narratives.append(narr_string.strip().lower())
-            print "Adding narr: " + narr_string.lower()
+            #print "Adding narr: " + narr_string.lower()
 
         # SYMPTOM features
         elif train and (symp_train in featurenames):
