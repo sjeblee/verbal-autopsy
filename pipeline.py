@@ -83,6 +83,10 @@ def main():
     else:
         testset = args.dev
 
+    dataset = "mds_one"
+    if args.data:
+        dataset = args.data
+
     fn = "feats"
     if args.featurename:
         fn = args.featurename
@@ -106,9 +110,9 @@ def main():
             n_feats = 398
 
     if experiment == "traintest":
-        run(args.model, modelname, args.train, testset, args.features, fn, args.name, pre, labels, arg_dev=dev, arg_hyperopt=False, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes)
+        run(args.model, modelname, args.train, testset, args.features, fn, args.name, pre, labels, arg_dev=dev, arg_hyperopt=False, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes, arg_dataset=dataset)
     elif experiment == "hyperopt":
-        run(args.model, modelname, args.train, testset, args.features, fn, args.name, pre, labels, arg_dev=dev, arg_hyperopt=True)
+        run(args.model, modelname, args.train, testset, args.features, fn, args.name, pre, labels, arg_dev=dev, arg_hyperopt=True, arg_dataset=dataset)
     elif experiment == "crossval":
         crossval(modelname, args.train, args.features, fn, args.name, pre, labels, args.data)
 
@@ -263,10 +267,11 @@ def crossval(arg_modelname, arg_train, arg_features, arg_featurename, arg_name, 
                 else:
                     n_feats = 398
             
-            run(m, modelname, trainname, trainname, arg_features, arg_featurename, name, arg_preprocess, arg_labels, arg_dev=False, arg_hyperopt=False, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes, dataloc=datadir)
+            run(m, modelname, trainname, trainname, arg_features, arg_featurename, name, arg_preprocess, arg_labels, arg_dev=False, arg_hyperopt=False, arg_dataset=dset, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes, dataloc=datadir)
 
-def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev=True, arg_hyperopt=False, arg_n_feats=398, arg_anova="f_classif", arg_nodes=297, dataloc="/u/sjeblee/research/va/data/datasets"):
+def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev=True, arg_hyperopt=False, arg_dataset="mds_one", arg_n_feats=398, arg_anova="f_classif", arg_nodes=297, dataloc="/u/sjeblee/research/va/data/datasets"):
 
+    #dataloc = dataloc + "/" + arg_dataset
     trainname = arg_train + "_cat" # all, adult, child, or neonate
     devname = arg_test + "_cat"
     pre = arg_preprocess
