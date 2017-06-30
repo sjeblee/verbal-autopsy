@@ -1,0 +1,130 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Get average scores from cross-validation
+from __future__ import division
+
+import argparse
+import fnmatch
+import os
+
+def main():
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument('--in', action="store", dest="infile")
+    argparser.add_argument('--out', action="store", dest="outfile")
+    args = argparser.parse_args()
+
+    if not (args.infile and args.outfile):
+        print "usage: ./score_crossval.py --in [.../crossval] --out [crossval_results.csv]"
+        exit()
+
+    run(args.infile, args.outfile)
+
+def run(arg_infile, arg_outfile):
+    crossval_dir = arg_infile
+    models = ["nb","rf","svm","nn"]
+    final_scores = {}
+    global p, r, f1, pccc, csmfa
+    p = 'p'
+    r = 'r'
+    f1 = 'f1'
+    pccc = 'pccc'
+    csmfa = 'csmfa'
+    global metrics
+    metrics = [p, r, f1, pccc, csmfa]
+
+    for model in models:
+        print "Getting scores for " + model
+        neonate_scores = []
+        child_scores = []
+        adult_scores = []
+        for x in range(0, 10):
+            prefix = crossval_dir + "/" + model + "_" + str(x)
+            for f in os.listdir(prefix):
+                if fnmatch.fnmatch(f, 'test_neonate*.stats'):
+                    n_scores = get_scores(prefix + "/" + f)
+                    neonate_scores.append(n_scores)
+                elif fnmatch.fnmatch(f, 'test_child*.stats'):
+                    c_scores = get_scores(prefix + "/" + f)
+                    child_scores.append(c_scores)
+                elif fnmatch.fnmatch(f, 'test_adult*.stats'):
+                    a_scores = get_scores(prefix + "/" + f)
+                    adult_scores.append(a_scores)
+        # Average the scores
+        print "adult scores: " + str(len(adult_scores))
+        print "child scores: " + str(len(child_scores))
+        print "neonate scores: " + str(len(neonate_scores))
+        scores = {}
+        scores['adult'] = []
+        scores['child'] = []
+        scores['neonate'] = []
+        for metric in metrics:
+            scores['adult'].append(avg_scores(adult_scores, metric))
+            scores['child'].append(avg_scores(child_scores, metric))
+            scores['neonate'].append(avg_scores(neonate_scores, metric))
+
+        final_scores[model] = scores
+
+    # write the stats to file
+    output = open(arg_outfile, "w")
+    output.write("model,precision,recall,f1,pccc,csmfa\n")
+
+    # Adult
+    output.write("adult\n")
+    for model in models:
+        output.write(model + ",")
+        for x in range(0,5):
+            output.write(str(final_scores[model]['adult'][x]) + ",")
+        output.write("\n")
+
+    # Child
+    output.write("child\n")
+    for model in models:
+        output.write(model + ",")
+        for x in range(0,5):
+            output.write(str(final_scores[model]['child'][x]) + ",")
+        output.write("\n")
+
+    # Neonate
+    output.write("neonate\n")
+    for model in models:
+        output.write(model + ",")
+        for x in range(0,5):
+            output.write(str(final_scores[model]['neonate'][x]) + ",")
+        output.write("\n")
+
+        
+    output.close()
+
+def get_scores(filename):
+    scores = {}
+    mnames = ['precision', 'recall', 'f1', 'pccc', 'csmf_accuracy']
+    with open(filename, 'r') as f:
+        for line in f:
+            parts = line.split(',')
+            if len(parts) > 1:
+                name = parts[0]
+                val = parts[1]
+                if name == 'precision':
+                    scores[p] = val
+                elif name == 'recall':
+                    scores[r] = val
+                elif name == 'f1':
+                    scores[f1] = val
+                elif name == 'pccc':
+                    scores[pccc] = val
+                elif name == 'csmf_accuracy':
+                    scores[csmfa] = val
+    return scores
+
+def avg_scores(scores, metric):
+    avg_score = 0.0
+    score = 0.0
+    count = 0
+    for entry in scores:
+        score = score + float(entry[metric])
+        count = count + 1
+    if count > 0:
+        avg_score = score / count
+    return avg_score
+
+if __name__ == "__main__":main()
