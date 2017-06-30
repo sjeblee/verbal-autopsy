@@ -110,14 +110,17 @@ def map_forward(labels, rec_type):
     return new_labels
 
 def map_back(results, rec_type):
+    #print "map_back: " + rec_type + " " + str(len(results))
     new_labels = []
     label_map = adult_map
     if rec_type == "child":
         label_map = child_map
     elif rec_type == "neonate":
         label_map = neonate_map
+    #print "label_map: " + str(label_map)
     for y in results:
-        l = label_map[y]
+        #print "mapping result: " + str(y)
+        l = label_map[int(y)]
         new_labels.append(l)
     return new_labels
 
