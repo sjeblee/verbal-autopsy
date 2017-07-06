@@ -6,6 +6,7 @@ from __future__ import division
 import argparse
 import fnmatch
 import os
+import statistics
 
 def main():
     argparser = argparse.ArgumentParser()
@@ -37,6 +38,7 @@ def run(arg_infile, arg_outfile):
         neonate_scores = []
         child_scores = []
         adult_scores = []
+        all_scores = []
         for x in range(0, 10):
             prefix = crossval_dir + "/" + model + "_" + str(x)
             for f in os.listdir(prefix):
@@ -49,18 +51,23 @@ def run(arg_infile, arg_outfile):
                 elif fnmatch.fnmatch(f, 'test_adult*.stats'):
                     a_scores = get_scores(prefix + "/" + f)
                     adult_scores.append(a_scores)
+                elif fnmatch.fnmatch(f, 'test_all*.stats'):
+                    all_scores.append(get_scores(prefix + "/" + f))
         # Average the scores
         print "adult scores: " + str(len(adult_scores))
         print "child scores: " + str(len(child_scores))
         print "neonate scores: " + str(len(neonate_scores))
+        print "all scores: " + str(len(all_scores))
         scores = {}
         scores['adult'] = []
         scores['child'] = []
         scores['neonate'] = []
+        scores['all'] = []
         for metric in metrics:
-            scores['adult'].append(avg_scores(adult_scores, metric))
-            scores['child'].append(avg_scores(child_scores, metric))
-            scores['neonate'].append(avg_scores(neonate_scores, metric))
+            scores['adult'].append(median_scores(adult_scores, metric))
+            scores['child'].append(median_scores(child_scores, metric))
+            scores['neonate'].append(median_scores(neonate_scores, metric))
+            scores['all'].append(median_scores(all_scores, metric))
 
         final_scores[model] = scores
 
@@ -90,6 +97,14 @@ def run(arg_infile, arg_outfile):
         output.write(model + ",")
         for x in range(0,5):
             output.write(str(final_scores[model]['neonate'][x]) + ",")
+        output.write("\n")
+
+    # All
+    output.write("all\n")
+    for model in models:
+        output.write(model + ",")
+        for x in range(0,5):
+            output.write(str(final_scores[model]['all'][x]) + ",")
         output.write("\n")
 
         
@@ -126,5 +141,11 @@ def avg_scores(scores, metric):
     if count > 0:
         avg_score = score / count
     return avg_score
+
+def median_scores(scores, metric):
+    metric_scores = []
+    for entry in scores:
+        metric_scores.append(float(entry[metric]))
+    return statistics.median(metric_scores)
 
 if __name__ == "__main__":main()
