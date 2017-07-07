@@ -136,7 +136,8 @@ def crossval(arg_modelname, arg_train, arg_features, arg_featurename, arg_name, 
     datafile_child = dataloc + "/" + dset + "/all_child_cat.txt"
     datafile_neo = dataloc + "/" + dset + "/all_neonate_cat.txt"
     datafile_adult = dataloc + "/" + dset + "/all_adult_cat.txt"
-    datafile = dataloc + "/" + dset + "/all_" + arg_train + "_cat.txt"
+    #datafile = dataloc + "/" + dset + "/all_" + arg_train + "_cat.txt"
+    datafile = dataloc + "/" + dset + "/all_cat.txt"
     records = []
     data = {}
     datasets = []
@@ -270,7 +271,7 @@ def crossval(arg_modelname, arg_train, arg_features, arg_featurename, arg_name, 
 
 def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev=True, arg_hyperopt=False, arg_dataset="mds_one", arg_n_feats=414, arg_anova="chi2", arg_nodes=297, dataloc="/u/sjeblee/research/va/data/datasets"):
 
-    dataloc = dataloc + "/" + arg_dataset
+    #dataloc = dataloc + "/" + arg_dataset
     trainname = arg_train + "_cat" # all, adult, child, or neonate
     devname = arg_test + "_cat"
     pre = arg_preprocess
@@ -285,6 +286,7 @@ def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_feature
     # Location of data files
     #dataloc="/u/sjeblee/research/va/data/datasets"
     resultsloc="/u/sjeblee/research/va/data/" + arg_name
+    #dataloc=resultsloc
     heideldir="/u/sjeblee/tools/heideltime/heideltime-standalone"
     scriptdir="/u/sjeblee/research/va/git/verbal-autopsy"
 
