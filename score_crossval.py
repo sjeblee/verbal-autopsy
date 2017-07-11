@@ -64,10 +64,10 @@ def run(arg_infile, arg_outfile):
         scores['neonate'] = []
         scores['all'] = []
         for metric in metrics:
-            scores['adult'].append(median_scores(adult_scores, metric))
-            scores['child'].append(median_scores(child_scores, metric))
-            scores['neonate'].append(median_scores(neonate_scores, metric))
-            scores['all'].append(median_scores(all_scores, metric))
+            scores['adult'].append(avg_scores(adult_scores, metric))
+            scores['child'].append(avg_scores(child_scores, metric))
+            scores['neonate'].append(avg_scores(neonate_scores, metric))
+            scores['all'].append(avg_scores(all_scores, metric))
 
         final_scores[model] = scores
 
