@@ -4,6 +4,7 @@
 import argparse
 import extract_features
 import heidel_tag
+import medttk_tag
 import model
 import nn
 import os
@@ -40,12 +41,12 @@ def main():
         print "--test [test.features]"
         print "--out [test.results]"
         print "--labels [ICD_cat/Final_code] (optional)"
-        print "--features [type/dem/narr_count/narr_vec/narr_tfidf/kw_count/kw_tfidf/lda/symp_train]"
+        print "--features [type/dem/narr_count/narr_vec/narr_tfidf/kw_count/kw_tfidf/lda/symp_train/narr_medttk_count]"
         print "--featurename [feature_set_name]"
         print "--model [nn/lstm/svm/rf/nb]"
         print "--modelname [nn1_all] (optional)"
         print "--name [rnn_ngram3]"
-        print "--preprocess [spell/heidel/symp/stem/lemma] (optional, default: spell)"
+        print "--preprocess [spell/heidel/symp/stem/lemma/medttk] (optional, default: spell)"
         print "--ex [traintest/hyperopt] (optional, default: traintest)"
         print "--dataset [mds_one/mds_tr/mds_one+tr] (optional, default: mds_one)"
         exit()
@@ -108,6 +109,9 @@ def main():
             anova = "chi2"
         else:
             n_feats = 398
+
+    # Temp for RNN
+    #nodes = 600
 
     if experiment == "traintest":
         run(args.model, modelname, args.train, testset, args.features, fn, args.name, pre, labels, arg_dev=dev, arg_hyperopt=False, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes, arg_dataset=dataset)
@@ -271,7 +275,7 @@ def crossval(arg_modelname, arg_train, arg_features, arg_featurename, arg_name, 
 
 def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev=True, arg_hyperopt=False, arg_dataset="mds_one", arg_n_feats=398, arg_anova="f_classif", arg_nodes=297, dataloc="/u/sjeblee/research/va/data/datasets"):
 
-    #dataloc = dataloc + "/" + arg_dataset
+    dataloc = dataloc + "/" + arg_dataset
     trainname = arg_train + "_cat" # all, adult, child, or neonate
     devname = arg_test + "_cat"
     pre = arg_preprocess
@@ -284,7 +288,6 @@ def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_feature
     #resultsloc_name = arg_name
 
     # Location of data files
-    #dataloc="/u/sjeblee/research/va/data/datasets"
     resultsloc="/u/sjeblee/research/va/data/" + arg_name
     heideldir="/u/sjeblee/tools/heideltime/heideltime-standalone"
     scriptdir="/u/sjeblee/research/va/git/verbal-autopsy"
@@ -305,6 +308,7 @@ def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_feature
         devfeatures = dataloc + "/test_" + devname + ".features." + featureset
         devresults = resultsloc + "/test_" + devname + ".results." + modelname + "." + featureset
     trainfeatures = dataloc + "/train_" + trainname + ".features." + featureset
+    element = "narrative"
 
     # Preprocessing
     spname = "spell"
@@ -348,6 +352,27 @@ def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_feature
         devname = devname + "_ht"
         trainname = trainname + "_ht"
 
+    if "medttk" in pre:
+        print "Running medttk..."
+        #with cd(heideldir):
+        trainh = dataloc + "/train_" + trainname + "_medttk.xml"
+        if not os.path.exists(trainh):
+            medttk_tag.run(trainset, trainh)
+	    fixtags(trainh)
+        trainset = trainh
+        devh = ""
+        if arg_dev:
+            devh = dataloc + "/dev_" + devname + "_medttk.xml"
+        else:
+            devh = dataloc + "/test_" + devname + "_medttk.xml"
+        if not os.path.exists(devh):
+            medttk_tag.run(devset, devh)
+	    fixtags(devh)
+        devset = devh
+        devname = devname + "_medttk"
+        trainname = trainname + "_medttk"
+        element = "narr_medttk"
+
     if "symp" in pre:
         print "Tagging symptoms..."
         sympname = "symp"
@@ -383,7 +408,7 @@ def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_feature
     print "stem: " + str(stem) + " lemma: " + str(lemma)
     if not (os.path.exists(trainfeatures) and os.path.exists(devfeatures)):
         print "Extracting features..."
-        extract_features.run(trainset, trainfeatures, devset, devfeatures, features, labels, stem, lemma)
+        extract_features.run(trainset, trainfeatures, devset, devfeatures, features, labels, stem, lemma, element)
 
     # Model
     if arg_hyperopt:
@@ -422,8 +447,9 @@ def get_recs(filename):
     with open(filename, 'r') as f:
         for line in f:
             recs.append(line.strip())
-    del recs[len(recs)-1]
-    del recs[0]
+    # TODO: do we need this?
+    #del recs[len(recs)-1]
+    #del recs[0]
     return recs
 
 if __name__ == "__main__":main()
