@@ -5,6 +5,8 @@
 
 from lxml import etree
 from sklearn.decomposition import LatentDirichletAllocation
+from keras.preprocessing.sequence import pad_sequences
+from keras.preprocessing.text import hashing_trick
 from nltk.stem import WordNetLemmatizer
 from nltk.stem.porter import PorterStemmer
 import sklearn.feature_extraction
@@ -21,12 +23,13 @@ def main():
     argparser.add_argument('--testfeats', action="store", dest="testoutfile")
     argparser.add_argument('--labels', action="store", dest="labelname")
     argparser.add_argument('--features', action="store", dest="featurenames")
+    argparser.add_argument('--element', action="store", dest="element")
     args = argparser.parse_args()
 
     if not (args.trainfile and args.testfile and args.trainoutfile and args.testoutfile):
         print "usage: ./extract_features.py --train [file.xml] --test [file.xml] --trainfeats [train.feats] --testfeats [test.feats] --labels [labelname] --features [f1,f2,f3]"
         print "labels: Final_code, ICD_cat"
-        print "features: checklist, kw_bow, kw_tfidf, kw_phrase, kw_count, narr_bow, narr_count, narr_tfidf, narr_ngram, narr_vec, lda"
+        print "features: checklist, kw_bow, kw_tfidf, kw_phrase, kw_count, narr_bow, narr_count, narr_tfidf, narr_ngram, narr_vec, narr_seq, lda"
         exit()
 
     if args.labelname:
@@ -34,17 +37,17 @@ def main():
     else:
         run(args.trainfile, args.trainoutfile, args.testfile, args.testoutfile, args.featurenames)
 
-def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames="narr_count", arg_labelname="Final_Code", stem=False, lemma=False):
-    print "extract_features from " + arg_train_in + " and " + arg_test_in
+def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames="narr_count", arg_labelname="Final_Code", stem=False, lemma=False, arg_element="narrative"):
+    print "extract_features from " + arg_train_in + " and " + arg_test_in + " : " + arg_element
 
     # Timing
     starttime = time.time()
 
     global vecfile, labelname
-    vecfile = "/u/sjeblee/research/va/data/datasets/narratives.vectors"
+    vecfile = "/u/sjeblee/research/va/data/datasets/mds_one/narr+ice.vectors"
     labelname = arg_labelname
 
-    global featurenames, rec_type, checklist, dem, kw_bow, kw_tfidf, narr_bow, kw_count, narr_count, narr_tfidf, narr_vec, lda, symp_train
+    global featurenames, rec_type, checklist, dem, kw_bow, kw_tfidf, narr_bow, kw_count, narr_count, narr_tfidf, narr_vec, narr_seq, lda, symp_train
     rec_type = "type"
     checklist = "checklist"
     dem = "dem"
@@ -56,6 +59,7 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
     narr_count = "narr_count"
     narr_tfidf = "narr_tfidf"
     narr_vec = "narr_vec"
+    narr_seq = "narr_seq"
     lda = "lda"
     symp_train = "symp_train"
     featurenames = arg_featurenames.split(',')
@@ -76,7 +80,7 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
 
     global kw_features, narr_features, stopwords
     kw_features = kw_bow in featurenames or kw_tfidf in featurenames or kw_phrase in featurenames or kw_count in featurenames
-    narr_features = narr_bow in featurenames or narr_tfidf in featurenames or narr_count in featurenames or narr_vec in featurenames or lda in featurenames
+    narr_features = narr_bow in featurenames or narr_tfidf in featurenames or narr_count in featurenames or narr_vec in featurenames or narr_seq in featurenames or lda in featurenames
     print "narr_features: " + str(narr_features)
     stopwords = []
 
@@ -88,15 +92,15 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
     global tfidfVectorizer
     global ldaModel
 
-    keys = extract(arg_train_in, arg_train_out, None, stem)
+    keys = extract(arg_train_in, arg_train_out, None, stem, lemma, arg_element)
     print "dict_keys: " + str(keys)
-    extract(arg_test_in, arg_test_out, keys, stem)
+    extract(arg_test_in, arg_test_out, keys, stem, lemma, arg_element)
 
     endtime = time.time()
     totaltime = endtime - starttime
     print "feature extraction took " + str(totaltime/60) + " mins"
 
-def extract(infile, outfile, dict_keys, stem=False, lemma=False):
+def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrative"):
     train = False
     narratives = []
     keywords = []
@@ -119,6 +123,7 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False):
 
     print "train: " + str(train)
     print "stem: " + str(stem)
+    print "lemma: " + str(lemma)
     # Extract features
     matrix = []
     for child in root:
@@ -129,7 +134,6 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False):
 
         # CHECKLIST features
         for key in dict_keys:
-            #print "- key: " + key
             if key[0:3] == "CL_":
                 key = key[3:]
             item = child.find(key)
@@ -141,6 +145,8 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False):
                     value = 9
             features[key] = value
             #print "-- value: " + value
+            if key == "MG_ID":
+                print "extracting features from: " + value
 
         # KEYWORD features
         if kw_features:
@@ -158,7 +164,7 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False):
         # NARRATIVE features
         if narr_features or ((not train) and (symp_train in featurenames)):
             narr_string = ""
-            item = child.find("narrative")
+            item = child.find(element)
             if item != None:
                 narr_string = ""
                 if item.text != None:
@@ -301,7 +307,9 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False):
 
         # Convert words to vectors and add to matrix
         dict_keys.append(narr_vec)
-        maxlen = 0
+        global max_seq_len
+        if train:
+            max_seq_len = 400
         zero_vec = []
         for z in range(0, 200):
             zero_vec.append(0)
@@ -309,32 +317,69 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False):
             narr = narratives[x]
             #print "narr: " + narr
             vectors = []
+            vec = zero_vec
             for word in narr.split(' '):
                 if len(word) > 0:
                     #if word == "didnt":
                     #    word = "didn't"
-                    vec = word2vec[word]
+                    if word in word2vec:
+                        vec = word2vec[word]
                     vectors.append(vec)
-            length = len(vectors)
-            if length > maxlen:
-                maxlen = length
+            if train:
+                length = len(vectors)
+                if length > max_seq_len:
+                    #max_seq_len = length
+                    vectors = vectors[(-1*max_seq_len):]
             (matrix[x])[narr_vec] = vectors
 
         # Pad the narr_vecs with 0 vectors
-        print "padding vectors to reach maxlen " + str(maxlen)
+        print "padding vectors to reach maxlen " + str(max_seq_len)
         for x in range(len(matrix)):
             length = len(matrix[x][narr_vec])
-            if length < maxlen:
-                for k in range(0, maxlen-length):
-                    matrix[x][narr_vec].append(zero_vec)
-                
+            matrix[x]['max_seq_len'] = max_seq_len
+            if length < max_seq_len:
+                for k in range(0, max_seq_len-length):
+                    matrix[x][narr_vec].insert(0,zero_vec) # use insert for pre-padding
+
+    # narr_seq for RNN
+    elif narr_seq in featurenames:
+        global vocab_size, max_seq_len
+        if train:
+            dict_keys.append(narr_seq)
+            dict_keys.append('vocab_size')
+            dict_keys.append('max_seq_len')
+            vocab = set()
+            for narr in narratives:
+                words = narr.split(' ')
+                for word in words:
+                    vocab.add(word)
+            vocab_size = len(vocab)
+            max_seq_len = 0
+
+        sequences = []
+
+        # Convert text into integer sequences
+        for x in range(len(matrix)):
+            narr = narratives[x]
+            seq = hashing_trick(narr, vocab_size, hash_function='md5', filters='\t\n', lower=True, split=' ')
+            if len(seq) > max_seq_len:
+                max_seq_len = len(seq)
+            sequences.append(seq)
+
+        # Pad the sequences
+        sequences = pad_sequences(sequences, maxlen=max_seq_len, dtype='int32', padding='pre')
+        for x in range(len(matrix)):
+            matrix[x]['narr_seq'] = sequences[x]
+            matrix[x]['vocab_size'] = vocab_size
+            matrix[x]['max_seq_len'] = max_seq_len
 
     # Write the features to file
     print "writing " + str(len(matrix)) + " feature vectors to file..."
     output = open(outfile, 'w')
     for feat in matrix:
         #print "ICD_cat: " + feat["ICD_cat"]
-        output.write(str(feat) + "\n")
+        feat_string = str(feat).replace('\n', '')
+        output.write(feat_string + "\n")
     output.close()
 
     key_output = open(outfile + ".keys", "w")

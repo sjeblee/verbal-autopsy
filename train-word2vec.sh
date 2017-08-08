@@ -1,17 +1,17 @@
 #!/bin/bash
 # Train word2vec model
 
-DATA_DIR=$HOME/research/va/data/datasets
+DATA_DIR=$HOME/research/va/data/datasets/mds_one
 BIN_DIR=$HOME/tools/word2vec/word2vec/bin
 
 SUFFIX="cat_spell.narrsent"
 
-TEXT_DATA=$DATA_DIR/all_narrsent.txt
-VECTOR_DATA=$DATA_DIR/narratives.vectors
+TEXT_DATA=$DATA_DIR/all_narr+ice.txt
+VECTOR_DATA=$DATA_DIR/narr+ice.vectors
 
-cat $DATA_DIR/train_all_$SUFFIX $DATA_DIR/dev_all_$SUFFIX $DATA_DIR/test_all_$SUFFIX > $TEXT_DATA
+#cat $DATA_DIR/train_all_$SUFFIX $DATA_DIR/dev_all_$SUFFIX $DATA_DIR/test_all_$SUFFIX > $TEXT_DATA
 
-rm -f $VECTOR_DATA
+#rm -f $VECTOR_DATA
 
 if [ ! -e $VECTOR_DATA ]; then
   echo -----------------------------------------------------------------------------------------------------
