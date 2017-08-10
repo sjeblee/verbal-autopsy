@@ -8,11 +8,14 @@ import os
 import time
 from hyperopt import hp, fmin, tpe, space_eval
 from keras.models import Sequential, load_model
-from keras.layers import Dense, Dropout, Activation
+from keras.layers import Dense, Dropout, Activation, Flatten
 from keras.layers import Embedding
 from keras.layers import LSTM
+from keras.layers.recurrent import SimpleRNN
+from keras.layers.wrappers import Bidirectional
 from keras.utils.np_utils import to_categorical
 #from keras.utils.visualize_util import plot
+from numpy import array, int32
 from sklearn import metrics
 from sklearn import neighbors
 from sklearn import preprocessing
@@ -66,6 +69,7 @@ def hyperopt(arg_model, arg_train_feats, arg_test_feats, arg_result_file, arg_pr
     space = None
     objective = None
 
+    print "h_model: " + h_model
     if h_model == "nn":
         objective = obj_nn
         global activation
@@ -102,6 +106,7 @@ def hyperopt(arg_model, arg_train_feats, arg_test_feats, arg_result_file, arg_pr
         }
 
     # Run hyperopt
+    print "space: " + str(space)
     best = fmin(objective, space, algo=tpe.suggest, max_evals=100)
     print best
 
@@ -236,7 +241,7 @@ def obj_rf(params):
     return 1 - f1score
 
 
-def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_file, arg_prefix, arg_labelname, arg_n_feats=200, arg_anova="f_classif", arg_nodes=297):
+def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_file, arg_prefix, arg_labelname, arg_n_feats=227, arg_anova="chi2", arg_nodes=192):
     total_start_time = time.time()
 
     # Params
@@ -245,7 +250,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
 
     global labelname
     labelname = arg_labelname
-    is_nn = arg_model == "nn" or arg_model == "lstm"
+    is_nn = arg_model == "nn" or arg_model == "lstm" or arg_model == "rnn"
         
     trainids = []        # VA record id
     trainlabels = []     # Correct ICD codes
@@ -272,6 +277,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     anova_function = f_classif
     if arg_anova == "chi2":
         anova_function = chi2
+    print "anova_function: " + arg_anova
     if not is_nn:
         anova_filter, X = create_anova_filter(X, Y, anova_function, num_feats)
 
@@ -284,23 +290,23 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
         if os.path.exists(modelfile):
             print "using pre-existing model at " + modelfile
             model = load_model(modelfile)
-            anova_filter, X = create_anova_filter(X, Y, anova_function, num_feats)
+            if not arg_model == "rnn":
+                anova_filter, X = create_anova_filter(X, Y, anova_function, num_feats)
             Y = to_categorical(Y)
+            X = numpy.asarray(X)
         else:
             print "creating a new neural network model"
             if arg_model == "nn":
                 model, X, Y = create_nn_model(X, Y, anova_function, num_feats, num_nodes, 'relu')
             elif arg_model == "lstm":
-                Y = to_categorical(Y)
-                model = Sequential()
-                #nn.add(Embedding(max_feat256, input_dim=200))
-                model.add(LSTM(256, input_dim=200, activation='sigmoid', inner_activation='hard_sigmoid'))
-                model.add(Dropout(0.5))
-                model.add(Dense(Y.shape[1]))
-                model.add(Activation('sigmoid'))
-                model.compile(loss='binary_crossentropy', optimizer='rmsprop', metrics=['accuracy'])
-                model.fit(numpy.array(X), Y, batch_size=16, nb_epoch=10)
-                #score = model.evaluate(X_test, Y_test, batch_size=16)
+                embedding_dim = 200
+                num_nodes = 256
+                model, X, Y = create_lstm_model(X, Y, embedding_dim, num_nodes, 'relu')
+                #model.fit(numpy.array(X), Y, batch_size=16, nb_epoch=10)
+                #score = model.evaluate(X_test, Y_test, batch_size=16
+            elif arg_model == "rnn":
+                embedding_dim = 200
+                model, X, Y = create_rnn_model(X, Y, embedding_dim, num_nodes, 'relu')
 
             # Save the model
             print "saving the model..."
@@ -354,10 +360,13 @@ def test(model_type, model, testfile):
     testY = []
     predictedY = []
     testY = preprocess(testfile, testids, testlabels, testX, testY)
-    if not model_type == "lstm":
+    if not model_type == "lstm" and not model_type == "rnn":
         testX = anova_filter.transform(testX)
+    if model_type == "rnn" or model_type == "lstm":
+        testX = numpy.asarray(testX)
 
-    if model_type == "nn" or model_type == "lstm":
+    print "testX shape: " + str(testX.shape)
+    if model_type == "nn" or model_type == "lstm" or model_type == "rnn":
         predictedY = model.predict(testX)
         results = map_back(predictedY)
     else:
@@ -375,6 +384,7 @@ def create_nn_model(X, Y, anova_function, num_feats, num_nodes, activation):
 #    X = anova_filter.transform(X)
     Y = to_categorical(Y)
 
+    print "neural network: nodes: " + str(num_nodes) + ", feats: " + str(num_feats)
     nn = Sequential([Dense(num_nodes, input_dim=num_feats),
                     Activation(activation),
                     #Dense(num_nodes, input_dim=num_feats),
@@ -383,6 +393,46 @@ def create_nn_model(X, Y, anova_function, num_feats, num_nodes, activation):
                     Activation('softmax'),])
         
     nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+    nn.fit(X, Y)
+    nn.summary()
+    return nn, X, Y
+
+def create_rnn_model(X, Y, embedding_size, num_nodes, act):
+    Y = to_categorical(Y)
+    X = numpy.asarray(X)
+    print "train X shape: " + str(X.shape)
+
+    print "RNN: nodes: " + str(num_nodes) + " embedding: " + str(embedding_size)
+    #print "vocab: " + str(vocab_size)
+    print "max_seq_len: " + str(max_seq_len)
+    # TEMP for no embedding
+    embedding_size = 200
+    nn = Sequential([#Embedding(vocab_size, embedding_size, input_length=max_seq_len, mask_zero=False),
+                     SimpleRNN(num_nodes, activation=act, return_sequences=False, input_shape=(max_seq_len, embedding_size)),# Dense(200, activation='tanh'),
+                     #LSTM(256, input_dim=200, activation='sigmoid', inner_activation='hard_sigmoid'),
+                     Dropout(0.5),
+                     Dense(Y.shape[1], activation='softmax')])
+    nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+
+    nn.fit(X, Y)
+    nn.summary()
+    return nn, X, Y
+
+def create_lstm_model(X, Y, embedding_size, num_nodes, act):
+    Y = to_categorical(Y)
+    X = numpy.asarray(X)
+    print "train X shape: " + str(X.shape)
+
+    print "LSTM: nodes: " + str(num_nodes) + " embedding: " + str(embedding_size)
+    #print "vocab: " + str(vocab_size)
+    print "max_seq_len: " + str(max_seq_len)
+    #nn = Sequential([Bidirectional(LSTM(256, input_dim=embedding_size, activation='sigmoid', inner_activation='hard_sigmoid', return_sequences=True), input_shape=(200, embedding_size), merge_mode='concat'),
+    nn = Sequential([LSTM(num_nodes, input_shape=(max_seq_len, embedding_size), activation='sigmoid', inner_activation='hard_sigmoid', return_sequences=False),
+                     Dropout(0.5),
+                     #Flatten(), # For bidirectional
+                     Dense(Y.shape[1], activation='softmax')])
+    nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+
     nn.fit(X, Y)
     nn.summary()
     return nn, X, Y
@@ -419,12 +469,21 @@ def preprocess(filename, ids, labels, x, y, trainlabels=False):
                 elif key == "CL_type":
                     print "CL_type: " + vector[key]
                     types.append(vector[key])
-                elif key == "narr_vec":
+                elif key == "narr_vec" or key == "narr_seq":
                     # The feature matrix for word2vec can't have other features
                     features = vector[key]
-                    #print "narr_vec shape: " + str(len(features)) + " " + str(len(features[0]))
+                    
                     vec_feats = True
-                else:
+                    #if key == "narr_seq":
+                    #global vocab_size
+                    global max_seq_len
+                    #vocab_size = vector['vocab_size']
+                    max_seq_len = vector['max_seq_len']
+                    features = numpy.asarray(features)#.reshape(max_seq_len, 1)
+                    if features.shape[0] > 200:
+                        features = features[-200:]
+                    print "narr_vec shape: " + str(features.shape)
+                elif not vec_feats:
                     if vector.has_key(key):
                         features.append(vector[key])
                     else:
@@ -432,7 +491,7 @@ def preprocess(filename, ids, labels, x, y, trainlabels=False):
             x.append(features)
 
     # Convert type features to numerical features
-    if len(types) > 0:
+    if len(types) > 0 and not vec_feats:
         if trainlabels:
             typeencoder.fit(types)
         enc_types = typeencoder.transform(types)
@@ -460,7 +519,6 @@ def map_back(results):
     output = []
     for x in range(len(results)):
         res = results[x]
-        #print "res: " + str(res.tolist())
         val = numpy.argmax(res)
         output.append(val)
     return output

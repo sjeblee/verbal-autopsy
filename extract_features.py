@@ -309,7 +309,7 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
         dict_keys.append(narr_vec)
         global max_seq_len
         if train:
-            max_seq_len = 400
+            max_seq_len = 0
         zero_vec = []
         for z in range(0, 200):
             zero_vec.append(0)
@@ -325,11 +325,11 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
                     if word in word2vec:
                         vec = word2vec[word]
                     vectors.append(vec)
-            if train:
-                length = len(vectors)
-                if length > max_seq_len:
-                    #max_seq_len = length
-                    vectors = vectors[(-1*max_seq_len):]
+            length = len(vectors)
+            if length > max_seq_len:
+                if train:
+                    max_seq_len = length
+                vectors = vectors[(-1*max_seq_len):]
             (matrix[x])[narr_vec] = vectors
 
         # Pad the narr_vecs with 0 vectors

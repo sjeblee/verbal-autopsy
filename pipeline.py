@@ -397,6 +397,15 @@ def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_feature
         trainname = trainname + "_" + spname
 
     # Feature Extraction
+    if arg_dev:
+        devset = dataloc + "/dev_" + devname + ".xml"
+        devfeatures = dataloc + "/dev_" + devname + ".features." + featureset
+        devresults = resultsloc + "/dev_" + devname + ".results." + modelname + "." + featureset
+    else:
+        devset = dataloc + "/test_" + devname + ".xml"
+        devfeatures = dataloc + "/test_" + devname + ".features." + featureset
+        devresults = resultsloc + "/test_" + devname + ".results." + modelname + "." + featureset
+    trainfeatures = dataloc + "/train_" + trainname + ".features." + featureset
     print "trainfeatures: " + trainfeatures
     print "devfeatures: " + devfeatures
     stem = False
