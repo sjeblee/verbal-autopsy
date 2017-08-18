@@ -36,22 +36,25 @@ def main():
         rec_id = id_node.text
         print "ID: " + rec_id
         icd = "R99"
-        node = child.find("Final_code")
-        if node != None:
-            icd = node.text
-        if icd == "NULL":
-            print "Removing record!"
-            root.remove(child)
-            removed = removed + 1
-            continue
-        elif icd == None:
-            print "ICD was None, set to R99"
-            icd = "R99"
-        else:
-            print "ICD: " + icd
-        icdcat = etree.Element("ICD_cat")
-        icdcat.text = icdmap[icd]
-        child.append(icdcat)
+        # Skip if record already has an ICD cat
+        cat_node = child.find("ICD_cat")
+        if cat_node is None:
+            node = child.find("Final_code")
+            if node != None:
+                icd = node.text
+            if icd == "NULL":
+                print "Removing record!"
+                root.remove(child)
+                removed = removed + 1
+                continue
+            elif icd == None:
+                print "ICD was None, set to R99"
+                icd = "R99"
+            else:
+                print "ICD: " + icd
+            icdcat = etree.Element("ICD_cat")
+            icdcat.text = icdmap[icd]
+            child.append(icdcat)
         
     # write the xml to file
     tree.write(args.outfile)
