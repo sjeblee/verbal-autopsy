@@ -241,8 +241,11 @@ def obj_rf(params):
     return 1 - f1score
 
 
-def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_file, arg_prefix, arg_labelname, arg_n_feats=227, arg_anova="chi2", arg_nodes=192):
+def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_file, arg_prefix, arg_labelname, arg_n_feats=227, arg_anova="chi2", arg_nodes=192, arg_activation='relu', arg_dropout=0.5):
     total_start_time = time.time()
+
+    # Special handling for neural network models
+    is_nn = arg_model == "nn" or arg_model == "lstm" or arg_model == "rnn" or arg_model == "cnn"
 
     # Params
     num_feats = arg_n_feats
@@ -250,8 +253,6 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
 
     global labelname
     labelname = arg_labelname
-    is_nn = arg_model == "nn" or arg_model == "lstm" or arg_model == "rnn"
-        
     trainids = []        # VA record id
     trainlabels = []     # Correct ICD codes
     X = []               # Feature vectors
@@ -262,17 +263,21 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     global keys
     with open(arg_train_feats + ".keys", "r") as kfile:
         keys = eval(kfile.read())
-        
+
+    # Transform ICD codes and record types to numbers
     global labelencoder, typeencoder
-    labelencoder = preprocessing.LabelEncoder() # Transforms ICD codes to numbers
+    labelencoder = preprocessing.LabelEncoder()
     typeencoder = preprocessing.LabelEncoder()
+
+    # Load the feautures
     Y = preprocess(arg_train_feats, trainids, trainlabels, X, Y, True)
     print "X: " + str(len(X)) + "\nY: " + str(len(Y))
 
-    # Train model
+    # Train the model
     print "training model..."
     stime = time.time()
 
+    # Feature selection
     global anova_filter
     anova_function = f_classif
     if arg_anova == "chi2":
@@ -290,8 +295,6 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
         if os.path.exists(modelfile):
             print "using pre-existing model at " + modelfile
             model = load_model(modelfile)
-            if not arg_model == "rnn":
-                anova_filter, X = create_anova_filter(X, Y, anova_function, num_feats)
             Y = to_categorical(Y)
             X = numpy.asarray(X)
         else:
@@ -299,14 +302,13 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
             if arg_model == "nn":
                 model, X, Y = create_nn_model(X, Y, anova_function, num_feats, num_nodes, 'relu')
             elif arg_model == "lstm":
-                embedding_dim = 200
+                embedding_dim = 100
                 num_nodes = 256
-                model, X, Y = create_lstm_model(X, Y, embedding_dim, num_nodes, 'relu')
-                #model.fit(numpy.array(X), Y, batch_size=16, nb_epoch=10)
+                model, X, Y = create_lstm_model(X, Y, embedding_dim, num_nodes, arg_activation)
                 #score = model.evaluate(X_test, Y_test, batch_size=16
             elif arg_model == "rnn":
                 embedding_dim = 200
-                model, X, Y = create_rnn_model(X, Y, embedding_dim, num_nodes, 'relu')
+                model, X, Y = create_rnn_model(X, Y, embedding_dim, num_nodes, arg_activation)
 
             # Save the model
             print "saving the model..."
@@ -318,7 +320,6 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     else:
          if arg_model == "svm":
              print "svm model"
-             #model = svm.SVC(kernel='rbf', decision_function_shape='ovr')
              model = svm.SVC(kernel='linear', decision_function_shape='ovr', probability=True)
          elif arg_model == "knn":
              print "k-nearest neighbor model"
@@ -379,14 +380,14 @@ def test(model_type, model, testfile):
     print "results: " + str(results)
     return testids, testlabels, predictedlabels
 
-def create_nn_model(X, Y, anova_function, num_feats, num_nodes, activation):
+def create_nn_model(X, Y, anova_function, num_feats, num_nodes, act):
     anova_filter, X = create_anova_filter(X, Y, anova_function, num_feats)
 #    X = anova_filter.transform(X)
     Y = to_categorical(Y)
 
     print "neural network: nodes: " + str(num_nodes) + ", feats: " + str(num_feats)
     nn = Sequential([Dense(num_nodes, input_dim=num_feats),
-                    Activation(activation),
+                    Activation(act),
                     #Dense(num_nodes, input_dim=num_feats),
                     #Activation(activation),
                     Dense(Y.shape[1]),
@@ -397,7 +398,7 @@ def create_nn_model(X, Y, anova_function, num_feats, num_nodes, activation):
     nn.summary()
     return nn, X, Y
 
-def create_rnn_model(X, Y, embedding_size, num_nodes, act):
+def create_rnn_model(X, Y, embedding_size, num_nodes, act, dropout=0.5):
     Y = to_categorical(Y)
     X = numpy.asarray(X)
     print "train X shape: " + str(X.shape)
@@ -410,7 +411,7 @@ def create_rnn_model(X, Y, embedding_size, num_nodes, act):
     nn = Sequential([#Embedding(vocab_size, embedding_size, input_length=max_seq_len, mask_zero=False),
                      SimpleRNN(num_nodes, activation=act, return_sequences=False, input_shape=(max_seq_len, embedding_size)),# Dense(200, activation='tanh'),
                      #LSTM(256, input_dim=200, activation='sigmoid', inner_activation='hard_sigmoid'),
-                     Dropout(0.5),
+                     Dropout(dropout),
                      Dense(Y.shape[1], activation='softmax')])
     nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
 
@@ -418,22 +419,23 @@ def create_rnn_model(X, Y, embedding_size, num_nodes, act):
     nn.summary()
     return nn, X, Y
 
-def create_lstm_model(X, Y, embedding_size, num_nodes, act):
+def create_lstm_model(X, Y, embedding_size, num_nodes, activation='sigmoid', dropout=0.5):
     Y = to_categorical(Y)
     X = numpy.asarray(X)
     print "train X shape: " + str(X.shape)
+    embedding_size = X.shape[2]
 
     print "LSTM: nodes: " + str(num_nodes) + " embedding: " + str(embedding_size)
     #print "vocab: " + str(vocab_size)
     print "max_seq_len: " + str(max_seq_len)
     #nn = Sequential([Bidirectional(LSTM(256, input_dim=embedding_size, activation='sigmoid', inner_activation='hard_sigmoid', return_sequences=True), input_shape=(200, embedding_size), merge_mode='concat'),
-    nn = Sequential([LSTM(num_nodes, input_shape=(max_seq_len, embedding_size), activation='sigmoid', inner_activation='hard_sigmoid', return_sequences=False),
-                     Dropout(0.5),
+    nn = Sequential([LSTM(num_nodes, input_shape=(200, embedding_size), activation='sigmoid', inner_activation='hard_sigmoid', return_sequences=False),
+                     Dropout(dropout),
                      #Flatten(), # For bidirectional
                      Dense(Y.shape[1], activation='softmax')])
     nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
 
-    nn.fit(X, Y)
+    nn.fit(X, Y, nb_epoch=15)
     nn.summary()
     return nn, X, Y
 
@@ -472,16 +474,16 @@ def preprocess(filename, ids, labels, x, y, trainlabels=False):
                 elif key == "narr_vec" or key == "narr_seq":
                     # The feature matrix for word2vec can't have other features
                     features = vector[key]
-                    
                     vec_feats = True
-                    #if key == "narr_seq":
-                    #global vocab_size
+                    if key == "narr_seq":
+                        global vocab_size
+                        vocab_size = vector['vocab_size']
                     global max_seq_len
-                    #vocab_size = vector['vocab_size']
                     max_seq_len = vector['max_seq_len']
+                    print "max_seq_len: " + str(max_seq_len)
                     features = numpy.asarray(features)#.reshape(max_seq_len, 1)
-                    if features.shape[0] > 200:
-                        features = features[-200:]
+                    #if features.shape[0] > 200:
+                    #    features = features[-200:]
                     print "narr_vec shape: " + str(features.shape)
                 elif not vec_feats:
                     if vector.has_key(key):
