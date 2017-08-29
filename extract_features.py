@@ -7,13 +7,13 @@ from lxml import etree
 from sklearn.decomposition import LatentDirichletAllocation
 from keras.preprocessing.sequence import pad_sequences
 from keras.preprocessing.text import hashing_trick
-from nltk.stem import WordNetLemmatizer
-from nltk.stem.porter import PorterStemmer
 import sklearn.feature_extraction
 import argparse
 import os
 import string
 import time
+
+import preprocessing
 
 def main():
     argparser = argparse.ArgumentParser()
@@ -44,7 +44,7 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
     starttime = time.time()
 
     global vecfile, labelname
-    vecfile = "/u/sjeblee/research/va/data/datasets/mds_one/narr+ice.vectors"
+    vecfile = "/u/sjeblee/research/va/data/datasets/mds+rct/narr+ice+medhelp.vectors.200"
     labelname = arg_labelname
 
     global featurenames, rec_type, checklist, dem, kw_bow, kw_tfidf, narr_bow, kw_count, narr_count, narr_tfidf, narr_vec, narr_seq, lda, symp_train
@@ -166,27 +166,17 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
             narr_string = ""
             item = child.find(element)
             if item != None:
-                narr_string = ""
                 if item.text != None:
                     narr_string = item.text.encode("utf-8")
                 else:
                     print "warning: empty narrative"
                 narr_words = [w.strip() for w in narr_string.lower().translate(string.maketrans("",""), string.punctuation).split(' ')]
+                text = " ".join(narr_words)
 
                 if stem:
-                    stemmer = PorterStemmer()
-                    narr_string = ""
-                    for nw in narr_words:
-                        #print "stem( " + nw + ", " + str(len(nw)) + ")"
-                        newword = stemmer.stem(nw)
-                        #print "stem: " + nw + " -> " + newword
-                        narr_string = narr_string + " " + newword
+                    narr_string = preprocessing.stem(text)
                 elif lemma:
-                    lemmatizer = WordNetLemmatizer()
-                    narr_string = ""
-                    for nw in narr_words:
-                        newword = lemmatizer.lemmatize(nw)
-                        narr_string = narr_string + " " + newword
+                    narr_string = preprocessing.lemmatize(text)
             narratives.append(narr_string.strip().lower())
             #print "Adding narr: " + narr_string.lower()
 
@@ -289,6 +279,7 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
 
         # Create word2vec mapping
         word2vec = {}
+        dim = 0
         with open(vecfile, "r") as f:
             firstline = True
             for line in f:
@@ -304,14 +295,18 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
                         #print "token: " + token
                         vec.append(float(token))
                     word2vec[word] = vec
+                    dim = len(vec)
 
         # Convert words to vectors and add to matrix
         dict_keys.append(narr_vec)
         global max_seq_len
-        if train:
-            max_seq_len = 0
+        max_seq_len = 200
+        #if train:
+            #max_seq_len = 0
+        print "word2vec dim: " + str(dim)
+        print "initial max_seq_len: " + str(max_seq_len)
         zero_vec = []
-        for z in range(0, 200):
+        for z in range(0, dim):
             zero_vec.append(0)
         for x in range(len(matrix)):
             narr = narratives[x]
@@ -327,8 +322,8 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
                     vectors.append(vec)
             length = len(vectors)
             if length > max_seq_len:
-                if train:
-                    max_seq_len = length
+                #if train:
+                #    max_seq_len = length
                 vectors = vectors[(-1*max_seq_len):]
             (matrix[x])[narr_vec] = vectors
 
@@ -415,5 +410,24 @@ def add_keywords(keywords, keyword_string, translate_table, stopwords):
                 w2 = w.strip().strip('-')
                 if w2 not in stopwords:
                     keywords.add(w2)
+
+def get_narrs(filename):
+    narratives = []
+    # Get the xml from file
+    root = etree.parse(filename).getroot()
+    for child in root:
+        item = child.find("narrative")
+        if item != None:
+            narr_string = ""
+            if item.text != None:
+                narr_string = item.text.encode("utf-8")
+            else:
+                print "warning: empty narrative"
+            # Uncomment for removing punctuation
+            #narr_words = [w.strip() for w in narr_string.lower().translate(string.maketrans("",""), string.punctuation).split(' ')]
+            #narr_string = " ".join(narr_words)
+            print narr_string.strip().lower()
+            narratives.append(narr_string.strip().lower())
+    return narratives
 
 if __name__ == "__main__":main()
