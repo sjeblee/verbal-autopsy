@@ -23,11 +23,14 @@ class Link:
 
 class TempPhrase:
     def __init__(self, name, index):
-        self.name = name
-        self.index = index
+        self.name = name.strip()
+        self.startindex = index
+        num = len(self.name.split(' '))
+        print "num words in tp: " + str(num)
+        self.endindex = index + (num-1)
 
     def __str__(self):
-        return str(self.index) + " " + self.name
+        return str(self.startindex) + "-" + str(self.endindex) + " " + self.name
 
 def main():
     argparser = argparse.ArgumentParser()
@@ -80,6 +83,7 @@ def main():
             # Get depparses TODO: move this to a function
             links = {}
             for line in narr_dp.split('\n'):
+                line = line.strip()
                 # Store the links of the parse in a dictionary
                 if len(line) == 0:
                     sent_deps.append(links)
@@ -103,11 +107,33 @@ def main():
                     print "added link: " + str(link)
 
             print "sent_deps: " + str(len(sent_deps))
-            print "sent_temps: "
-            for sentence in sent_temps:
-                print "sent: "
-                for tp in sentence:
-                    print str(tp)
+            print str(sent_deps)
+            print "sent_temps: " + str(len(sent_temps))
+            print str(sent_temps)
+            phrase = ""
+            for x in range(len(sent_temps)):
+                temps = sent_temps[x]
+                deps = sent_deps[x]
+                print "sent: " + str(x)
+                for tp in temps:
+                    print "tp: " + str(tp)
+                    phrase = ""
+                    # TODO: keep track of which indices have already been added to the phrase
+                    # TODO: also don't add words that are already part of the temporal phrase
+                    for ind in range(tp.startindex, tp.endindex+1):
+                        print "checking index " + str(ind)
+                        for links in deps.values():
+                            #print ind + " links: " + str(len(links))
+                            for link in links:
+                                if ind == int(link.sindex) or ind == int(link.tindex):
+                                    print "-- " + str(link)
+                                    phrase = phrase + " " + link.source
+                                    # Follow links to current word
+                                    for link2 in links:
+                                        if link2.tindex == link.sindex:
+                                            print "--- " + str(link2)
+                                            phrase = link.source + " " + phrase
+                    print "link phrase: " + phrase
             # TODO: find the head of the temporal phrase in the dependency parse
             # TODO: find the link from the temporal phrase head to another phrase
 
