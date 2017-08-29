@@ -163,8 +163,6 @@ def crossval(arg_modelname, arg_train, arg_features, arg_featurename, arg_name, 
 
     # Read data file
     print "Reading main data file..."
-    #tree = etree.parse(datafile)
-    #root = tree.getroot()
     total = 0
     with open(datafile, 'r') as f:
         for line in f:
@@ -229,8 +227,11 @@ def crossval(arg_modelname, arg_train, arg_features, arg_featurename, arg_name, 
         # Write train and test sets to file
         trainname = arg_train + "_" + str(z)
         datadir = "/u/sjeblee/research/va/data/" + arg_name
-        trainfile = datadir + "/train_" + trainname +  "_cat_spell.xml"
-        testfile = datadir + "/test_" + trainname + "_cat_spell.xml"
+        datapath = datadir + "/" + arg_dataset
+        if not os.path.exists(datapath):
+            os.mkdir(datapath)
+        trainfile = datapath + "/train_" + trainname +  "_cat_spell.xml"
+        testfile = datapath + "/test_" + trainname + "_cat_spell.xml"
         outfile = open(trainfile, 'w')
         outfile.write(xml_header + "\n")
         for item in trainset:
@@ -273,7 +274,7 @@ def crossval(arg_modelname, arg_train, arg_features, arg_featurename, arg_name, 
             
             run(m, modelname, trainname, trainname, arg_features, arg_featurename, name, arg_preprocess, arg_labels, arg_dev=False, arg_hyperopt=False, arg_dataset=dset, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes, dataloc=datadir)
 
-def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev=True, arg_hyperopt=False, arg_dataset="mds_one", arg_n_feats=398, arg_anova="f_classif", arg_nodes=297, dataloc="/u/sjeblee/research/va/data/datasets"):
+def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev=True, arg_hyperopt=False, arg_dataset="mds", arg_n_feats=398, arg_anova="f_classif", arg_nodes=297, dataloc="/u/sjeblee/research/va/data/datasets"):
 
     dataloc = dataloc + "/" + arg_dataset
     trainname = arg_train + "_cat" # all, adult, child, or neonate
@@ -314,6 +315,7 @@ def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_feature
     spname = "spell"
     print "Preprocessing..."
     if "spell" in pre:
+        print "Running spelling correction..."
         trainsp = dataloc + "/train_" + trainname + "_" + spname + ".xml"
         devsp = ""
         if arg_dev:
