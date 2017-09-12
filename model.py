@@ -74,13 +74,20 @@ def hyperopt(arg_model, arg_train_feats, arg_test_feats, arg_result_file, arg_pr
         objective = obj_nn
         global activation
         activation = 'relu'
-
-        # Define parameter space
         space = {
             'activation':hp.choice('activation', [('relu', 'relu'), ('tanh', 'tanh'), ('sigmoid','sigmoid')]),
             'n_nodes':hp.uniform('n_nodes', 50, 300),
             'n_feats':hp.uniform('n_feats', 100, 400),
             'anova_name':hp.choice('anova_name', [('f_classif', 'f_classif'), ('chi2', 'chi2')])
+        }
+
+    elif h_model == "lstm":
+        objective = obj_lstm
+        space = {
+            'activation':hp.choice('activation', [('relu', 'relu'), ('tanh', 'tanh'), ('sigmoid','sigmoid')]),
+            'n_nodes':hp.uniform('n_nodes', 100, 400),
+            #'embedding_size':hp.choice('embedding_size', [100, 150, 200, 250, 300, 400]),
+            'dropout':hp.uniform('dropout', 0.1, 0.9)
         }
     
     elif h_model == "svm":
@@ -142,6 +149,38 @@ def obj_nn(params):
 
     # Run test
     testids, testlabels, predictedlabels = test('nn', model, h_test)
+    f1score = metrics.f1_score(testlabels, predictedlabels)
+    print "F1: " + str(f1score)
+
+    # Return a score to minimize
+    return 1 - f1score
+
+def obj_lstm(params):
+    activation = params['activation'][0]
+    n_nodes = int(params['n_nodes'])
+    embedding_size = 200
+    dropout = float(params['dropout'])
+    print "obj_lstm: " + str(activation) + ", nodes:" + str(n_nodes) + ", embedding_size:" + str(embedding_size) + ", dropout: " + str(dropout)
+
+    # Read in feature keys
+    global keys
+    with open(h_train + ".keys", "r") as kfile:
+        keys = eval(kfile.read())
+
+    global labelencoder, typeencoder
+    labelencoder = preprocessing.LabelEncoder() # Transforms ICD codes to numbers
+    typeencoder = preprocessing.LabelEncoder()
+    trainids = []
+    trainlabels = []
+    X = []
+    Y = []
+    Y = preprocess(h_train, trainids, trainlabels, X, Y, True)
+    #print "X: " + str(len(X)) + "\nY: " + str(len(Y))
+
+    model, X, Y = create_lstm_model(X, Y, embedding_size, n_nodes, activation, dropout)
+
+    # Run test
+    testids, testlabels, predictedlabels = test('lstm', model, h_test)
     f1score = metrics.f1_score(testlabels, predictedlabels)
     print "F1: " + str(f1score)
 
