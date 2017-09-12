@@ -3,7 +3,7 @@
 # Cluster the keywords from the records using word2vec
 
 from lxml import etree
-from sklearn.cluster import KMeans, SpectralClustering
+from sklearn.cluster import AgglomerativeClustering, KMeans, SpectralClustering
 from scipy.stats import mode
 import argparse
 import numpy
@@ -62,16 +62,20 @@ def run(outfile, clusterfile, vecfile, infile=None):
     # Generate clusters
     print "generating clusters..."
     clusterer = KMeans(n_clusters=num_clusters, n_jobs=1, precompute_distances=False, max_iter=300, n_init=15)
-    #clusterer = SpectralClustering(n_clusters=num_clusters, n_init=15)
-    kw_clusters = map_back(clusterer.fit_predict(kw_vecs))
+    #clusterer = SpectralClustering(n_clusters=num_clusters, n_init=15, affinity='nearest_neighbors')
+    #clusterer = AgglomerativeClustering(n_clusters=num_clusters)
+    kw_clusters = map_back(clusterer.fit_predict(kw_vecs), cluster_names)
 
     # Score clusters
     print "scoring clusters..."
     purity_score = purity(keywords, kw_clusters_correct, kw_clusters)
-    print "purity: " + str(purity)
+    print "purity: " + str(purity_score)
 
     # Write results to file
-    write_clusters_to_file(outfile, get_cluster_map(keywords, pred_clusters))
+    write_clusters_to_file(outfile, get_cluster_map(keywords, kw_clusters))
+    outf = open(outfile + ".vecs", 'w')
+    outf.write(str(get_cluster_map(kw_vecs, kw_clusters)))
+    outf.close()
 
     totaltime = time.time() - starttime
     print "Total time: " + str(totaltime) + " s"
@@ -167,7 +171,7 @@ def write_clusters_to_file(outfile, cluster_map):
         print "cluster " + str(key)
         outf.write(str(key) + ",")
         for item in cluster_map[key]:
-            outf.write(item + ",")
+            outf.write(str(item) + ",")
         outf.write("\n")
     outf.close()
 
