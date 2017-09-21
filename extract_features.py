@@ -278,24 +278,7 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
         print "Warning: using word2vec features, ignoring all other features"
 
         # Create word2vec mapping
-        word2vec = {}
-        dim = 0
-        with open(vecfile, "r") as f:
-            firstline = True
-            for line in f:
-                # Ignore the first line of the file
-                if firstline:
-                    firstline = False
-                else:
-                    #print "line: " + line
-                    tokens = line.strip().split(' ')
-                    vec = []
-                    word = tokens[0]
-                    for token in tokens[1:]:
-                        #print "token: " + token
-                        vec.append(float(token))
-                    word2vec[word] = vec
-                    dim = len(vec)
+        word2vec, dim = load_word2vec(vecfile)
 
         # Convert words to vectors and add to matrix
         dict_keys.append(narr_vec)
@@ -429,5 +412,25 @@ def get_narrs(filename):
             print narr_string.strip().lower()
             narratives.append(narr_string.strip().lower())
     return narratives
+
+def load_word2vec(vecfile):
+    # Create word2vec mapping
+    word2vec = {}
+    dim = 0
+    with open(vecfile, "r") as f:
+        firstline = True
+        for line in f:
+            # Ignore the first line of the file
+            if firstline:
+                firstline = False
+            else:
+                tokens = line.strip().split(' ')
+                vec = []
+                word = tokens[0]
+                for token in tokens[1:]:
+                    vec.append(float(token))
+                word2vec[word] = vec
+                dim = len(vec)
+    return word2vec, dim
 
 if __name__ == "__main__":main()
