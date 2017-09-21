@@ -30,6 +30,8 @@ def main():
     tree = etree.parse(args.infile)
     root = tree.getroot()
     removed = 0
+    removed_unk = 0
+    notfound = []
     
     for child in root:
         id_node = child.find("MG_ID")
@@ -41,24 +43,30 @@ def main():
         if cat_node is None:
             node = child.find("Final_code")
             if node != None:
-                icd = node.text
-            if icd == "NULL":
+                icd = node.text.upper()
+            if icd is None or icd == "NULL" or icd == "NR":
                 print "Removing record!"
                 root.remove(child)
                 removed = removed + 1
                 continue
-            elif icd == None:
-                print "ICD was None, set to R99"
-                icd = "R99"
             else:
                 print "ICD: " + icd
             icdcat = etree.Element("ICD_cat")
-            icdcat.text = icdmap[icd]
+            if icd in icdmap:
+                icdcat.text = icdmap[icd]
+            else:
+                print "ICD not found: " + icd
+                notfound.append(icd)
+                root.remove(child)
+                removed_unk = removed_unk + 1
+                continue
             child.append(icdcat)
         
     # write the xml to file
     tree.write(args.outfile)
 
-    print "Removed " + str(removed) + " records with NULL ICD codes"
+    print "Removed " + str(removed) + " records with NULL or missing ICD codes"
+    print "Removed " + str(removed_unk) + " records with unrecognized ICD codes"
+    print "ICD codes not recognized: " + str(notfound)
 
 if __name__ == "__main__":main()
