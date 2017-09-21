@@ -11,6 +11,8 @@ from keras.models import Sequential, load_model
 from keras.layers import Dense, Dropout, Activation, Flatten
 from keras.layers import Embedding
 from keras.layers import LSTM
+from keras.layers.convolutional import Conv1D
+from keras.layers.pooling import GlobalMaxPooling1D
 from keras.layers.recurrent import SimpleRNN
 from keras.layers.wrappers import Bidirectional
 from keras.utils.np_utils import to_categorical
@@ -338,16 +340,17 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
             X = numpy.asarray(X)
         else:
             print "creating a new neural network model"
+            embedding_dim = 200
             if arg_model == "nn":
                 model, X, Y = create_nn_model(X, Y, anova_function, num_feats, num_nodes, 'relu')
             elif arg_model == "lstm":
-                embedding_dim = 100
                 num_nodes = 256
                 model, X, Y = create_lstm_model(X, Y, embedding_dim, num_nodes, arg_activation)
                 #score = model.evaluate(X_test, Y_test, batch_size=16
             elif arg_model == "rnn":
-                embedding_dim = 200
                 model, X, Y = create_rnn_model(X, Y, embedding_dim, num_nodes, arg_activation)
+            elif arg_model == "cnn":
+                model, X, Y = create_cnn_model(X, Y, embedding_dim)
 
             # Save the model
             print "saving the model..."
@@ -400,13 +403,13 @@ def test(model_type, model, testfile):
     testY = []
     predictedY = []
     testY = preprocess(testfile, testids, testlabels, testX, testY)
-    if not model_type == "lstm" and not model_type == "rnn":
+    if not model_type == "lstm" and not model_type == "rnn" and not model_type == "cnn":
         testX = anova_filter.transform(testX)
-    if model_type == "rnn" or model_type == "lstm":
+    if model_type == "rnn" or model_type == "lstm" or model_type == "cnn":
         testX = numpy.asarray(testX)
 
     print "testX shape: " + str(testX.shape)
-    if model_type == "nn" or model_type == "lstm" or model_type == "rnn":
+    if model_type == "nn" or model_type == "lstm" or model_type == "rnn" or model_type == "cnn":
         predictedY = model.predict(testX)
         results = map_back(predictedY)
     else:
@@ -475,6 +478,25 @@ def create_lstm_model(X, Y, embedding_size, num_nodes, activation='sigmoid', dro
     nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
 
     nn.fit(X, Y, nb_epoch=15)
+    nn.summary()
+    return nn, X, Y
+
+def create_cnn_model(X, Y, embedding_size, act=None, window=3):
+    Y = to_categorical(Y)
+    X = numpy.asarray(X)
+    print "train X shape: " + str(X.shape)
+
+    print "CNN: filters: " + str(max_seq_len) + " embedding: " + str(embedding_size)
+    print "max_seq_len: " + str(max_seq_len)
+    print "window: " + str(window)
+    # TEMP for no embedding
+    embedding_size = 200
+    nn = Sequential([Conv1D(max_seq_len, window, input_shape=(max_seq_len, embedding_size)),
+                     GlobalMaxPooling1D(),
+                     Dense(Y.shape[1], activation='softmax')])
+    nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+
+    nn.fit(X, Y)
     nn.summary()
     return nn, X, Y
 
