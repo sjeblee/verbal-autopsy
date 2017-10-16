@@ -40,7 +40,7 @@ def main():
         print "--in [train.features]"
         print "--test [test.features]"
         print "--out [test.results]"
-        print "--labels [ICD_cat/Final_code] (optional)"
+        print "--labels [ICD_cat/ICD_cat_neo/Final_code] (optional)"
         print "--features [type/dem/narr_count/narr_vec/narr_tfidf/kw_count/kw_tfidf/lda/symp_train/narr_medttk_count]"
         print "--featurename [feature_set_name]"
         print "--model [nn/lstm/svm/rf/nb]"
@@ -108,7 +108,7 @@ def main():
             nodes = 192
             anova = "chi2"
         else:
-            n_feats = 398
+            n_feats = 378
 
     # Temp for RNN
     #nodes = 600
@@ -134,119 +134,130 @@ def crossval(arg_modelname, arg_train, arg_features, arg_featurename, arg_name, 
 
     # Records should be one per line, no xml header or footer
     dset = arg_dataset
-    datafile_child = dataloc + "/" + dset + "/all_child_cat_spell.txt"
-    datafile_neo = dataloc + "/" + dset + "/all_neonate_cat_spell.txt"
-    datafile_adult = dataloc + "/" + dset + "/all_adult_cat_spell.txt"
-    datafile = dataloc + "/" + dset + "/all_" + arg_train + "_cat_spell.txt"
+    datafile_child = dataloc + "/" + dset + "/all_child_cat.txt"
+    datafile_neo = dataloc + "/" + dset + "/all_neonate_cat.txt"
+    datafile_adult = dataloc + "/" + dset + "/all_adult_cat.txt"
+    datafile = dataloc + "/" + dset + "/all_" + arg_train + "_cat.txt"
     records = []
     data = {}
     datasets = []
     train_extra = []
 
+    #if "spell" in arg_preprocess:
     # TODO: check for spell version if spell in preprocessing
 
     xml_header = '<dataroot xmlns:od="urn:schemas-microsoft-com:officedata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="Adult_Anonymous_23Sept2016.xsd" generated="2016-09-23T12:57:36">'
     xml_footer = '</dataroot>'
 
-    # Extra training data
-    print "Loading extra training data..."
-    if arg_train == "adult":
-        train_extra = train_extra + get_recs(datafile_child)
-        train_extra = train_extra + get_recs(datafile_neo)
-    elif arg_train == "child":
-        train_extra = train_extra + get_recs(datafile_adult)
-        train_extra = train_extra + get_recs(datafile_neo)
-    elif arg_train == "neonate":
-        train_extra = train_extra + get_recs(datafile_child)
+    # Set up file paths
+    datadir = "/u/sjeblee/research/va/data/" + arg_name
+    datapath = datadir + "/" + arg_dataset
+    if os.path.exists(datapath):
+        print "Data files already exist, re-using them"
+    else:
+        os.mkdir(datapath)
 
-    print "train_extra: " + str(len(train_extra))
+        # TODO: if dirs exist already, don't recreate the datasets, just re-run the models that don't have output
 
-    # Read data file
-    print "Reading main data file..."
-    total = 0
-    with open(datafile, 'r') as f:
-        for line in f:
-            cat = 15
-            child = etree.fromstring(line)
-            node = child.find("ICD_cat")
-            if node != None:
-                cat = int(node.text)
-            if not cat in data:
-                data[cat] = []
-            data[cat].append(line.strip())
-            total = total + 1
-    print "Records in main data file: " + str(total)
+        # Extra training data
+        print "Loading extra training data..."
+        train_extra = []
+        if arg_train == "adult":
+            train_extra = train_extra + get_recs(datafile_child)
+            train_extra = train_extra + get_recs(datafile_neo)
+        elif arg_train == "child":
+            train_extra = train_extra + get_recs(datafile_adult)
+            train_extra = train_extra + get_recs(datafile_neo)
+        #elif arg_train == "neonate":
+        #    train_extra = train_extra + get_recs(datafile_child)
 
-    # Determine how many records we need from each category
-    num = {}
-    for category in data:
-        recs = data[category]
-        n = len(recs)/10
-        shuffle(data[category])
-        if n == 0:
-            n = 1
-        num[category] = n
-    print "Num of recs from each cat: " + str(num)
+        print "train_extra: " + str(len(train_extra))
 
-    for x in range(10):
-        # Construct datasets
-        print "Constructing dataset " + str(x)
-        recset = []
+        # Read data file
+        print "Reading main data file..."
+        total = 0
+        with open(datafile, 'r') as f:
+            for line in f:
+                print "line: " + line
+                cat = 15
+                child = etree.fromstring(line)
+                node = child.find("ICD_cat")
+                if node != None:
+                    cat = node.text
+                if not cat in data:
+                    data[cat] = []
+                data[cat].append(line.strip())
+                total = total + 1
+        print "Records in main data file: " + str(total)
+
+        # Determine how many records we need from each category
+        num = {}
         for category in data:
-            numrecs = num[category]
+            recs = data[category]
+            n = len(recs)/10
+            shuffle(data[category])
+            if n == 0:
+                n = 1
+            num[category] = n
+        print "Num of recs from each cat: " + str(num)
 
-            # Add recs to the set and remove from original list
-            if len(data[category]) > numrecs:
-                recset = recset + data[category][0:numrecs]
-                del data[category][0:numrecs]
-            elif len(data[category]) > 0:
-                recset = recset + data[category]
-                data[category] = []
-            else:
-                print "no recs added from cat " + str(category) + " because it was empty"
-        datasets.append(recset)
-        print "total recs: " + str(len(recset))
+        for x in range(10):
+            # Construct datasets
+            print "Constructing dataset " + str(x)
+            recset = []
+            for category in data:
+                numrecs = num[category]
 
+                # Add recs to the set and remove from original list
+                if len(data[category]) > numrecs:
+                    recset = recset + data[category][0:numrecs]
+                    del data[category][0:numrecs]
+                elif len(data[category]) > 0:
+                    recset = recset + data[category]
+                    data[category] = []
+                else:
+                    print "no recs added from cat " + str(category) + " because it was empty"
+            datasets.append(recset)
+            print "total recs: " + str(len(recset))
+
+        for z in range(10):
+            # Construct train and test sets
+            testset = datasets[z]
+            trainset = [] + train_extra
+            if z > 0:
+                for u in range(0, z):
+                    trainset = trainset + datasets[u]
+            if z < 9:
+                for v in range(z+1, 10):
+                    trainset = trainset + datasets[v]
+
+            shuffle(trainset)
+            shuffle(testset)
+
+            print "Train: " + str(len(trainset))
+            print "Test: " + str(len(testset))
+
+            # Write train and test sets to file
+            trainname = arg_train + "_" + str(z)
+            trainfile = datapath + "/train_" + trainname +  "_cat_spell.xml"
+            testfile = datapath + "/test_" + trainname + "_cat_spell.xml"
+            outfile = open(trainfile, 'w')
+            outfile.write(xml_header + "\n")
+            for item in trainset:
+                outfile.write(item + "\n")
+            outfile.write(xml_footer + "\n")
+            outfile.close()
+
+            outfile2 = open(testfile, 'w')
+            outfile2.write(xml_header + "\n")
+            for item in testset:
+                outfile2.write(item + "\n")
+            outfile2.write(xml_footer + "\n")
+            outfile2.close()
+
+    # Run models
     for z in range(10):
-        # Construct train and test sets
-        testset = datasets[z]
-        trainset = [] + train_extra
-        if z > 0:
-            for u in range(0, z):
-                trainset = trainset + datasets[u]
-        if z < 9:
-            for v in range(z+1, 10):
-                trainset = trainset + datasets[v]
-
-        shuffle(trainset)
-        shuffle(testset)
-
-        print "Train: " + str(len(trainset))
-        print "Test: " + str(len(testset))
-
-        # Write train and test sets to file
         trainname = arg_train + "_" + str(z)
-        datadir = "/u/sjeblee/research/va/data/" + arg_name
-        datapath = datadir + "/" + arg_dataset
-        if not os.path.exists(datapath):
-            os.mkdir(datapath)
-        trainfile = datapath + "/train_" + trainname +  "_cat_spell.xml"
-        testfile = datapath + "/test_" + trainname + "_cat_spell.xml"
-        outfile = open(trainfile, 'w')
-        outfile.write(xml_header + "\n")
-        for item in trainset:
-            outfile.write(item + "\n")
-        outfile.write(xml_footer + "\n")
-        outfile.close()
-
-        outfile2 = open(testfile, 'w')
-        outfile2.write(xml_header + "\n")
-        for item in testset:
-            outfile2.write(item + "\n")
-        outfile2.write(xml_footer + "\n")
-        outfile2.close()
-
-        # Run models
         for m in models:
             name = arg_name + "/" + m + "_" + str(z)
             modelname = m + "_" + str(z) + "_" + arg_train
@@ -270,7 +281,7 @@ def crossval(arg_modelname, arg_train, arg_features, arg_featurename, arg_name, 
                     nodes = 192
                     anova = "chi2"
                 else:
-                    n_feats = 398
+                    n_feats = 378
             
             run(m, modelname, trainname, trainname, arg_features, arg_featurename, name, arg_preprocess, arg_labels, arg_dev=False, arg_hyperopt=False, arg_dataset=dset, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes, dataloc=datadir)
 
