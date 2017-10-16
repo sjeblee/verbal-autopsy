@@ -9,8 +9,7 @@ import time
 from hyperopt import hp, fmin, tpe, space_eval
 from keras.models import Sequential, load_model
 from keras.layers import Dense, Dropout, Activation, Flatten
-from keras.layers import Embedding
-from keras.layers import LSTM
+from keras.layers import Embedding, LSTM, Merge
 from keras.layers.convolutional import Conv1D
 from keras.layers.pooling import GlobalMaxPooling1D
 from keras.layers.recurrent import SimpleRNN
@@ -41,7 +40,7 @@ def main():
     args = argparser.parse_args()
 
     if not (args.infile and args.outfile and args.testfile and args.model):
-        print "usage: python model.py --in [train.features] --test [test.features] --out [test.results] --labels [ICD_cat/Final_code] --model [nn] --name [rnn_ngram3] --prefix [/sjeblee/research/models]"
+        print "usage: python model.py --in [train.features] --test [test.features] --out [test.results] --labels [ICD_cat/ICD_cat_neo/Final_code] --model [nn] --name [rnn_ngram3] --prefix [/sjeblee/research/models]"
         exit()
 
     labelname = "Final_Code"
@@ -310,7 +309,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     labelencoder = preprocessing.LabelEncoder()
     typeencoder = preprocessing.LabelEncoder()
 
-    # Load the feautures
+    # Load the features
     Y = preprocess(arg_train_feats, trainids, trainlabels, X, Y, True)
     print "X: " + str(len(X)) + "\nY: " + str(len(Y))
 
@@ -340,7 +339,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
             X = numpy.asarray(X)
         else:
             print "creating a new neural network model"
-            embedding_dim = 200
+            embedding_dim = 200 
             if arg_model == "nn":
                 model, X, Y = create_nn_model(X, Y, anova_function, num_feats, num_nodes, 'relu')
             elif arg_model == "lstm":
@@ -409,8 +408,11 @@ def test(model_type, model, testfile):
         testX = numpy.asarray(testX)
 
     print "testX shape: " + str(testX.shape)
-    if model_type == "nn" or model_type == "lstm" or model_type == "rnn" or model_type == "cnn":
+    if model_type == "nn" or model_type == "lstm" or model_type == "rnn":
         predictedY = model.predict(testX)
+        results = map_back(predictedY)
+    elif model_type == "cnn":
+        predictedY = model.predict([testX, testX, testX])
         results = map_back(predictedY)
     else:
         results = model.predict(testX)
@@ -484,19 +486,33 @@ def create_lstm_model(X, Y, embedding_size, num_nodes, activation='sigmoid', dro
 def create_cnn_model(X, Y, embedding_size, act=None, window=3):
     Y = to_categorical(Y)
     X = numpy.asarray(X)
+    embedding_size = X.shape[-1]
     print "train X shape: " + str(X.shape)
-
     print "CNN: filters: " + str(max_seq_len) + " embedding: " + str(embedding_size)
     print "max_seq_len: " + str(max_seq_len)
     print "window: " + str(window)
-    # TEMP for no embedding
-    embedding_size = 200
-    nn = Sequential([Conv1D(max_seq_len, window, input_shape=(max_seq_len, embedding_size)),
-                     GlobalMaxPooling1D(),
-                     Dense(Y.shape[1], activation='softmax')])
+    window_sizes = [2, 3, 4]
+    branches = []
+
+    #for window in window_sizes:
+    branch = Sequential()
+    branch.add(Conv1D(max_seq_len, 2, input_shape=(max_seq_len, embedding_size)))
+    branch.add(GlobalMaxPooling1D())
+    branch2 = Sequential()
+    branch2.add(Conv1D(max_seq_len, 3, input_shape=(max_seq_len, embedding_size)))
+    branch2.add(GlobalMaxPooling1D())
+    branch3 = Sequential()
+    branch3.add(Conv1D(max_seq_len, 4, input_shape=(max_seq_len, embedding_size)))
+    branch3.add(GlobalMaxPooling1D())
+
+    #    branches.append(branch)
+    #print "branches: " + str(len(branches))
+    nn = Sequential()
+    nn.add(Merge([branch, branch2, branch3], mode = 'concat'))
+    nn.add(Dense(Y.shape[1], activation='softmax'))
     nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
 
-    nn.fit(X, Y)
+    nn.fit([X, X, X], Y)
     nn.summary()
     return nn, X, Y
 
@@ -507,8 +523,8 @@ def create_anova_filter(X, Y, function, num_feats):
     X = anova_filter.transform(X)
     selected = anova_filter.get_support(True)
     print "features selected: "
-    for i in selected:
-        print "\t" + keys[i+2]
+    #for i in selected:
+    #    print "\t" + keys[i+2]
     return anova_filter, X
 
 def preprocess(filename, ids, labels, x, y, trainlabels=False):
