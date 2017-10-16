@@ -11,16 +11,22 @@ def main():
     argparser.add_argument('--in', action="store", dest="infile")
     argparser.add_argument('--out', action="store", dest="outfile")
     argparser.add_argument('--map', action="store", dest="mapfile")
+    argparser.add_argument('--label', action="store", dest="label")
     args = argparser.parse_args()
 
     if not (args.infile and args.outfile and args.mapfile):
-        print "usage: ./addcategory.py --in [file.xml] --out [outfile.xml] --map [map.csv]"
+        print "usage: ./addcategory.py --in [file.xml] --out [outfile.xml] --map [map.csv] --label [ICD_cat]"
         exit()
+
+    label = "ICD_cat"
+    if args.label:
+        label = args.label
 
     # Get the ICD mapping
     icdmap = {}
     with open(args.mapfile, "r") as f:
         for line in f:
+            print "adding: " + line
             tokens = line.split(',')
             icd = tokens[0]
             cat = tokens[1]
@@ -39,7 +45,7 @@ def main():
         print "ID: " + rec_id
         icd = "R99"
         # Skip if record already has an ICD cat
-        cat_node = child.find("ICD_cat")
+        cat_node = child.find(label)
         if cat_node is None:
             node = child.find("Final_code")
             if node != None:
@@ -51,15 +57,18 @@ def main():
                 continue
             else:
                 print "ICD: " + icd
-            icdcat = etree.Element("ICD_cat")
+            icdcat = etree.Element(label)
             if icd in icdmap:
                 icdcat.text = icdmap[icd]
             else:
-                print "ICD not found: " + icd
-                notfound.append(icd)
-                root.remove(child)
-                removed_unk = removed_unk + 1
-                continue
+                if label == "ICD_cat_neo":
+                    icdcat.text = "N5"
+                else:
+                    print "ICD not found: " + icd
+                    notfound.append(icd)
+                    root.remove(child)
+                    removed_unk = removed_unk + 1
+                    continue
             child.append(icdcat)
         
     # write the xml to file
