@@ -10,6 +10,13 @@ import numpy
 import string
 import subprocess
 
+class Word:
+    def __init__(self, word, index):
+        self.word = word
+        self.index = index
+    def __str__(self):
+        return str(self.index) + ": " + self.word
+
 class Link:
     def __init__(self, name, source, sindex, target, tindex):
         self.name = name
@@ -80,37 +87,11 @@ def main():
                     sent_temps.append(temp_phrases)
                     sent_words.append(words)
 
-            # Get depparses TODO: move this to a function
-            links = {}
-            for line in narr_dp.split('\n'):
-                line = line.strip()
-                # Store the links of the parse in a dictionary
-                if len(line) == 0:
-                    sent_deps.append(links)
-                    links = {}
-                else:
-                    i = line.index('(')
-                    name = line[0:i]
-                    j = line.index(")")
-                    stuff = line[i+1:j]
-                    words = stuff.split(', ')
-                    k = words[0].index('-')
-                    source = words[0][0:k]
-                    sindex = words[0][k+1:]
-                    l = words[1].index('-')
-                    target = words[1][0:l]
-                    tindex = words[1][l+1:]
-                    link = Link(name, source, sindex, target, tindex)
-                    if not links.has_key(source):
-                        links[sindex] = []
-                    links[sindex].append(link)
-                    print "added link: " + str(link)
+            # Get depparses
+            sent_deps = get_deps(narr_dp)
 
-            print "sent_deps: " + str(len(sent_deps))
-            print str(sent_deps)
             print "sent_temps: " + str(len(sent_temps))
             print str(sent_temps)
-            phrase = ""
             for x in range(len(sent_temps)):
                 temps = sent_temps[x]
                 deps = sent_deps[x]
@@ -118,21 +99,52 @@ def main():
                 for tp in temps:
                     print "tp: " + str(tp)
                     phrase = ""
-                    # TODO: keep track of which indices have already been added to the phrase
-                    # TODO: also don't add words that are already part of the temporal phrase
+                    phrase_words = [] # array of Words
+                    used_indices = []
+                    # Keep track of which indices have already been added to the phrase
                     for ind in range(tp.startindex, tp.endindex+1):
+                        used_indices.append(ind)
+                    # TODO: also don't add words that are already part of the temporal phrase
+                    for ind in range(tp.startindex, tp.endindex+1): 
                         print "checking index " + str(ind)
+                        print "used_indices: " + str(used_indices)
                         for links in deps.values():
                             #print ind + " links: " + str(len(links))
                             for link in links:
-                                if ind == int(link.sindex) or ind == int(link.tindex):
+                                cont = True
+                                sind = int(link.sindex)
+                                tind = int(link.tindex)
+                                print "checking link: " + str(sind) + ":" + str(tind)
+                                #print "sind==ind " + str(sind==ind)
+                                #print "tind==ind " + str(tind==ind)
+                                
+                                if sind == ind and tind not in used_indices:
                                     print "-- " + str(link)
-                                    phrase = phrase + " " + link.source
-                                    # Follow links to current word
+                                    word = Word(link.target, tind)
+                                    phrase_words.append(word)
+                                    used_indices.append(tind)
+                                    # Follow forward links TODO: fix this
                                     for link2 in links:
-                                        if link2.tindex == link.sindex:
+                                        if int(link2.sindex) == tind:
                                             print "--- " + str(link2)
-                                            phrase = link.source + " " + phrase
+                                            if link.name in ["prep","xcomp","pobj","conj","cc"]:
+                                                phrase_words.append(word)
+                                elif tind == ind and sind not in used_indices:
+                                    print "-- " + str(link)
+                                    word = Word(link.source, sind)
+                                    phrase_words.append(word)
+                                    used_indices.append(sind)
+                                    for link2 in links:
+                                        if int(link2.tindex) == sind:
+                                            print "--- " + str(link2)
+                                            #if link.name in ["prep","xcomp","pobj","conj","cc"]:
+                                            phrase_words.append(word)
+
+                    # TODO: construct phrase in the correct order
+                    phrase_words.sort(key=lambda x: x.index, reverse=False)
+                    for w in phrase_words:
+                        phrase = phrase + " " + w.word
+                    phrase = phrase.strip()
                     print "link phrase: " + phrase
             # TODO: find the head of the temporal phrase in the dependency parse
             # TODO: find the link from the temporal phrase head to another phrase
@@ -141,6 +153,37 @@ def main():
         
     # write the new xml to file
     tree.write(args.outfile)
+
+def get_deps(narr_dp):
+    links = {}
+    sent_deps = []
+    for line in narr_dp.split('\n'):
+        line = line.strip()
+        # Store the links of the parse in a dictionary
+        if len(line) == 0:
+            sent_deps.append(links)
+            links = {}
+        else:
+            i = line.index('(')
+            name = line[0:i]
+            j = line.index(")")
+            stuff = line[i+1:j]
+            words = stuff.split(', ')
+            k = words[0].index('-')
+            source = words[0][0:k]
+            sindex = words[0][k+1:]
+            l = words[1].index('-')
+            target = words[1][0:l]
+            tindex = words[1][l+1:]
+            link = Link(name, source, sindex, target, tindex)
+            if not links.has_key(source):
+                links[sindex] = []
+            links[sindex].append(link)
+            print "added link: " + str(link)
+
+    print "sent_deps: " + str(len(sent_deps))
+    print str(sent_deps)
+    return sent_deps
 
 def parse_timeml(line):
     line = line.strip()
