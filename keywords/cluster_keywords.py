@@ -58,23 +58,24 @@ def run(outfile, clusterfile, vecfile, infile=None):
     print "num_keywords: " + str(len(keywords))
     print "num_clusters: " + str(num_clusters)
     print "dim: " + str(dim)
+    print "cluster_names: " + str(cluster_names)
 
     # Generate clusters
-    print "generating clusters..."
-    clusterer = KMeans(n_clusters=num_clusters, n_jobs=1, precompute_distances=False, max_iter=300, n_init=15)
+    #print "generating clusters..."
+    #clusterer = KMeans(n_clusters=num_clusters, n_jobs=1, precompute_distances=False, max_iter=300, n_init=15)
     #clusterer = SpectralClustering(n_clusters=num_clusters, n_init=15, affinity='nearest_neighbors')
     #clusterer = AgglomerativeClustering(n_clusters=num_clusters)
-    kw_clusters = map_back(clusterer.fit_predict(kw_vecs), cluster_names)
+    #kw_clusters = map_back(clusterer.fit_predict(kw_vecs), cluster_names)
 
     # Score clusters
-    print "scoring clusters..."
-    purity_score = purity(keywords, kw_clusters_correct, kw_clusters)
-    print "purity: " + str(purity_score)
+    #print "scoring clusters..."
+    #purity_score = purity(keywords, kw_clusters_correct, kw_clusters)
+    #print "purity: " + str(purity_score)
 
     # Write results to file
-    write_clusters_to_file(outfile, get_cluster_map(keywords, kw_clusters))
+    #write_clusters_to_file(outfile, get_cluster_map(keywords, kw_clusters))
     outf = open(outfile + ".vecs", 'w')
-    outf.write(str(get_cluster_map(kw_vecs, kw_clusters)))
+    outf.write(str(get_cluster_map(kw_vecs, kw_clusters_correct, cluster_names)))
     outf.close()
 
     totaltime = time.time() - starttime
@@ -154,11 +155,13 @@ def purity(keywords, corr_clusters, pred_clusters):
     purity = float(n_corr) / float(n)
     return purity
 
-def get_cluster_map(keywords, clusters):
+def get_cluster_map(keywords, clusters, cluster_names=None):
     cluster_map = {}
     for x in range(len(keywords)):
         kw = keywords[x]
         clust = clusters[x]
+        if cluster_names is not None:
+            clust = cluster_names[clust]
         if clust not in cluster_map:
             cluster_map[clust] = []
         cluster_map[clust].append(kw)
