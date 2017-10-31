@@ -12,17 +12,21 @@ def main():
     argparser = argparse.ArgumentParser()
     argparser.add_argument('--in', action="store", dest="infile")
     argparser.add_argument('--out', action="store", dest="outfile")
+    argparser.add_argument('--models', action="store",dest="models")
     args = argparser.parse_args()
 
     if not (args.infile and args.outfile):
         print "usage: ./score_crossval.py --in [.../crossval] --out [crossval_results.csv]"
         exit()
 
-    run(args.infile, args.outfile)
+    models = "nb,rf,svm,nn"
+    if args.models:
+        models = args.models
+    run(args.infile, args.outfile, models)
 
-def run(arg_infile, arg_outfile):
+def run(arg_infile, arg_outfile, arg_models):
     crossval_dir = arg_infile
-    models = ["nb","rf","svm","nn"]
+    models = arg_models.split(',')
     final_scores = {}
     global p, r, f1, pccc, csmfa
     p = 'p'
