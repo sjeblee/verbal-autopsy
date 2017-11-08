@@ -7,9 +7,9 @@ import numpy
 import os
 import time
 from hyperopt import hp, fmin, tpe, space_eval
-from keras.models import Sequential, load_model
-from keras.layers import Dense, Dropout, Activation, Flatten
-from keras.layers import Embedding, LSTM, Merge
+from keras.models import Model, Sequential, load_model
+from keras.layers import Input, Dense, Dropout, Activation, Flatten
+from keras.layers import Embedding, LSTM, Merge, merge, concatenate
 from keras.layers.convolutional import Conv1D
 from keras.layers.pooling import GlobalMaxPooling1D
 from keras.layers.recurrent import SimpleRNN
@@ -412,7 +412,7 @@ def test(model_type, model, testfile):
         predictedY = model.predict(testX)
         results = map_back(predictedY)
     elif model_type == "cnn":
-        predictedY = model.predict([testX, testX, testX])
+        predictedY = model.predict(testX)
         results = map_back(predictedY)
     else:
         results = model.predict(testX)
@@ -490,30 +490,44 @@ def create_cnn_model(X, Y, embedding_size, act=None, window=3):
     print "train X shape: " + str(X.shape)
     print "CNN: filters: " + str(max_seq_len) + " embedding: " + str(embedding_size)
     print "max_seq_len: " + str(max_seq_len)
-    print "window: " + str(window)
-    window_sizes = [2, 3, 4]
+    window_sizes = [1, 2, 3, 4, 5]
     branches = []
 
-    #for window in window_sizes:
-    branch = Sequential()
-    branch.add(Conv1D(max_seq_len, 2, input_shape=(max_seq_len, embedding_size)))
-    branch.add(GlobalMaxPooling1D())
-    branch2 = Sequential()
-    branch2.add(Conv1D(max_seq_len, 3, input_shape=(max_seq_len, embedding_size)))
-    branch2.add(GlobalMaxPooling1D())
-    branch3 = Sequential()
-    branch3.add(Conv1D(max_seq_len, 4, input_shape=(max_seq_len, embedding_size)))
-    branch3.add(GlobalMaxPooling1D())
+    # Keras functional API with attention
+    input_shape = (max_seq_len, embedding_size) 
+    inputs = Input(shape=input_shape)
 
-    #    branches.append(branch)
-    #print "branches: " + str(len(branches))
-    nn = Sequential()
-    nn.add(Merge([branch, branch2, branch3], mode = 'concat'))
-    nn.add(Dense(Y.shape[1], activation='softmax'))
+    #attention_layer = Dense(embedding_size, activation='softmax', name='attention')
+    #attention = attention_layer(inputs)
+    #attention_mul = merge([inputs, attention], output_shape=input_shape, name='attention_mul', mode='mul')
+
+    conv_outputs = []
+    for w in window_sizes:
+        print "window: " + str(w)
+        conv = Conv1D(max_seq_len, w, input_shape=input_shape)(inputs)
+        max_pool = GlobalMaxPooling1D()(conv)
+        conv_outputs.append(max_pool)
+
+    merged = concatenate(conv_outputs, axis=-1)
+
+    attn_size = merged._keras_shape[-1]
+    print "attn size: " + str(attn_size)
+    attention_layer = Dense(attn_size, activation='softmax', name='attention')
+    attention = attention_layer(merged)
+    attention_mul = merge([merged, attention], output_shape=attn_size, name='attention_mul', mode='mul')
+
+    prediction = Dense(Y.shape[1], activation='softmax')(attention_mul)
+    nn = Model(inputs=inputs, outputs=prediction)
+
     nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
-
-    nn.fit([X, X, X], Y)
+    nn.fit(X, Y, epochs=10)
     nn.summary()
+
+    try:
+        print "attention weights: " + str(attention_layer.get_weights())
+    except AttributeError:
+        print "ERROR: got an exception trying to print attention weights"
+
     return nn, X, Y
 
 def create_anova_filter(X, Y, function, num_feats):
