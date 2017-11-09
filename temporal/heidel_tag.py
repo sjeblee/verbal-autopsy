@@ -46,13 +46,16 @@ def run(infile, outfile):
             text1 = ""
             for line in lines:
                 text1 = text1 + line
-            text2 = text1.replace("&lt;", "<").replace("&gt;", ">")
-            print text2
-            newnode.text = text2
+            newnode.text = text1
             child.append(newnode)
         
     # write the stats to file
     tree.write(outfile)
-    
+    subprocess.call(["sed", "-i", "-e", 's/&lt;/ </g', outfile])
+    subprocess.call(["sed", "-i", "-e", 's/&gt;/> /g', outfile])
+    subprocess.call(["sed", "-i", "-e", 's/  / /g', outfile])
+    subprocess.call(["sed", "-i", "-e", "s/‘/'/g", outfile])
+    subprocess.call(["sed", "-i", "-e", "s/’/'/g", outfile])
+
 
 if __name__ == "__main__":main()

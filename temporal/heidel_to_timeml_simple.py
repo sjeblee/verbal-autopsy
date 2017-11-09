@@ -10,6 +10,7 @@ from itertools import chain
 import argparse
 import numpy
 import string
+import subprocess
 
 def main():
     argparser = argparse.ArgumentParser()
@@ -42,7 +43,7 @@ def main():
             node_ht = child.find("narr_heidel")
             if node_ht != None:
                 node_timeml = node_ht.find("TimeML")
-                narr_ht = stringify_children(node_timeml)#.encode('utf-8')
+                narr_ht = stringify_children(node_timeml).encode('utf-8')
                 print "narr_ht: " + narr_ht
                 simple_text = simplify(narr_ht)
                 text = simple_text.replace("&lt;", "<").replace("&gt;", ">")
@@ -53,6 +54,10 @@ def main():
         
     # write the new xml to file
     tree.write(args.outfile)
+
+    # Fix tags
+    subprocess.call(["sed", "-i", "-e", 's/&lt;/</g', args.outfile])
+    subprocess.call(["sed", "-i", "-e", 's/&gt;/>/g', args.outfile])            
 
 def stringify_children(node):
     parts = ([node.text] + list(chain(*([tostring(c)] for c in node.getchildren()))))
