@@ -99,6 +99,18 @@ def run(arg_infile, arg_outfile, arg_rank=1):
 
     # Confusion matrix
     confusion = metrics.confusion_matrix(correct, predicted, sorted(labels_correct.keys()))
+    totals = []
+    confusion_percent = []
+    for row in confusion:
+        total = 0
+        for item in row:
+            total = total + item
+        row_percent = []
+        totals.append(total)
+        for item in row:
+            item_percent = float(item)/float(total)
+            row_percent.append(item_percent)
+        confusion_percent.append(row_percent)
 
     # Print metrics to terminal
     print "Metrics:\n"
@@ -124,6 +136,21 @@ def run(arg_infile, arg_outfile, arg_rank=1):
         output.write(key)
         for j in range(len(row)):
             output.write("," + str(row[j]))
+        output.write("\n")
+
+    # Percentage confusion matrix
+    output.write("confusion_matrix_percent")
+    for key in keys:
+        output.write("," + key)
+    output.write("\n")
+    for i in range(len(keys)):
+        key = keys[i]
+        row = confusion_percent[i]
+        output.write(key)
+        for j in range(len(row)):
+            output.write("," + str(row[j]))
+        output.write("," + str(totals[i]))
+        print "totals[i]: " + str(totals[i])
         output.write("\n")
 
     output.write("predicted distribution\nicd_cat,num_records\n")
