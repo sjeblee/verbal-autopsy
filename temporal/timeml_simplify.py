@@ -63,7 +63,10 @@ def simplify(text):
                 elif "\"" not in chunk or "tid" in chunk:
                     simple_text = simple_text + " " + chunk
                 elif ">" in chunk:
-                    simple_text = simple_text + ">"
+                    ind = chunk.index('>')
+                    simple_text = simple_text + chunk[ind:]
+                    if time_end in chunk:
+                        in_time = False
             # Handle MAKEINSTANCE
             elif chunk == makeinstance:
                 eid = ""

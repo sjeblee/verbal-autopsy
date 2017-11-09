@@ -38,7 +38,17 @@ def run(infile, outfile):
             process = subprocess.Popen(["java", "-jar", "/u/sjeblee/tools/heideltime/heideltime-standalone/de.unihd.dbs.heideltime.standalone.jar", "/u/sjeblee/temp.txt"], stdout=subprocess.PIPE)
             output, err = process.communicate()
             newnode = etree.Element("narr_heidel")
-            newnode.text = output.decode('utf-8')
+
+            # Strip xml header and fix tags
+            text0 = output.decode('utf-8')
+            lines = text0.split('\n')
+            lines = lines[2:]
+            text1 = ""
+            for line in lines:
+                text1 = text1 + line
+            text2 = text1.replace("&lt;", "<").replace("&gt;", ">")
+            print text2
+            newnode.text = text2
             child.append(newnode)
         
     # write the stats to file
