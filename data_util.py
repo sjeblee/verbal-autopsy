@@ -2,6 +2,7 @@
 # Util functions
 # @author sjeblee@cs.toronto.edu
 
+from lxml import etree
 import subprocess
 
 def clean_file(filename):
@@ -32,6 +33,26 @@ def fix_line_breaks(filename, rec_type):
     out = open(filename, 'w')
     out.write(output)
     out.close()
+
+def remove_no_narrs(infile, outfile):
+    # Get the xml from file
+    tree = etree.parse(infile)
+    root = tree.getroot()
+    count = 0
+
+    for child in root:
+        node = child.find("narrative")
+        if node == None:
+            root.remove(child)
+            count = count+1
+        else:
+            narr = node.text
+            if narr == None or narr == "":
+                root.remove(child)
+                count = count+1
+
+    print "Removed " + str(count) + " missing or empty narratives"
+    tree.write(outfile)
 
 ''' matrix: a list of dictionaries
     dict_keys: a list of the dictionary keys
