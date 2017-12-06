@@ -13,7 +13,9 @@ import os
 import string
 import time
 
+import data_util
 import preprocessing
+import rebalance
 
 def main():
     argparser = argparse.ArgumentParser()
@@ -24,20 +26,24 @@ def main():
     argparser.add_argument('--labels', action="store", dest="labelname")
     argparser.add_argument('--features', action="store", dest="featurenames")
     argparser.add_argument('--element', action="store", dest="element")
+    argparser.add_argument('--rebalance', action="store", dest="rebalance")
     args = argparser.parse_args()
 
     if not (args.trainfile and args.testfile and args.trainoutfile and args.testoutfile):
-        print "usage: ./extract_features.py --train [file.xml] --test [file.xml] --trainfeats [train.feats] --testfeats [test.feats] --labels [labelname] --features [f1,f2,f3]"
+        print "usage: ./extract_features.py --train [file.xml] --test [file.xml] --trainfeats [train.feats] --testfeats [test.feats] --labels [labelname] --features [f1,f2,f3] --rebalance [adasyn/smote]"
         print "labels: Final_code, ICD_cat"
         print "features: checklist, kw_bow, kw_tfidf, kw_phrase, kw_count, narr_bow, narr_count, narr_tfidf, narr_ngram, narr_vec, narr_seq, lda"
         exit()
+    rebal = ""
+    if args.rebalance:
+        rebal = args.rebalance
 
     if args.labelname:
-        run(args.trainfile, args.trainoutfile, args.testfile, args.testoutfile, args.featurenames, args.labelname)
+        run(args.trainfile, args.trainoutfile, args.testfile, args.testoutfile, args.featurenames, args.labelname, rebal)
     else:
-        run(args.trainfile, args.trainoutfile, args.testfile, args.testoutfile, args.featurenames)
+        run(args.trainfile, args.trainoutfile, args.testfile, args.testoutfile, args.featurenames, arg_rebalance=rebal)
 
-def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames="narr_count", arg_labelname="Final_Code", stem=False, lemma=False, arg_element="narrative"):
+def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames="narr_count", arg_labelname="Final_Code", stem=False, lemma=False, arg_element="narrative", arg_rebalance=""):
     print "extract_features from " + arg_train_in + " and " + arg_test_in + " : " + arg_element
 
     # Timing
@@ -92,7 +98,7 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
     global tfidfVectorizer
     global ldaModel
 
-    keys = extract(arg_train_in, arg_train_out, None, stem, lemma, arg_element)
+    keys = extract(arg_train_in, arg_train_out, None, stem, lemma, arg_element, arg_rebalance)
     print "dict_keys: " + str(keys)
     extract(arg_test_in, arg_test_out, keys, stem, lemma, arg_element)
 
@@ -100,7 +106,7 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
     totaltime = endtime - starttime
     print "feature extraction took " + str(totaltime/60) + " mins"
 
-def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrative"):
+def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrative", arg_rebalance=""):
     train = False
     narratives = []
     keywords = []
@@ -351,19 +357,55 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
             matrix[x]['vocab_size'] = vocab_size
             matrix[x]['max_seq_len'] = max_seq_len
 
-    # Write the features to file
-    print "writing " + str(len(matrix)) + " feature vectors to file..."
-    output = open(outfile, 'w')
-    for feat in matrix:
-        #print "ICD_cat: " + feat["ICD_cat"]
-        feat_string = str(feat).replace('\n', '')
-        output.write(feat_string + "\n")
-    output.close()
+    #if arg_rebalance != "":
+    #    matrix_re = rebalance_data(matrix, dict_keys, arg_rebalance)
+    #    write_to_file(matrix_re, dict_keys, outfile)
+    #else:
+    data_util.write_to_file(matrix, dict_keys, outfile)
 
-    key_output = open(outfile + ".keys", "w")
-    key_output.write(str(dict_keys))
-    key_output.close()
-    return dict_keys
+def rebalance_data(matrix, dict_keys, rebal_name):
+    # Construct feature vectors and label vector
+    features = []
+    labels = []
+    keys = []
+    sizes = []
+    flag = True
+    for row in matrix:
+        feats = []
+        for key in dict_keys:
+            val = row[key]
+            if key == labelname:
+                labels.append(val)
+            elif key != "MG_ID":
+                if type(val) is list:
+                    feats = feats + val
+                    if flag:
+                        keys.append(key)
+                        sizes.append(len(val))
+                else:
+                    feats.append(val)
+                    if flag:
+                        keys.append(key)
+                        sizes.append(1)
+        features.append(feats)
+        if flag:
+            flag = False
+    new_feats, new_labels = rebalance.rebalance(features, labels, rebal_name)
+    new_matrix = []
+    for y in range(len(new_feats)):
+        row = new_feats[y]
+        label = labels[y]
+        index = 0
+        new_entry = {}
+        for x in range(len(sizes)):
+            key = keys[x]
+            size = sizes[x]
+            val = row[index:index+size]
+            index = index+size
+            new_entry[key] = val
+        new_entry[labelname] = label
+        new_matrix.append(new_entry)
+    return new_matrix
 
 def get_keywords(elem):
     keyword_string = ""
