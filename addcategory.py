@@ -48,9 +48,10 @@ def main():
         cat_node = child.find(label)
         if cat_node is None:
             node = child.find("Final_code")
-            if node != None:
+            icd = None
+            if node != None and node.text != None:
                 icd = node.text.upper()
-            if icd is None or icd == "NULL" or icd == "NR":
+            if icd is None or icd == "NULL" or icd == "NR" or icd == "":
                 print "Removing record!"
                 root.remove(child)
                 removed = removed + 1
