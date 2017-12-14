@@ -2,31 +2,64 @@
 # -*- coding: utf-8 -*-
 # Identify and label symptom phrases in narrative
 
+import sys
+sys.path.append('/u/sjeblee/research/va/git/verbal-autopsy')
+
 from lxml import etree
 import argparse
 import difflib
+import os
+import subprocess
 
+import data_util
 import extract_features
+import model_crf
+
+global symp_narr_tag
+symp_narr_tag = "narr_symp"
+symp_tagger_tag = "symp_tagger"
 
 def main():
     argparser = argparse.ArgumentParser()
     argparser.add_argument('--in', action="store", dest="infile")
     argparser.add_argument('--out', action="store", dest="outfile")
+    argparser.add_argument('--tagger', action="store", dest="tagger")
     args = argparser.parse_args()
 
     if not (args.infile and args.outfile):
-        print "usage: ./tag_symptoms.py --in [file.xml] --out [outfile.xml]"
+        print "usage: ./tag_symptoms.py --in [file.xml] --out [outfile.xml] --tagger [tagger]"
+        print "tagger options: keyword_match, crf, medttk"
         exit()
 
-    run(args.infile, args.outfile)
+    run(args.infile, args.outfile, args.tagger)
 
-def run(infile, outfile, usecardinal=True):
+def run(infile, outfile, tagger="keyword_match"):
+    if tagger == "crf":
+        crf_tagger(infile, outfile)
+    else:
+        tree = etree.parse(infile)
+        if tagger == "keyword_match": # DO NOT USE KEYWORD MATCH FOR TEST/DEV
+            tree = keyword_match(tree)
+        elif tagger == "medttk":
+            tree = medttk(tree)
+        tree.write(outfile)
+
+def crf_tagger(infile, outfile):
+    trainfile = '/u/sjeblee/research/data/i2b2/all_timeml_fixed.xml'
+    tempfile = './temp.xml'
+    model_crf.run(trainfile, infile, tempfile)
+    tree = etree.parse(tempfile)
+    tree.write(outfile)
+    #newtree = filter_narr(tree, "crf")
+    #newtree.write(outfile)
+
+def keyword_match(tree, usecardinal=True):
     diff_threshold = 0.8
-    starttag = '<symptom>'.encode('utf-8')
-    endtag = '</symptom>'.encode('utf-8')
+    starttag = '<EVENT>'.encode('utf-8')
+    endtag = '</EVENT>'.encode('utf-8')
 
     # Load cardinal symptoms file
-    cardinal_file = "../../data/cardinal_symptoms.txt"
+    cardinal_file = "/u/sjeblee/research/va/data/cardinal_symptoms.txt"
     cardinal = []
     if usecardinal:
         with open(cardinal_file, 'r') as f:
@@ -34,9 +67,9 @@ def run(infile, outfile, usecardinal=True):
                 cardinal.append(line.strip())
     
     # Get the xml from file
-    tree = etree.parse(infile)
     root = tree.getroot()
-    
+
+    # TODO: THIS IS CHEATING FOR TEST RECORDS!!!
     for child in root:
         keyphrases = []
         possible_phrases = []
@@ -119,15 +152,86 @@ def run(infile, outfile, usecardinal=True):
         
         # Save corrected narrative
         if node == None:
-            node = etree.Element("narrative")
+            node = etree.SubElement(child, "narrative")
         node.text = narr_fixed.strip()
-        node = etree.Element("narrative_symptoms")
+        node = etree.SubElement(child, narr_symp_tag)
         node.text = narr_symp.strip()
-        child.append(node)
+        tagger_node = etree.SubElement(child, symp_tagger_tag)
+        tagger_node.text = "keyword_match"
         
-    # write the xml to file
-    #print "writing outfile"
-    tree.write(outfile)
+    return tree
+
+def medttk(tree):
+    text_infile = "/u/sjeblee/temp.txt"
+    text_outfile = "/u/sjeblee/temp-medttk.xml"
+
+    root = tree.getroot()
+    for child in root:
+        node = child.find("narrative")
+        narr = ""
+        if node != None:
+            narr = node.text.encode('utf-8')
+        if len(narr) > 0:
+            temp = open(text_infile, "w")
+            temp.write("<TEXT>")
+            temp.write(narr)
+            temp.write("</TEXT>\n")
+            temp.close()
+
+            # Run medttk parser on narr
+            if os.path.exists(text_outfile):
+                os.remove(text_outfile)
+            process = subprocess.Popen(["python", "/u/sjeblee/tools/medttk/Med-TTK/code/tarsqi.py", "simple-xml ", text_infile, text_outfile], stdout=subprocess.PIPE)
+            output, err = process.communicate()
+
+            # Process medttk output file
+            medttk_root = etree.parse(text_outfile).getroot()
+            med_narr = ""
+            for med_child in medttk_root: # sentence
+                for item in med_child.iterdescendants("EVENT", "TIMEX3"):
+                    if item.text is not None:
+                        med_narr = med_narr + " " + item.text
+                    else:
+                        for it in item.iterdescendants():
+                            if it.text is not None:
+                                med_narr = med_narr + " " + it.text
+                #expressions = med_child.findall('.//EVENT')
+                #for ex in expressions:
+                #    if ex.text is not None:
+                #        med_narr = med_narr + " " + ex.text
+            newnode = etree.SubElement(child, symp_narr_tag)
+            node.text = med_narr.strip()
+            tagger_node = etree.SubElement(child, symp_tagger_tag)
+            tagger_node.text = "medttk"
+            print "med_narr: " + med_narr
+    return tree
+
+''' Keep only text from inside EVENT and TIMEX3 tags
+    tree: the xml tree
+    tagger_name: the name of the tool used to identify the events and temporal expressions
+'''
+def filter_narr(tree, tagger_name):
+    print "filter_narr"
+    root = tree.getroot()
+    symp_narr = ""
+    for child in root:
+        #print "child: " + data_util.stringify_children(child)
+        node = child.find(symp_narr_tag)
+        if node == None:
+            print "no " + symp_narr_tag + ": " + data_util.stringify_children(child)
+        for item in node.iterdescendants("EVENT", "TIMEX3"):
+            if item.text is not None:
+                symp_narr = symp_narr + " " + item.text
+            else:
+                for it in item.iterdescendants():
+                    if it.text is not None:
+                        symp_narr = symp_narr + " " + it.text.strip()
+        newnode = etree.SubElement(child, symp_narr_tag)
+        newnode.text = symp_narr.strip()
+        #print "symp_narr: " + symp_narr
+        tagger_node = etree.SubElement(child, symp_tagger_tag)
+        tagger_node.text = tagger_name
+    return tree
 
 def get_ngram(word, prevwords):
     ngram = ""

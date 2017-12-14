@@ -77,6 +77,21 @@ def stringify_children(node):
     # filter removes possible Nones in texts and tails
     return ''.join(filter(None, parts))
 
+def text_from_tags(text, tags):
+    for x in range(len(tags)):
+        tags[x] = tags[x].lower()
+    text = "<root>" + text + "</root>"
+    newtext = ""
+    root = etree.fromstring(text)
+    print "text: " + text
+    for child in root:
+        print "--child"
+        if child.tag.lower() in tags:
+            print "found tag: " + child.tag
+            if child.text != None:
+                newtext = newtext + ' ' + child.text
+    return newtext
+
 ''' matrix: a list of dictionaries
     dict_keys: a list of the dictionary keys
     outfile: the file to write to

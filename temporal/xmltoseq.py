@@ -9,6 +9,8 @@ import data_util
 from lxml import etree
 import argparse
 
+symp_narr_tag = "narr_symp"
+
 def main():
     argparser = argparse.ArgumentParser()
     argparser.add_argument('--in', action="store", dest="infile")
@@ -132,14 +134,33 @@ def xml_to_seq(text):
 
 '''
    seqs: dict[id] -> [(word, label),...]
+   filename: optional, the xml file to add the sequences to. If blank, will create a new tree
+   tag: the tag to use for new elements if creating a new tree
 '''
-def seq_to_xml(seqs, tag="Adult_Anonymous"):
-    root = etree.Element("root")
-    for key in seqs:
-        seq = seqs[key]
-        child = etree.SubElement(root, tag)
-        child.text = to_xml(seq)
-    tree =  etree.ElementTree(root)
+def seq_to_xml(seqs, filename="", tag="Adult_Anonymous"):
+    print "seq_to_xml"
+    tree = None
+    usefile = False
+    if len(filename) >0:
+        tree = etree.parse(filename)
+        root = tree.getroot()
+        usefile = True
+        for child in root:
+            rec_id = child.find("MG_ID").text
+            seq = ""
+            if rec_id in seqs:
+                seq = seqs[rec_id]
+            narr_node = etree.SubElement(child, symp_narr_tag)
+            narr_node.text = to_xml(seq)
+    else:
+        root = etree.Element("root")
+        for key in seqs:
+            seq = seqs[key]
+            child = etree.SubElement(root, tag)
+            narr_node = etree.SubElement(child, symp_narr_tag)
+            narr_node.text = to_xml(seq)
+            #print "added seq: " + child.text
+        tree =  etree.ElementTree(root)
     return tree
 
 def to_xml(seq):
@@ -162,16 +183,17 @@ def to_xml(seq):
         if label == O:
             if prevlabel != O:
                 text = text + closelabel(prevlabel)
-        elif label == BT:
+        elif label == BT or (label == IT and (prevlabel != BT and prevlabel != IT)):
             text = text + closelabel(prevlabel) + ' <TIMEX3 tid="t' + str(tid) + '">'
             tid = tid+1
-        elif label == BE:
+        elif label == BE or (label == IE and (prevlabel != BE and prevlabel != IE)):
             text = text + closelabel(prevlabel) + ' <EVENT tid="e' + str(eid) + '">'
             eid = eid+1
 
         # Add word
         text = text + ' ' + word
         prevlabel = label
+    text = text + closelabel(prevlabel)
     return text.strip()
 
 def closelabel(prevlabel):
