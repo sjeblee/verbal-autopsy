@@ -32,7 +32,7 @@ def main():
     if not (args.trainfile and args.testfile and args.trainoutfile and args.testoutfile):
         print "usage: ./extract_features.py --train [file.xml] --test [file.xml] --trainfeats [train.feats] --testfeats [test.feats] --labels [labelname] --features [f1,f2,f3] --rebalance [adasyn/smote]"
         print "labels: Final_code, ICD_cat"
-        print "features: checklist, kw_bow, kw_tfidf, kw_phrase, kw_count, narr_bow, narr_count, narr_tfidf, narr_ngram, narr_vec, narr_seq, lda"
+        print "features: checklist, kw_bow, kw_tfidf, kw_phrase, kw_count, lda, narr_bow, narr_count, narr_tfidf, narr_ngram, narr_vec, narr_seq, event_vec, event_seq"
         exit()
     rebal = ""
     if args.rebalance:
@@ -53,7 +53,7 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
     vecfile = "/u/sjeblee/research/va/data/datasets/mds+rct/narr+ice+medhelp.vectors.200"
     labelname = arg_labelname
 
-    global featurenames, rec_type, checklist, dem, kw_bow, kw_tfidf, narr_bow, kw_count, narr_count, narr_tfidf, narr_vec, narr_seq, lda, symp_train
+    global featurenames, rec_type, checklist, dem, kw_bow, kw_tfidf, narr_bow, kw_count, narr_count, narr_tfidf, narr_vec, narr_seq, event_vec, event_seq, lda, symp_train
     rec_type = "type"
     checklist = "checklist"
     dem = "dem"
@@ -66,6 +66,8 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
     narr_tfidf = "narr_tfidf"
     narr_vec = "narr_vec"
     narr_seq = "narr_seq"
+    event_vec = "event_vec"
+    event_seq = "event_seq"
     lda = "lda"
     symp_train = "symp_train"
     featurenames = arg_featurenames.split(',')
@@ -86,7 +88,7 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
 
     global kw_features, narr_features, stopwords
     kw_features = kw_bow in featurenames or kw_tfidf in featurenames or kw_phrase in featurenames or kw_count in featurenames
-    narr_features = narr_bow in featurenames or narr_tfidf in featurenames or narr_count in featurenames or narr_vec in featurenames or narr_seq in featurenames or lda in featurenames
+    narr_features = narr_bow in featurenames or narr_tfidf in featurenames or narr_count in featurenames or narr_vec in featurenames or narr_seq in featurenames or lda in featurenames or event_vec in featurenames or event_seq in featurenames
     print "narr_features: " + str(narr_features)
     stopwords = []
 
@@ -110,6 +112,9 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
     train = False
     narratives = []
     keywords = []
+
+    if event_vec in featurenames or event_seq in featurenames:
+        element = "narr_symp"
     
     # Get the xml from file
     root = etree.parse(infile).getroot()
@@ -119,6 +124,8 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
 
         # Set up the keys for the feature vector
         dict_keys = ["MG_ID", labelname]
+        if rec_type in featurenames:
+            dict_keys.append("CL_" + rec_type)
         if checklist in featurenames:
             dict_keys = dict_keys + ["CL_DeathAge", "CL_ageunit", "CL_DeceasedSex", "CL_Occupation", "CL_Marital", "CL_Hypertension", "CL_Heart", "CL_Stroke", "CL_Diabetes", "CL_TB", "CL_HIV", "CL_Cancer", "CL_Asthma","CL_InjuryHistory", "CL_SmokeD", "CL_AlcoholD", "CL_ApplytobaccoD"]
         elif dem in featurenames:
@@ -166,15 +173,15 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
                 for wx in w:
                     words.append(wx.strip().strip('–'))
             keywords.append(" ".join(words))
-                
+
         # NARRATIVE features
         if narr_features or ((not train) and (symp_train in featurenames)):
             narr_string = ""
             item = child.find(element)
             if item != None:
-                if item.text != None:
-                    narr_string = item.text.encode("utf-8")
-                else:
+                narr_string = data_util.stringify_children(item).encode('utf-8')
+                
+                if narr_string == "":
                     print "warning: empty narrative"
                 narr_words = [w.strip() for w in narr_string.lower().translate(string.maketrans("",""), string.punctuation).split(' ')]
                 text = " ".join(narr_words)
@@ -280,26 +287,39 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
             # TODO: Print LDA topics
 
     # WORD2VEC features
-    elif narr_vec in featurenames:
+    elif narr_vec in featurenames or event_vec in featurenames or event_seq in featurenames:
         print "Warning: using word2vec features, ignoring all other features"
 
         # Create word2vec mapping
         word2vec, dim = load_word2vec(vecfile)
+        global max_seq_len
+        feat_name = narr_vec
+        if event_vec in featurenames:
+            feat_name = event_vec
+        elif event_seq in featurenames:
+            feat_name = event_seq
 
         # Convert words to vectors and add to matrix
-        dict_keys.append(narr_vec)
-        global max_seq_len
-        max_seq_len = 200
+        if narr_vec in featurenames:
+            dict_keys.append(narr_vec)
+            max_seq_len = 200
+        elif event_vec in featurenames:
+            dict_keys.append(event_vec)
+            max_seq_len = 50
         #if train:
             #max_seq_len = 0
         print "word2vec dim: " + str(dim)
         print "initial max_seq_len: " + str(max_seq_len)
+        print "narratives: " + str(len(narratives))
         zero_vec = []
         for z in range(0, dim):
             zero_vec.append(0)
-        for x in range(len(matrix)):
+        for x in range(len(narratives)):
             narr = narratives[x]
-            #print "narr: " + narr
+            print "narr: " + narr
+            if event_vec in featurenames:
+                narr = data_util.text_from_tags(narr, ['EVENT', 'TIMEX3'])
+            print "narr_filtered: " + narr
             vectors = []
             vec = zero_vec
             for word in narr.split(' '):
@@ -314,16 +334,17 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
                 #if train:
                 #    max_seq_len = length
                 vectors = vectors[(-1*max_seq_len):]
-            (matrix[x])[narr_vec] = vectors
+            (matrix[x])[feat_name] = vectors
 
-        # Pad the narr_vecs with 0 vectors
+        # TODO: move this to a function
+        # Pad the narr_vecs with 0 vectors 
         print "padding vectors to reach maxlen " + str(max_seq_len)
         for x in range(len(matrix)):
-            length = len(matrix[x][narr_vec])
+            length = len(matrix[x][feat_name])
             matrix[x]['max_seq_len'] = max_seq_len
             if length < max_seq_len:
                 for k in range(0, max_seq_len-length):
-                    matrix[x][narr_vec].insert(0,zero_vec) # use insert for pre-padding
+                    matrix[x][feat_name].insert(0,zero_vec) # use insert for pre-padding
 
     # narr_seq for RNN
     elif narr_seq in featurenames:
