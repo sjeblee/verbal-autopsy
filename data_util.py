@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
 # Util functions
 # @author sjeblee@cs.toronto.edu
 
@@ -25,6 +26,15 @@ def fix_arrows(filename):
     out.write(output)
     out.close()
 
+def fix_escaped_chars(filename):
+    subprocess.call(["sed", "-i", "-e", 's/&lt;/ </g', filename])
+    subprocess.call(["sed", "-i", "-e", 's/&gt;/> /g', filename])
+    subprocess.call(["sed", "-i", "-e", 's/  / /g', filename])
+    subprocess.call(["sed", "-i", "-e", "s/‘/'/g", filename])
+    subprocess.call(["sed", "-i", "-e", "s/’/'/g", filename])
+    subprocess.call(["sed", "-i", "-e", "s/&#8216;/'/g", filename])
+    subprocess.call(["sed", "-i", "-e", "s/&#8217;/'/g", filename])
+    subprocess.call(["sed", "-i", "-e", "s/&#8211;/,/g", filename])
 
 ''' Remove blank lines, convert \n to space, remove double spaces, insert a line break before each record
     filename: the file to fix (file will be overwritten)
@@ -48,6 +58,26 @@ def fix_line_breaks(filename, rec_type):
     out = open(filename, 'w')
     out.write(output)
     out.close()
+
+def load_word2vec(vecfile):
+    # Create word2vec mapping
+    word2vec = {}
+    dim = 0
+    with open(vecfile, "r") as f:
+        firstline = True
+        for line in f:
+            # Ignore the first line of the file
+            if firstline:
+                firstline = False
+            else:
+                tokens = line.strip().split(' ')
+                vec = []
+                word = tokens[0]
+                for token in tokens[1:]:
+                    vec.append(float(token))
+                word2vec[word] = vec
+                dim = len(vec)
+    return word2vec, dim
 
 def remove_no_narrs(infile, outfile):
     # Get the xml from file
@@ -77,6 +107,34 @@ def stringify_children(node):
     # filter removes possible Nones in texts and tails
     return ''.join(filter(None, parts))
 
+''' Get contents of tags as a list of strings
+    text: the xml-tagged text to process
+    tags: a list of the tags to extract
+    atts: a list of attributes to extract as well
+'''
+def phrases_from_tags(text, tags, atts=[]):
+    for x in range(len(tags)):
+        tags[x] = tags[x].lower()
+    text = "<root>" + text + "</root>"
+    phrases = []
+    root = etree.fromstring(text)
+    #print "phrases_from tags text: " + text
+    for child in root:
+        if child.tag.lower() in tags:
+            print "found tag: " + child.tag
+            phrase = {}
+            if child.text != None:
+                phrase['text'] = child.text
+            for att in atts:
+                if att in child.keys():
+                    phrase[att] = child.get(att)
+            phrases.append(phrase)
+    return phrases
+
+''' Get contents of tags as a list of strings
+    text: the xml-tagged text to process
+    tags: a list of the tags to extract
+'''
 def text_from_tags(text, tags):
     for x in range(len(tags)):
         tags[x] = tags[x].lower()
