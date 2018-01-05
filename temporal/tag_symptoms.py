@@ -43,6 +43,7 @@ def run(infile, outfile, tagger="keyword_match"):
         elif tagger == "medttk":
             tree = medttk(tree)
         tree.write(outfile)
+        data_util.fix_escaped_chars(outfile)
 
 def crf_tagger(infile, outfile):
     trainfile = '/u/sjeblee/research/data/i2b2/all_timeml_fixed.xml'
@@ -174,6 +175,7 @@ def medttk(tree):
         if len(narr) > 0:
             temp = open(text_infile, "w")
             temp.write("<TEXT>")
+            print "narr: " + narr
             temp.write(narr)
             temp.write("</TEXT>\n")
             temp.close()
@@ -188,23 +190,30 @@ def medttk(tree):
             medttk_root = etree.parse(text_outfile).getroot()
             med_narr = ""
             for med_child in medttk_root: # sentence
-                for item in med_child.iterdescendants("EVENT", "TIMEX3"):
+                for item in med_child.iterdescendants("EVENT", "TIMEX3", "TLINK"):
+                    # TODO: convert medttk output to simple_timeml
                     if item.text is not None:
-                        med_narr = med_narr + " " + item.text
+                        med_narr = med_narr + " " + start_tag_with_atts(item) + " " + item.text + "</" + item.tag + ">"
                     else:
+                        med_narr = med_narr + " " + start_tag_with_atts(item)
                         for it in item.iterdescendants():
                             if it.text is not None:
                                 med_narr = med_narr + " " + it.text
-                #expressions = med_child.findall('.//EVENT')
-                #for ex in expressions:
-                #    if ex.text is not None:
-                #        med_narr = med_narr + " " + ex.text
+                        med_narr = med_narr + "</" + item.tag + ">"
+            #med_narr = data_util.stringify_children(medttk_root).decode('utf-8')
             newnode = etree.SubElement(child, symp_narr_tag)
-            node.text = med_narr.strip()
+            newnode.text = med_narr.strip()
             tagger_node = etree.SubElement(child, symp_tagger_tag)
             tagger_node.text = "medttk"
             print "med_narr: " + med_narr
     return tree
+
+def start_tag_with_atts(item):
+    text = "<" + item.tag
+    for key in item.keys():
+        text = text + " " + key + '="' + item.get(key) + '"'
+    text = text + ">"
+    return text
 
 ''' Keep only text from inside EVENT and TIMEX3 tags
     tree: the xml tree
