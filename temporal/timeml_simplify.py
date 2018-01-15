@@ -4,7 +4,6 @@
 
 from lxml import etree
 import argparse
-import string
 
 def main():
     argparser = argparse.ArgumentParser()
@@ -29,19 +28,21 @@ def simplify(text):
     print "text: " + text
     event_start = "<EVENT"
     time_start = "<TIMEX3"
-    tlink_start = "<TLINK"
     event_end = "</EVENT>"
     time_end = "</TIMEX3>"
+    tlink_start = "<TLINK"
     makeinstance = "<MAKEINSTANCE"
-    ignore_tags = ["<SLINK", "<ALINK"]
-    lookup = {}
+    ignore_tags = ["<SLINK", "<ALINK", "<TLINK", makeinstance]
     in_event = False
     in_time = False
     simple_text = ""
+
+    # Get Tlinks
+    tlinks, lookup = get_tlinks(text)
+    
     chunks = text.split(" ")
     chunk = chunks[0]
     x = 0
-
     while x < len(chunks):
         chunk = chunks[x].strip()
         if len(chunk) > 0:
@@ -51,8 +52,15 @@ def simplify(text):
                 if chunk == event_end:
                     in_event = False
                     simple_text = simple_text + " " + chunk
-                elif "\"" not in chunk or "eid" in chunk:
+                elif "\"" not in chunk or "id=" in chunk or "polarity=" in chunk:
                     simple_text = simple_text + " " + chunk
+                    if "id=" in chunk:
+                        eid = get_val(chunk)
+                        if eid in tlinks:
+                            #tid = tlinks[eid][0]
+                            #sigid = tlinks[eid][1]
+                            tid = tlinks[eid]
+                            simple_text = simple_text + ' relatedToTime="' + tid + '"'# signalID="' + sigid + '"'
                 elif ">" in chunk:
                     simple_text = simple_text + ">"
             # Handle TIMEX3
@@ -60,25 +68,13 @@ def simplify(text):
                 if chunk == time_end:
                     in_time = False
                     simple_text = simple_text + " " + chunk
-                elif "\"" not in chunk or "tid" in chunk:
+                elif "\"" not in chunk or "id=" in chunk:
                     simple_text = simple_text + " " + chunk
                 elif ">" in chunk:
                     ind = chunk.index('>')
                     simple_text = simple_text + chunk[ind:]
                     if time_end in chunk:
                         in_time = False
-            # Handle MAKEINSTANCE
-            elif chunk == makeinstance:
-                eid = ""
-                eiid = ""
-                while "/>" not in chunk and x+1 < len(chunks):
-                    x = x+1
-                    chunk = chunks[x]
-                    if "eventID" in chunk:
-                        eid = get_val(chunk)
-                    elif "eiid" in chunk:
-                        eiid = get_val(chunk)
-                lookup[eiid] = eid
             elif chunk in ignore_tags:
                 while "</" not in chunk and "/>" not in chunk and x+1 < len(chunks):
                     x = x+1
@@ -92,6 +88,7 @@ def simplify(text):
                     simple_text = simple_text + " " + chunk
                 # Handle TLINKS
                 elif chunk == tlink_start:
+                    print "found TLINK"
                     queue = chunk
                     add_tlink = False
                     while not "/>" in chunk and x+1 < len(chunks):
@@ -115,6 +112,52 @@ def simplify(text):
         x = x+1
     print "simple_text: " + simple_text
     return simple_text.strip()
+
+def get_tlinks(text):
+    tlink_start = "<TLINK"
+    makeinstance = "<MAKEINSTANCE"
+    tlinks = {}
+    lookup = {}
+    chunks = text.split(' ')
+
+    chunk = chunks[0]
+    x = 0
+    while x < len(chunks):
+        chunk = chunks[x].strip()
+        # MAKEINSTANCE
+        if chunk == makeinstance:
+            eid = ""
+            eiid = ""
+            while "/>" not in chunk and x+1 < len(chunks):
+                x = x+1
+                chunk = chunks[x]
+                if "eventID" in chunk:
+                    eid = get_val(chunk)
+                elif "eiid" in chunk:
+                    eiid = get_val(chunk)
+            lookup[eiid] = eid
+        # TLINK
+        elif chunk == tlink_start:
+            print "found TLINK"
+            sigid = ""
+            eid = ""
+            tid = ""
+            while not "/>" in chunk and x+1 < len(chunks):
+                x = x+1
+                chunk = chunks[x]
+                if "signalID" in chunk:
+                    sigid = get_val(chunk)
+                elif "eventInstanceID" in chunk or "fromID" in chunk:
+                    #eiid = get_val(chunk)
+                    #eid = lookup[eiid]
+                    eid = get_val(chunk)
+                elif "relatedToTime" in chunk or "toID" in chunk:
+                    tid = get_val(chunk)
+            if "T" in tid and eid not in tlinks:
+                print "tlinks[" + eid + "] = " + tid + ", " + sigid
+                tlinks[eid] = tid #(tid, sigid)
+        x = x+1
+    return tlinks, lookup
 
 def get_val(chunk):
     start = chunk.index('"')+1

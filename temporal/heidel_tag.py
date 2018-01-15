@@ -56,6 +56,8 @@ def run(infile, outfile):
     subprocess.call(["sed", "-i", "-e", 's/  / /g', outfile])
     subprocess.call(["sed", "-i", "-e", "s/‘/'/g", outfile])
     subprocess.call(["sed", "-i", "-e", "s/’/'/g", outfile])
-
+    subprocess.call(["sed", "-i", "-e", "s/&#8216;/'/g", outfile])
+    subprocess.call(["sed", "-i", "-e", "s/&#8217;/'/g", outfile])
+    subprocess.call(["sed", "-i", "-e", "s/&#8211;/,/g", outfile])
 
 if __name__ == "__main__":main()

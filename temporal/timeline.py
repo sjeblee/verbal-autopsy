@@ -23,9 +23,9 @@ class Event:
         self.neg = neg
 
     def __str__(self):
-        return self.time + ' : ' + self.text()
+        return self.time + ' : ' + self.to_text()
 
-    def text(self):
+    def to_text(self):
         if self.neg:
             return 'no ' + self.text
         else:
@@ -54,15 +54,20 @@ def run(infile, outfile, vecfile):
         node = child.find("narr_timeml_simple")
         narr = ""
         if node != None:
-            narr = node.text.encode('utf-8')
+            narr = data_util.stringify_children(node) #.encode('utf-8')
+            print "narr: " + narr
             timeline, events = create_timeline(narr, vecfile)
-            timelines.append(events)
+            timelines.append(timeline)
+            print "Timeline text:"
+            for event in events:
+                print str(event)
 
     out = open(outfile, 'w')
     out.write(str(timelines))
     out.close()
 
 def create_timeline(text, vecfile):
+    print "create_timeline"
     events = get_events(text)
     ordered_events = order_events(events) # TODO
     timeline = represent_events(ordered_events, vecfile)
@@ -79,6 +84,8 @@ def get_events(text):
     time_atts = ['id', 'type','val']
     event_phrases = data_util.phrases_from_tags(text, ['EVENT'], event_atts)
     time_phrases = data_util.phrases_from_tags(text, ['TIMEX3'], time_atts)
+    print "event_phrases: " + str(len(event_phrases))
+    print "time_phrases: " + str(len(time_phrases))
     times = {}
     for t in time_phrases:
         tid = t['id']
@@ -87,7 +94,8 @@ def get_events(text):
         # Construct an Event object
         neg = False
         phrase = ev['text'].strip()
-        pol = ev['polarity']
+        pol = ev['polarity'].lower()
+        print "polarity: " + pol
         if pol != None and pol == 'neg':
             neg = True
         tid = ev['relatedToTime']
@@ -98,6 +106,7 @@ def get_events(text):
             # TODO: get actual time value from time elements
             time = time_phrase['text'].strip()
         event = Event(phrase, time, neg)
+        print "created event: " + str(event)
         events.append(event)
     return events
 
@@ -116,7 +125,7 @@ def represent_events(events, vecfile):
         zero_vec.append(0)
     vectors = []
     for event in events:
-        phrase = get_avg_vec(event.text(), word2vec)
+        phrase = get_avg_vec(event.to_text(), word2vec)
         time_vec = zero_vec
         if event.time != unk:
             time_vec = get_avg_vec(event.time, word2vec)
