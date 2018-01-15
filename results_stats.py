@@ -108,7 +108,9 @@ def run(arg_infile, arg_outfile, arg_rank=1):
         row_percent = []
         totals.append(total)
         for item in row:
-            item_percent = float(item)/float(total)
+            item_percent = 0.0
+            if total > 0:
+                item_percent = float(item)/float(total)
             row_percent.append(item_percent)
         confusion_percent.append(row_percent)
 
@@ -150,7 +152,7 @@ def run(arg_infile, arg_outfile, arg_rank=1):
         for j in range(len(row)):
             output.write("," + str(row[j]))
         output.write("," + str(totals[i]))
-        print "totals[i]: " + str(totals[i])
+        #print "totals[i]: " + str(totals[i])
         output.write("\n")
 
     output.write("predicted distribution\nicd_cat,num_records\n")
