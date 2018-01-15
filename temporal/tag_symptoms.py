@@ -13,7 +13,7 @@ import subprocess
 
 import data_util
 import extract_features
-import model_crf
+import model_seq
 
 global symp_narr_tag
 symp_narr_tag = "narr_symp"
@@ -23,11 +23,12 @@ def main():
     argparser = argparse.ArgumentParser()
     argparser.add_argument('--in', action="store", dest="infile")
     argparser.add_argument('--out', action="store", dest="outfile")
+    argparser.add_argument('--train', action="store", dest="trainfile")
     argparser.add_argument('--tagger', action="store", dest="tagger")
     args = argparser.parse_args()
 
     if not (args.infile and args.outfile):
-        print "usage: ./tag_symptoms.py --in [file.xml] --out [outfile.xml] --tagger [tagger]"
+        print "usage: ./tag_symptoms.py --in [file.xml] --out [outfile.xml] --train [trainfile.xml] --tagger [tagger]"
         print "tagger options: keyword_match, crf, medttk"
         exit()
 
@@ -42,17 +43,24 @@ def run(infile, outfile, tagger="keyword_match"):
             tree = keyword_match(tree)
         elif tagger == "medttk":
             tree = medttk(tree)
+        elif tagger == seq2seq:
+            tree = seq2seq(tree)
         tree.write(outfile)
         data_util.fix_escaped_chars(outfile)
 
 def crf_tagger(infile, outfile):
     trainfile = '/u/sjeblee/research/data/i2b2/all_timeml_fixed.xml'
     tempfile = './temp.xml'
-    model_crf.run(trainfile, infile, tempfile)
+    model_seq.run(trainfile, infile, tempfile, "crf")
     tree = etree.parse(tempfile)
     tree.write(outfile)
     #newtree = filter_narr(tree, "crf")
     #newtree.write(outfile)
+
+def seq2seq(infile, outfile):
+    print "TODO"
+    trainfile = '/u/sjeblee/research/data/i2b2/all_timeml_fixed.xml'
+    model_seq.run(trainfile, infile, outfile, "seq2seq")
 
 def keyword_match(tree, usecardinal=True):
     diff_threshold = 0.8
