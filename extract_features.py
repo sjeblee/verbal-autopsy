@@ -9,6 +9,7 @@ from keras.preprocessing.sequence import pad_sequences
 from keras.preprocessing.text import hashing_trick
 import sklearn.feature_extraction
 import argparse
+import numpy
 import os
 import string
 import time
@@ -27,6 +28,7 @@ def main():
     argparser.add_argument('--features', action="store", dest="featurenames")
     argparser.add_argument('--element', action="store", dest="element")
     argparser.add_argument('--rebalance', action="store", dest="rebalance")
+    argparser.add_argument('-v', '--vecfile', action="store", dest="vecfile")
     args = argparser.parse_args()
 
     if not (args.trainfile and args.testfile and args.trainoutfile and args.testoutfile):
@@ -34,23 +36,27 @@ def main():
         print "labels: Final_code, ICD_cat"
         print "features: checklist, kw_bow, kw_tfidf, kw_phrase, kw_count, lda, narr_bow, narr_count, narr_tfidf, narr_ngram, narr_vec, narr_seq, event_vec, event_seq"
         exit()
-    rebal = ""
-    if args.rebalance:
-        rebal = args.rebalance
+
+    vecfile = ""
+    if args.vecfile:
+        vecfile = args.vecfile
 
     if args.labelname:
-        run(args.trainfile, args.trainoutfile, args.testfile, args.testoutfile, args.featurenames, args.labelname, rebal)
+        run(args.trainfile, args.trainoutfile, args.testfile, args.testoutfile, args.featurenames, args.labelname, arg_vecfile=vecfile)
     else:
-        run(args.trainfile, args.trainoutfile, args.testfile, args.testoutfile, args.featurenames, arg_rebalance=rebal)
+        run(args.trainfile, args.trainoutfile, args.testfile, args.testoutfile, args.featurenames, arg_vecfile=vecfile)
 
-def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames="narr_count", arg_labelname="Final_Code", stem=False, lemma=False, arg_element="narrative", arg_rebalance=""):
+def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames="narr_count", arg_labelname="Final_Code", stem=False, lemma=False, arg_element="narrative", arg_vecfile=""):
     print "extract_features from " + arg_train_in + " and " + arg_test_in + " : " + arg_element
 
     # Timing
     starttime = time.time()
 
     global vecfile, labelname
-    vecfile = "/u/sjeblee/research/va/data/datasets/mds+rct/narr+ice+medhelp.vectors.200"
+    if arg_vecfile == "":
+        vecfile = "/u/sjeblee/research/va/data/datasets/mds+rct/narr+ice+medhelp.vectors.200"
+    else:
+        vecfile = arg_vecfile
     labelname = arg_labelname
 
     global featurenames, rec_type, checklist, dem, kw_bow, kw_tfidf, narr_bow, kw_count, narr_count, narr_tfidf, narr_vec, narr_seq, event_vec, event_seq, lda, symp_train
@@ -100,15 +106,15 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
     global tfidfVectorizer
     global ldaModel
 
-    keys = extract(arg_train_in, arg_train_out, None, stem, lemma, arg_element, arg_rebalance)
+    keys = extract(arg_train_in, arg_train_out, None, stem, lemma, arg_element, vecfile)
     print "dict_keys: " + str(keys)
-    extract(arg_test_in, arg_test_out, keys, stem, lemma, arg_element)
+    extract(arg_test_in, arg_test_out, keys, stem, lemma, arg_element, arg_vecfile=vecfile)
 
     endtime = time.time()
     totaltime = endtime - starttime
     print "feature extraction took " + str(totaltime/60) + " mins"
 
-def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrative", arg_rebalance=""):
+def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrative", arg_rebalance="", arg_vecfile=""):
     train = False
     narratives = []
     keywords = []
@@ -288,63 +294,13 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
 
     # WORD2VEC features
     elif narr_vec in featurenames or event_vec in featurenames or event_seq in featurenames:
-        print "Warning: using word2vec features, ignoring all other features"
-
-        # Create word2vec mapping
-        word2vec, dim = load_word2vec(vecfile)
-        global max_seq_len
         feat_name = narr_vec
         if event_vec in featurenames:
             feat_name = event_vec
         elif event_seq in featurenames:
             feat_name = event_seq
 
-        # Convert words to vectors and add to matrix
-        if narr_vec in featurenames:
-            dict_keys.append(narr_vec)
-            max_seq_len = 200
-        elif event_vec in featurenames:
-            dict_keys.append(event_vec)
-            max_seq_len = 50
-        #if train:
-            #max_seq_len = 0
-        print "word2vec dim: " + str(dim)
-        print "initial max_seq_len: " + str(max_seq_len)
-        print "narratives: " + str(len(narratives))
-        zero_vec = []
-        for z in range(0, dim):
-            zero_vec.append(0)
-        for x in range(len(narratives)):
-            narr = narratives[x]
-            print "narr: " + narr
-            if event_vec in featurenames:
-                narr = data_util.text_from_tags(narr, ['EVENT', 'TIMEX3'])
-            print "narr_filtered: " + narr
-            vectors = []
-            vec = zero_vec
-            for word in narr.split(' '):
-                if len(word) > 0:
-                    #if word == "didnt":
-                    #    word = "didn't"
-                    if word in word2vec:
-                        vec = word2vec[word]
-                    vectors.append(vec)
-            length = len(vectors)
-            if length > max_seq_len:
-                #if train:
-                #    max_seq_len = length
-                vectors = vectors[(-1*max_seq_len):]
-            (matrix[x])[feat_name] = vectors
-
-        # TODO: move this to a function
-        # Pad the narr_vecs with 0 vectors 
-        print "padding vectors to reach maxlen " + str(max_seq_len)
-        for x in range(len(matrix)):
-            length = len(matrix[x][feat_name])
-            matrix[x]['max_seq_len'] = max_seq_len
-            if length < max_seq_len:
-                for k in range(0, max_seq_len-length):
-                    matrix[x][feat_name].insert(0,zero_vec) # use insert for pre-padding
+        matrix, dict_keys = vector_features(feat_name, narratives, matrix, dict_keys, vecfile)
 
     # narr_seq for RNN
     elif narr_seq in featurenames:
@@ -383,6 +339,80 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
     #    write_to_file(matrix_re, dict_keys, outfile)
     #else:
     data_util.write_to_file(matrix, dict_keys, outfile)
+
+def vector_features(feat_name, narratives, matrix, dict_keys, vecfile):
+    word2vec, dim = load_word2vec(vecfile)
+    global max_seq_len
+    max_seq_len = 50
+    dict_keys.append(feat_name)
+    # Convert words to vectors and add to matrix
+    if feat_name == narr_vec:
+        max_seq_len = 200
+    #if train:
+    #max_seq_len = 0
+    print "word2vec dim: " + str(dim)
+    print "initial max_seq_len: " + str(max_seq_len)
+    print "narratives: " + str(len(narratives))
+    zero_vec = []
+    for z in range(0, dim):
+        zero_vec.append(0)
+    for x in range(len(narratives)):
+        narr = narratives[x]
+        #print "narr: " + narr
+        vectors = []
+        tags = ['EVENT']#, 'TIMEX3']
+
+        if feat_name == event_vec or feat_name == narr_vec:
+            if feat_name == event_vec:
+                narr = data_util.text_from_tags(narr, tags)
+            #print "narr_filtered: " + narr
+            vec = zero_vec
+            for word in narr.split(' '):
+                if len(word) > 0:
+                    #if word == "didnt":
+                    #    word = "didn't"
+                    if word in word2vec:
+                        vec = word2vec[word]
+                    else:
+                        vec = zero_vec
+                    vectors.append(vec)
+        elif feat_name == event_seq:
+            phrases = data_util.phrases_from_tags(narr, tags)
+            print "phrases: " + str(len(phrases))
+            # TODO: what if phrases is empty???
+            for phrase in phrases:
+                word_vecs = []
+                for word in phrase['text'].split(' '):
+                    if word in word2vec:
+                        vec = word2vec[word]
+                    else:
+                        vec = zero_vec
+                    word_vecs.append(vec)
+                if len(word_vecs) > 1:
+                    vector = numpy.average(numpy.asarray(word_vecs), axis=0)
+                else:
+                    vector = word_vecs[0]
+                #print "vector: " + str(vector)
+                vectors.append(vector)
+        length = len(vectors)
+        if length > max_seq_len:
+            # Uncomment for dynamic max_seq_len
+            #if train:
+            #    max_seq_len = length
+            vectors = vectors[(-1*max_seq_len):]
+        (matrix[x])[feat_name] = vectors
+
+    # TODO: move this to a function
+    # Pad the narr_vecs with 0 vectors
+    print "padding vectors to reach maxlen " + str(max_seq_len)
+    for x in range(len(matrix)):
+        length = len(matrix[x][feat_name])
+        matrix[x]['max_seq_len'] = max_seq_len
+        if length < max_seq_len:
+            for k in range(0, max_seq_len-length):
+                matrix[x][feat_name].insert(0,zero_vec) # use insert for pre-padding
+
+    return matrix, dict_keys
 
 def rebalance_data(matrix, dict_keys, rebal_name):
     # Construct feature vectors and label vector
@@ -457,12 +487,12 @@ def add_keywords(keywords, keyword_string, translate_table, stopwords):
                 if w2 not in stopwords:
                     keywords.add(w2)
 
-def get_narrs(filename):
+def get_narrs(filename, element="narrative"):
     narratives = []
     # Get the xml from file
     root = etree.parse(filename).getroot()
     for child in root:
-        item = child.find("narrative")
+        item = child.find(element)
         if item != None:
             narr_string = ""
             if item.text != None:

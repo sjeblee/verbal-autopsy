@@ -2,20 +2,23 @@
 # Build a classifier model with the VA features
 # @author sjeblee@cs.toronto.edu
 
+import sys
+sys.path.append('../keras-attention-mechanism')
+
 import argparse
 import numpy
 import os
 import time
 from hyperopt import hp, fmin, tpe, space_eval
 from keras.models import Model, Sequential, load_model
-from keras.layers import Input, Dense, Dropout, Activation, Flatten
+from keras.layers import Input, Dense, Dropout, Activation, Flatten, Permute, Reshape
 from keras.layers import Embedding, LSTM, Merge, merge, concatenate
 from keras.layers.convolutional import Conv1D
-from keras.layers.pooling import GlobalMaxPooling1D
+from keras.layers.pooling import GlobalMaxPooling1D, MaxPooling1D
 from keras.layers.recurrent import SimpleRNN
 from keras.layers.wrappers import Bidirectional
 from keras.utils.np_utils import to_categorical
-#from keras.utils.visualize_util import plot
+from keras.utils import plot_model
 from numpy import array, int32
 from sklearn import metrics
 from sklearn import neighbors
@@ -26,7 +29,11 @@ from sklearn.feature_selection import SelectKBest, f_classif, chi2
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.pipeline import make_pipeline
 
+import attention_utils
+import rebalance
+
 labelencoder = None
+vec_types = ["narr_vec", "narr_seq", "event_vec", "event_seq"]
 
 def main():
     argparser = argparse.ArgumentParser()
@@ -281,7 +288,7 @@ def obj_rf(params):
     return 1 - f1score
 
 
-def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_file, arg_prefix, arg_labelname, arg_n_feats=227, arg_anova="chi2", arg_nodes=192, arg_activation='relu', arg_dropout=0.5):
+def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_file, arg_prefix, arg_labelname, arg_n_feats=227, arg_anova="chi2", arg_nodes=192, arg_activation='relu', arg_dropout=0.5, arg_rebalance=""):
     total_start_time = time.time()
 
     # Special handling for neural network models
@@ -297,12 +304,22 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     trainlabels = []     # Correct ICD codes
     X = []               # Feature vectors
     Y = []
+    X2 = [] # Extra features for hybrid model
     
     # Read in feature keys
     print "reading feature keys..."
     global keys
     with open(arg_train_feats + ".keys", "r") as kfile:
         keys = eval(kfile.read())
+    vec_keys = [] # vector/matrix features for CNN and RNN models
+    point_keys = [] # traditional features for other models
+
+    # If a mix of traditional and vector features is requested, use a hybrid nn model
+    vec_keys, point_keys = split_feats(keys)
+    hybrid = False
+    if len(vec_keys) > 0 and len(point_keys) > 2:
+        hybrid = True
+        print "hybrid features"
 
     # Transform ICD codes and record types to numbers
     global labelencoder, typeencoder
@@ -310,8 +327,19 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     typeencoder = preprocessing.LabelEncoder()
 
     # Load the features
-    Y = preprocess(arg_train_feats, trainids, trainlabels, X, Y, True)
-    print "X: " + str(len(X)) + "\nY: " + str(len(Y))
+    if hybrid:
+        Y = preprocess(arg_train_feats, trainids, trainlabels, X, Y, vec_keys, True)
+        preprocess(arg_train_feats, [], [], X2, [], point_keys, True)
+    else:
+        Y = preprocess(arg_train_feats, trainids, trainlabels, X, Y, keys, True)
+    print "X: " + str(len(X)) + " Y: " + str(len(Y))
+    print "X2: " + str(len(X2))
+
+    # Rebalance
+    if arg_rebalance != "":
+        print "rebalance: " + arg_rebalance
+        X, Y = rebalance.rebalance(X, Y, arg_rebalance)
+        print "X: " + str(len(X)) + "\nY: " + str(len(Y))
 
     # Train the model
     print "training model..."
@@ -343,19 +371,19 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
             if arg_model == "nn":
                 model, X, Y = create_nn_model(X, Y, anova_function, num_feats, num_nodes, 'relu')
             elif arg_model == "lstm":
-                num_nodes = 256
-                model, X, Y = create_lstm_model(X, Y, embedding_dim, num_nodes, arg_activation)
+                num_nodes = 56
+                model, X, Y = create_lstm_model(X, Y, embedding_dim, num_nodes, arg_activation, hybrid=hybrid, X2=X2)
                 #score = model.evaluate(X_test, Y_test, batch_size=16
             elif arg_model == "rnn":
                 model, X, Y = create_rnn_model(X, Y, embedding_dim, num_nodes, arg_activation)
             elif arg_model == "cnn":
-                model, X, Y = create_cnn_model(X, Y, embedding_dim)
+                model, X, Y = create_cnn_model(X, Y, embedding_dim, hybrid=hybrid, X2=X2)
 
             # Save the model
             print "saving the model..."
             model.save(modelfile)
-            #plotname = modelfile + ".png"
-            #plot(nn, to_file=plotname)
+            plotname = modelfile + ".png"
+            plot_model(model, to_file=plotname)
 
     # Other models
     else:
@@ -378,7 +406,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     print "training took " + str(etime - stime) + " s"
 
     # Test
-    testids, testlabels, predictedlabels = test(arg_model, model, arg_test_feats)
+    testids, testlabels, predictedlabels = test(arg_model, model, arg_test_feats, hybrid)
 
     # Write results to a file
     output = open(arg_result_file, 'w')
@@ -393,27 +421,39 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     total_time = (time.time() - total_start_time) / 60
     print "total time: " + str(total_time) + " mins"
 
-def test(model_type, model, testfile):
+def test(model_type, model, testfile, hybrid=False):
     print "testing..."
     stime = time.time()
     testids = []
     testlabels = []
     testX = []
+    testX2 = []
     testY = []
     predictedY = []
-    testY = preprocess(testfile, testids, testlabels, testX, testY)
+    if hybrid:
+        vec_keys, point_keys = split_feats(keys)
+        testY = preprocess(testfile, testids, testlabels, testX, testY, vec_keys)
+        preprocess(testfile, [], [], testX2, [], point_keys)
+    else:
+        testY = preprocess(testfile, testids, testlabels, testX, testY, keys)
     if not model_type == "lstm" and not model_type == "rnn" and not model_type == "cnn":
         testX = anova_filter.transform(testX)
     if model_type == "rnn" or model_type == "lstm" or model_type == "cnn":
         testX = numpy.asarray(testX)
 
+    inputs = [testX]
+    if hybrid:
+        testX2 = numpy.asarray(testX2)
+        inputs.append(testX2)
     print "testX shape: " + str(testX.shape)
     if model_type == "nn" or model_type == "lstm" or model_type == "rnn":
-        predictedY = model.predict(testX)
+        predictedY = model.predict(inputs)
         results = map_back(predictedY)
     elif model_type == "cnn":
-        predictedY = model.predict(testX)
+        predictedY = model.predict(inputs)
         results = map_back(predictedY)
+        #attn_vec = get_attention_vector(model, testX)
+        #print "attention vector: " + str(attn_vec)
     else:
         results = model.predict(testX)
 
@@ -463,72 +503,133 @@ def create_rnn_model(X, Y, embedding_size, num_nodes, act, dropout=0.5):
     nn.summary()
     return nn, X, Y
 
-def create_lstm_model(X, Y, embedding_size, num_nodes, activation='sigmoid', dropout=0.5):
+def create_lstm_model(X, Y, embedding_size, num_nodes, activation='sigmoid', dropout=0.1, hybrid=False, X2=[]):
     Y = to_categorical(Y)
     X = numpy.asarray(X)
     print "train X shape: " + str(X.shape)
-    embedding_size = X.shape[2]
+    embedding_size = X.shape[-1]
+    inputs = []
+    input_arrays = [X]
 
-    print "LSTM: nodes: " + str(num_nodes) + " embedding: " + str(embedding_size)
-    #print "vocab: " + str(vocab_size)
-    print "max_seq_len: " + str(max_seq_len)
+    print "LSTM: nodes: " + str(num_nodes) + " embedding: " + str(embedding_size) + " max_seq_len: " + str(max_seq_len)
     #nn = Sequential([Bidirectional(LSTM(256, input_dim=embedding_size, activation='sigmoid', inner_activation='hard_sigmoid', return_sequences=True), input_shape=(200, embedding_size), merge_mode='concat'),
-    nn = Sequential([LSTM(num_nodes, input_shape=(200, embedding_size), activation='sigmoid', inner_activation='hard_sigmoid', return_sequences=False),
-                     Dropout(dropout),
+    #nn = Sequential([LSTM(num_nodes, input_shape=(200, embedding_size), activation='sigmoid', inner_activation='hard_sigmoid', return_sequences=False),
+    #                 Dropout(dropout),
                      #Flatten(), # For bidirectional
-                     Dense(Y.shape[1], activation='softmax')])
+    #                 Dense(Y.shape[1], activation='softmax')])
+
+    input_shape = (max_seq_len, embedding_size)
+    input1 = Input(shape=input_shape)
+    inputs.append(input1)
+    if hybrid:
+        X2 = numpy.asarray(X2)
+        print "X2 shape: " + str(X2.shape)
+        input_arrays.append(X2)
+        input2 = Input(shape=(X2.shape[1],))
+        inputs.append(input2)
+        ff = Dense(10, activation='relu')(input2)
+
+    lstm_out = LSTM(num_nodes, return_sequences=False)(input1)
+    dropout_out = Dropout(dropout)(lstm_out)
+    #attn_out = attention(dropout_out, max_seq_len, embedding_size)
+
+    if hybrid:
+        #print "ff shape: " + str(ff.output_shape)
+        merged = concatenate([dropout_out, ff], axis=-1)
+
+    prediction = Dense(Y.shape[1], activation='softmax')(dropout_out)
+    nn = Model(inputs=inputs, outputs=prediction)
+
     nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
 
-    nn.fit(X, Y, nb_epoch=15)
+    nn.fit(input_arrays, Y, nb_epoch=15)
     nn.summary()
     return nn, X, Y
 
-def create_cnn_model(X, Y, embedding_size, act=None, window=3):
+def create_cnn_model(X, Y, embedding_size, act=None, window=3, hybrid=False, X2=[]):
     Y = to_categorical(Y)
     X = numpy.asarray(X)
     embedding_size = X.shape[-1]
     print "train X shape: " + str(X.shape)
-    print "CNN: filters: " + str(max_seq_len) + " embedding: " + str(embedding_size)
+    print "CNN: embedding: " + str(embedding_size)
     print "max_seq_len: " + str(max_seq_len)
+    print "hybrid: " + str(hybrid)
     window_sizes = [1, 2, 3, 4, 5]
     branches = []
+    inputs = []
+    input_arrays = [X]
 
     # Keras functional API with attention
+    # Input layers
     input_shape = (max_seq_len, embedding_size) 
-    inputs = Input(shape=input_shape)
+    input1 = Input(shape=input_shape)
+    inputs.append(input1)
+    if hybrid:
+        X2 = numpy.asarray(X2)
+        print "X2 shape: " + str(X2.shape)
+        input_arrays.append(X2)
+        input2 = Input(shape=(X2.shape[1],))
+        inputs.append(input2)
+        ff = Dense(10, activation='relu')(input2)
 
-    #attention_layer = Dense(embedding_size, activation='softmax', name='attention')
-    #attention = attention_layer(inputs)
-    #attention_mul = merge([inputs, attention], output_shape=input_shape, name='attention_mul', mode='mul')
+    # Attention
+    #attn_out = attention(inputs, max_seq_len, embedding_size)
 
+    # Convolution
     conv_outputs = []
     for w in window_sizes:
-        print "window: " + str(w)
-        conv = Conv1D(max_seq_len, w, input_shape=input_shape)(inputs)
-        max_pool = GlobalMaxPooling1D()(conv)
+        print "window: " + str(max_seq_len) + " x " + str(w)
+        #conv_layer = Conv1D(w, embedding_size, input_shape=input_shape)
+        conv_layer = Conv1D(max_seq_len, w, input_shape=input_shape)
+        conv = conv_layer(input1)
+        max_pool_layer = GlobalMaxPooling1D()
+        max_pool = max_pool_layer(conv)
         conv_outputs.append(max_pool)
+        print "conv: " + str(conv_layer.output_shape) + " pool: " + str(max_pool_layer.output_shape)
 
+    # Merge
     merged = concatenate(conv_outputs, axis=-1)
+    #print "conv shape: " + str(merged.output_shape)
+    if hybrid:
+        #print "ff shape: " + str(ff.output_shape)
+        merged = concatenate([merged, ff], axis=-1)
 
-    attn_size = merged._keras_shape[-1]
-    print "attn size: " + str(attn_size)
-    attention_layer = Dense(attn_size, activation='softmax', name='attention')
-    attention = attention_layer(merged)
-    attention_mul = merge([merged, attention], output_shape=attn_size, name='attention_mul', mode='mul')
-
-    prediction = Dense(Y.shape[1], activation='softmax')(attention_mul)
+    # Prediction
+    prediction = Dense(Y.shape[1], activation='softmax')(merged)
     nn = Model(inputs=inputs, outputs=prediction)
 
     nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
-    nn.fit(X, Y, epochs=10)
+    nn.fit(input_arrays, Y, epochs=10)
     nn.summary()
 
-    try:
-        print "attention weights: " + str(attention_layer.get_weights())
-    except AttributeError:
-        print "ERROR: got an exception trying to print attention weights"
+    #try:
+    #    print "attention weights: " + str(attention_layer.get_weights())
+    #except AttributeError:
+    #    print "ERROR: got an exception trying to print attention weights"
 
     return nn, X, Y
+
+def attention(inputs, time_steps, input_dim):
+    #input_dim = int(inputs.shape[-1])
+    a = Permute((2, 1))(inputs)
+    a = Reshape((input_dim, time_steps))(a) # this line is not useful. It's just to know which dimension is what.
+    a = Dense(time_steps, activation='softmax')(a)
+    a_probs = Permute((2, 1), name='attention_vec')(a)
+    output_attention_mul = merge([inputs, a_probs], name='attention_mul', mode='mul')
+    return output_attention_mul
+
+def get_attention_vector(model, test_input):
+    #attention_vectors = []
+    #for i in range(300):
+    #testing_inputs_1, testing_outputs = get_data_recurrent(1, TIME_STEPS, INPUT_DIM)
+    attention_vector = numpy.mean(attention_utils.get_activations(model, test_input,
+                                                   print_shape_only=True,
+                                                   layer_name='attention_vec')[0], axis=2).squeeze()
+        #print('attention =', attention_vector)
+    #assert (numpy.sum(attention_vector) - 1.0) < 1e-5
+    #attention_vectors.append(attention_vector)
+    #attention_vector_final = np.mean(np.array(attention_vectors), axis=0)
+    return attention_vector
 
 def create_anova_filter(X, Y, function, num_feats):
     global anova_filter
@@ -541,12 +642,21 @@ def create_anova_filter(X, Y, function, num_feats):
     #    print "\t" + keys[i+2]
     return anova_filter, X
 
-def preprocess(filename, ids, labels, x, y, trainlabels=False):
+'''
+    Get the features from the feature file
+    filename: the name of the feature file
+    ids: the array for the ids
+    x: the array for the features
+    y: the array for the labels
+    feats: a list of the names of the features to extract
+    trainlabels: True if this is the trainset, we need to train the label embedding
+'''
+def preprocess(filename, ids, labels, x, y, feats, trainlabels=False):
     global labelencoder
 
     # Read in the feature vectors
     starttime = time.time()
-    print "preprocessing features..."
+    print "preprocessing features: " + str(feats)
     types = []
     vec_feats = False
     with open(filename, 'r') as f:
@@ -559,32 +669,32 @@ def preprocess(filename, ids, labels, x, y, trainlabels=False):
                     #print "ID: " + vector[key]
                 elif key == labelname:
                     labels.append(vector[key])
-                elif key == "CL_type":
-                    print "CL_type: " + vector[key]
-                    types.append(vector[key])
-                elif key == "narr_vec" or key == "narr_seq":
-                    # The feature matrix for word2vec can't have other features
-                    features = vector[key]
-                    vec_feats = True
-                    if key == "narr_seq":
-                        global vocab_size
-                        vocab_size = vector['vocab_size']
-                    global max_seq_len
-                    max_seq_len = vector['max_seq_len']
-                    print "max_seq_len: " + str(max_seq_len)
-                    features = numpy.asarray(features)#.reshape(max_seq_len, 1)
-                    #if features.shape[0] > 200:
-                    #    features = features[-200:]
-                    print "narr_vec shape: " + str(features.shape)
-                elif not vec_feats:
-                    if vector.has_key(key):
-                        features.append(vector[key])
-                    else:
-                        features.append('0')
+                elif key in feats: # Only pull out the desired features
+                    if key == "CL_type":
+                        print "CL_type: " + vector[key]
+                        types.append(vector[key])
+                    elif key in vec_types:
+                        # The feature matrix for word2vec can't have other features
+                        features = vector[key]
+                        vec_feats = True
+                        if key == "narr_seq":
+                            global vocab_size
+                            vocab_size = vector['vocab_size']
+                        global max_seq_len
+                        max_seq_len = vector['max_seq_len']
+                        #print "max_seq_len: " + str(max_seq_len)
+                        features = numpy.asarray(features)#.reshape(max_seq_len, 1)
+                        #print "narr_vec shape: " + str(features.shape)
+                    elif not vec_feats:
+                        if vector.has_key(key):
+                            features.append(vector[key])
+                        else:
+                            features.append('0')
             x.append(features)
 
     # Convert type features to numerical features
-    if len(types) > 0 and not vec_feats:
+    if len(types) > 0: #and not vec_feats:
+        print "converting types to numeric features"
         if trainlabels:
             typeencoder.fit(types)
         enc_types = typeencoder.transform(types)
@@ -616,5 +726,16 @@ def map_back(results):
         output.append(val)
     return output
 
+def split_feats(keys):
+    vec_keys = [] # vector/matrix features for CNN and RNN models
+    point_keys = [] # traditional features for other models
+    for key in keys:
+        if key in vec_types:
+            vec_keys.append(key)
+        else:
+            point_keys.append(key)
+    print "vec_keys: " + str(vec_keys)
+    print "point_keys: " + str(point_keys)
+    return vec_keys, point_keys
 
 if __name__ == "__main__":main() 
