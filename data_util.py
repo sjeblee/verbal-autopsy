@@ -59,6 +59,18 @@ def fix_line_breaks(filename, rec_type):
     out.write(output)
     out.close()
 
+''' Read an icd category mapping from a csv file into a python dictionary
+    filename: the name of the csv file (lines formatted as code,cat)
+'''
+def get_icd_map(filename):
+    icd_map = {}
+    with open(filename, "r") as f:
+        for line in f:
+            line = line.strip()
+            parts = line.split(',')
+            icd_map[parts[0]] = parts[1]
+    return icd_map
+
 def load_word2vec(vecfile):
     # Create word2vec mapping
     word2vec = {}
