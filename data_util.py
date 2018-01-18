@@ -168,4 +168,9 @@ def write_to_file(matrix, dict_keys, outfile):
     key_output.write(str(dict_keys))
     key_output.close()
     return dict_keys
-                                                    
+
+def zero_vec(dim):
+    vec = []
+    for x in range(dim):
+        vec.append(0)
+    return vec
