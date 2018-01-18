@@ -6,6 +6,8 @@ from lxml import etree
 import argparse
 import string
 
+import data_util
+
 def main():
     argparser = argparse.ArgumentParser()
     argparser.add_argument('--in', action="store", dest="infile")
@@ -23,14 +25,7 @@ def main():
         label = args.label
 
     # Get the ICD mapping
-    icdmap = {}
-    with open(args.mapfile, "r") as f:
-        for line in f:
-            print "adding: " + line
-            tokens = line.split(',')
-            icd = tokens[0]
-            cat = tokens[1]
-            icdmap[icd] = cat.strip()
+    icdmap = data_util.get_icd_map(args.mapfile)
 
     # Get the xml from file
     tree = etree.parse(args.infile)
