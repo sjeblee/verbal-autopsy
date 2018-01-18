@@ -129,7 +129,13 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
         train = True
 
         # Set up the keys for the feature vector
-        dict_keys = ["MG_ID", labelname]
+        dict_keys = ["MG_ID"]
+        if "codex" in labelname:
+            dict_keys.append("WB10_codex")
+            dict_keys.append("WB10_codex2")
+            dict_keys.append("WB10_codex4")
+        else:
+            dict_keys.append(labelname)
         if rec_type in featurenames:
             dict_keys.append("CL_" + rec_type)
         if checklist in featurenames:

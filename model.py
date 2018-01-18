@@ -653,6 +653,7 @@ def create_anova_filter(X, Y, function, num_feats):
 '''
 def preprocess(filename, ids, labels, x, y, feats, trainlabels=False):
     global labelencoder
+    ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4"]
 
     # Read in the feature vectors
     starttime = time.time()
@@ -669,7 +670,7 @@ def preprocess(filename, ids, labels, x, y, feats, trainlabels=False):
                     #print "ID: " + vector[key]
                 elif key == labelname:
                     labels.append(vector[key])
-                elif key in feats: # Only pull out the desired features
+                elif key in feats and key not in ignore_feats: # Only pull out the desired features
                     if key == "CL_type":
                         print "CL_type: " + vector[key]
                         types.append(vector[key])
