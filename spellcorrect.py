@@ -31,7 +31,10 @@ def run(infile, outfile, arg_lm=False):
     mapping = {'labor':'labour', 'laborer':'labourer', 'color':'colour', 'yeras':'years', 'elergies':'allergies', 'around12':'around 12', 'learnt':'learned', 'rigor':'rigour', 'couldn':'couldn\'t', 'didnt':'didn\'t', 'didn':'didn\'t', 'neighbor':'neighbour', 'enjury':'injury'}
 
     # Language model
-    lmfile = "/u/sjeblee/research/va/res/ICE-India/ice-lm-5.binary"
+    #lmfile = None
+    #lm = None
+    #if arg_lm:
+    lmfile = "/u/sjeblee/research/data/ICE-India/ice-lm-5.binary"
     lm = kenlm.Model(lmfile)
 
     # Get the xml from file
