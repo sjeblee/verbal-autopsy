@@ -26,6 +26,46 @@ def fix_arrows(filename):
     out.write(output)
     out.close()
 
+def decode_ageunit(unit):
+    unit = str(unit).lower()
+    if unit == "3" or "year" in unit:
+        return "years"
+    elif unit == "2" or "month" in unit:
+        return "months"
+    elif unit == "1" or "day" in unit:
+        return "days"
+    else:
+        return None
+
+def encode_ageunit(unit):
+    unit = unit.lower()
+    if unit == "years":
+        return "3"
+    elif unit == "months":
+        return "2"
+    elif unit == "days":
+        return "1"
+    else:
+        return None
+
+def decode_gender(gender):
+    gender = str(gender).lower()
+    if gender == "1" or gender == "male":
+        return "male"
+    elif gender == "2" or gender == "female":
+        return "female"
+    else:
+        return None
+
+def encode_gender(gender):
+    gender = gender.lower()
+    if gender == "male":
+        return "1"
+    elif gender == "female":
+        return "2"
+    else:
+        return None
+
 def fix_escaped_chars(filename):
     subprocess.call(["sed", "-i", "-e", 's/&lt;/ </g', filename])
     subprocess.call(["sed", "-i", "-e", 's/&gt;/> /g', filename])
