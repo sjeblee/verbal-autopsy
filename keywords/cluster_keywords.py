@@ -20,7 +20,7 @@ def main():
     args = argparser.parse_args()
 
     if not (args.outfile and args.clusterfile and args.vecfile):
-        print "usage: ./cluster_keywords.py --in [file.xml] --out [file.txt] --clusters [file.csv] --vecfile [file.vectors]"
+        print "usage: ./cluster_keywords.py --in [file.xml] --out [file.xml] --clusters [file.csv] --vecfile [file.vectors]"
         exit()
 
     if args.infile:
@@ -38,45 +38,57 @@ def run(outfile, clusterfile, vecfile, infile=None):
     word2vec, dim = extract_features.load_word2vec(vecfile)
     
     # Extract keywords
+    ids = [] # ids can occur more than once!
     keywords = []
     kw_vecs = []
     kw_clusters_correct = []
     cluster_names = []
 
     if infile is not None:
-        print "reading XML file...TODO"
+        print "reading XML file..."
         # Get the xml from file
+        num_clusters = 50
         root = etree.parse(infile).getroot()
         for child in root:
+            kw_list = []
+            node = child.find('MG_ID')
+            rec_id = node.text
             kws = extract_features.get_keywords(child)
             for kw in kws:
-
+                ids.append(rec_id)
+                keywords.append(kw)
+                kw_vecs.append(vectorize(kw, word2vec, dim))
     else:
         print "reading cluster file..."
         keywords, kw_clusters_correct, kw_vecs, cluster_names = read_cluster_file(clusterfile, word2vec, dim)
-    num_clusters = len(cluster_names)
+        num_clusters = len(cluster_names)
     print "num_keywords: " + str(len(keywords))
     print "num_clusters: " + str(num_clusters)
     print "dim: " + str(dim)
     print "cluster_names: " + str(cluster_names)
 
     # Generate clusters
+    print "shape: [total_keywords, dim]" # keywords listed individually
     print "generating clusters..."
-    clusterer = KMeans(n_clusters=num_clusters, n_jobs=1, precompute_distances=False, max_iter=500, n_init=15)
+    #clusterer = KMeans(n_clusters=num_clusters, n_jobs=1, precompute_distances=False, max_iter=500, n_init=15)
     #clusterer = SpectralClustering(n_clusters=num_clusters, n_init=15, affinity='nearest_neighbors')
-    #clusterer = AgglomerativeClustering(n_clusters=num_clusters)
-    kw_clusters = map_back(clusterer.fit_predict(kw_vecs), cluster_names)
+    clusterer = AgglomerativeClustering(n_clusters=num_clusters, affinity='cosine', linkage='average')
+    kw_clusters = clusterer.fit_predict(kw_vecs)
+    #kw_clusters = map_back(clusterer.fit_predict(kw_vecs), cluster_names)
 
     # Score clusters
-    print "scoring clusters..."
-    purity_score = purity(keywords, kw_clusters_correct, kw_clusters)
-    print "purity: " + str(purity_score)
+   # print "scoring clusters..."
+   # purity_score = purity(keywords, kw_clusters_correct, kw_clusters)
+   # print "purity: " + str(purity_score)
 
     # Write results to file
-    #write_clusters_to_file(outfile, get_cluster_map(keywords, kw_clusters))
-    outf = open(outfile + ".vecs", 'w')
-    outf.write(str(get_cluster_map(kw_vecs, kw_clusters_correct, cluster_names)))
-    outf.close()
+    print "Adding cluster labels to xml tree..."
+    write_clusters_to_xml(infile, outfile, ids, kw_clusters)
+    print "Writing clusters to csv file..."
+    write_clusters_to_file(clusterfile, get_cluster_map(keywords, kw_clusters))
+    #outf = open(outfile + ".vecs", 'w')
+    #outf.write(str(get_cluster_map(kw_vecs, kw_clusters_correct, cluster_names)))
+    #outf.close()
 
     totaltime = time.time() - starttime
     print "Total time: " + str(totaltime) + " s"
@@ -178,10 +190,48 @@ def write_clusters_to_file(outfile, cluster_map):
         outf.write("\n")
     outf.close()
 
+def write_clusters_to_xml(xmlfile, outfile, ids, cluster_pred):
+    # Create dictionary
+    kw_label = "keyword_clusters"
+    id_dict = {}
+    for x in range(len(ids)):
+        rec_id = ids[x]
+        cluster = cluster_pred[x]
+        if rec_id not in id_dict:
+            id_dict[rec_id] = []
+        id_dict[rec_id].append(cluster)
+    # Read xml file and add attributes
+    tree = etree.parse(xmlfile)
+    root = tree.getroot()
+    for child in root:
+        node = child.find('MG_ID')
+        rec_id = node.text
+        keywords = id_dict[rec_id]
+        keyword_text = ""
+        for kw in keywords:
+            keyword_text = keyword_text + ","
+        newnode = etree.SubElement(child, kw_label)
+        newnode.text = keyword_text.strip(',')
+    # Write tree to file
+    tree.write(outfile)
+
 def map_back(clusters, cluster_names):
     cluster_vals = []
     for val in clusters:
         cluster_vals.append(cluster_names[val])
     return cluster_vals
+
+def vectorize(phrase, word2vec, dim):
+    words = phrase.split(' ')
+    vecs = []
+    zero_vec = data_util.zero_vec(dim)
+    for word in words:
+        if word in word2vec:
+            vecs.append(word2vec.get(word))
+        else:
+            vecs.append(zero_vec)
+    # Average vectors
+    avg_vec = numpy.average(numpy.asarray(vecs), axis=0)
+    return avg_vec
     
 if __name__ == "__main__":main()
