@@ -46,10 +46,10 @@ def run(outfile, clusterfile, vecfile, infile=None):
     if infile is not None:
         print "reading XML file...TODO"
         # Get the xml from file
-        #root = etree.parse(infile).getroot()
-        #for child in root:
-        #    kws = extract_features.get_keywords(child)
-        #    for kw in kws:
+        root = etree.parse(infile).getroot()
+        for child in root:
+            kws = extract_features.get_keywords(child)
+            for kw in kws:
 
     else:
         print "reading cluster file..."
@@ -61,16 +61,16 @@ def run(outfile, clusterfile, vecfile, infile=None):
     print "cluster_names: " + str(cluster_names)
 
     # Generate clusters
-    #print "generating clusters..."
-    #clusterer = KMeans(n_clusters=num_clusters, n_jobs=1, precompute_distances=False, max_iter=300, n_init=15)
+    print "generating clusters..."
+    clusterer = KMeans(n_clusters=num_clusters, n_jobs=1, precompute_distances=False, max_iter=500, n_init=15)
     #clusterer = SpectralClustering(n_clusters=num_clusters, n_init=15, affinity='nearest_neighbors')
     #clusterer = AgglomerativeClustering(n_clusters=num_clusters)
-    #kw_clusters = map_back(clusterer.fit_predict(kw_vecs), cluster_names)
+    kw_clusters = map_back(clusterer.fit_predict(kw_vecs), cluster_names)
 
     # Score clusters
-    #print "scoring clusters..."
-    #purity_score = purity(keywords, kw_clusters_correct, kw_clusters)
-    #print "purity: " + str(purity_score)
+    print "scoring clusters..."
+    purity_score = purity(keywords, kw_clusters_correct, kw_clusters)
+    print "purity: " + str(purity_score)
 
     # Write results to file
     #write_clusters_to_file(outfile, get_cluster_map(keywords, kw_clusters))
