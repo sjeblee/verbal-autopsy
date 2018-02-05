@@ -2,6 +2,10 @@
 # -*- coding: utf-8 -*-
 # Cluster the keywords from the records using word2vec
 
+import sys
+sys.path.append('/u/sjeblee/research/va/git/verbal-autopsy')
+import data_util
+
 from lxml import etree
 from sklearn.cluster import AgglomerativeClustering, KMeans, SpectralClustering
 from scipy.stats import mode
@@ -9,7 +13,7 @@ import argparse
 import numpy
 import time
 
-import extract_features
+import extract_features_temp as extract_features
 
 def main():
     argparser = argparse.ArgumentParser()
@@ -31,7 +35,7 @@ def main():
 def run(outfile, clusterfile, vecfile, infile=None):
     starttime = time.time()
 
-    stopwords = ["a", "about", "above", "after", "against", "all", "am", "an", "and", "any", "are", "aren't", "as", "at", "be", "because", "been", "before", "being", "between", "but", "by", "can't", "cannot", "could", "couldn't", "did", "didn't", "do", "does", "doesn't", "doing", "don't", "during", "each", "for", "from", "further", "had", "hadn't", "has", "hasn't", "have", "haven't", "having", "he", "he'd", "he'll", "he's", "her", "here", "here's", "hers", "him", "his", "how", "how's", "i", "i'd", "i'll", "i'm", "i've", "if", "in", "into", "is", "isn't", "it", "it's", "its", "itself", "let's", "me", "more", "most", "mustn't", "my", "myself", "no", "nor", "not", "of", "off", "on", "only", "or", "other", "ought", "our", "ours", "ourselves", "out", "over", "own", "same", "shan't", "she", "she'd", "she'll", "she's", "should", "shouldn't", "so", "some", "such", "than", "that", "that's", "the", "then", "there", "there's", "these", "they", "they'd", "they'll", "they're", "they've", "this", "those", "through", "to", "too", "under", "until", "up", "very", "was", "wasn't", "we", "we'd", "we'll", "we're", "we've", "were", "weren't", "what", "what's", "where", "where's", "which", "while", "who", "who's", "whom", "why", "why's", "with", "won't", "would", "wouldn't", "you", "you'd", "you'll", "you're", "you've", "your", "yours", "yourself", "yourselves"]
+    #stopwords = ["a", "about", "above", "after", "against", "all", "am", "an", "and", "any", "are", "aren't", "as", "at", "be", "because", "been", "before", "being", "between", "but", "by", "can't", "cannot", "could", "couldn't", "did", "didn't", "do", "does", "doesn't", "doing", "don't", "during", "each", "for", "from", "further", "had", "hadn't", "has", "hasn't", "have", "haven't", "having", "he", "he'd", "he'll", "he's", "her", "here", "here's", "hers", "him", "his", "how", "how's", "i", "i'd", "i'll", "i'm", "i've", "if", "in", "into", "is", "isn't", "it", "it's", "its", "itself", "let's", "me", "more", "most", "mustn't", "my", "myself", "no", "nor", "not", "of", "off", "on", "only", "or", "other", "ought", "our", "ours", "ourselves", "out", "over", "own", "same", "shan't", "she", "she'd", "she'll", "she's", "should", "shouldn't", "so", "some", "such", "than", "that", "that's", "the", "then", "there", "there's", "these", "they", "they'd", "they'll", "they're", "they've", "this", "those", "through", "to", "too", "under", "until", "up", "very", "was", "wasn't", "we", "we'd", "we'll", "we're", "we've", "were", "weren't", "what", "what's", "where", "where's", "which", "while", "who", "who's", "whom", "why", "why's", "with", "won't", "would", "wouldn't", "you", "you'd", "you'll", "you're", "you've", "your", "yours", "yourself", "yourselves"]
 
     # Load word2vec vectors
     print "loading vectors..."
@@ -50,14 +54,21 @@ def run(outfile, clusterfile, vecfile, infile=None):
         num_clusters = 50
         root = etree.parse(infile).getroot()
         for child in root:
-            kw_list = []
             node = child.find('MG_ID')
             rec_id = node.text
-            kws = extract_features.get_keywords(child)
+            kws = extract_features.get_keywords(child).split(',')
+            count = 0
             for kw in kws:
-                ids.append(rec_id)
-                keywords.append(kw)
-                kw_vecs.append(vectorize(kw, word2vec, dim))
+                kw = kw.strip()
+                if len(kw) > 0:
+                    print rec_id + " : " + kw
+                    vec = vectorize(kw, word2vec, dim)
+                    if vec is not None:
+                        ids.append(rec_id)
+                        keywords.append(kw)
+                        kw_vecs.append(vec)
+                    else:
+                        print "DROPPED"
     else:
         print "reading cluster file..."
         keywords, kw_clusters_correct, kw_vecs, cluster_names = read_cluster_file(clusterfile, word2vec, dim)
@@ -68,7 +79,7 @@ def run(outfile, clusterfile, vecfile, infile=None):
     print "cluster_names: " + str(cluster_names)
 
     # Generate clusters
-    print "shape: [total_keywords, dim]" # keywords listed individually
+    print "shape: [num_keywords, dim]" # keywords listed individually
     print "generating clusters..."
     #clusterer = KMeans(n_clusters=num_clusters, n_jobs=1, precompute_distances=False, max_iter=500, n_init=15)
     #clusterer = SpectralClustering(n_clusters=num_clusters, n_init=15, affinity='nearest_neighbors')
@@ -206,10 +217,11 @@ def write_clusters_to_xml(xmlfile, outfile, ids, cluster_pred):
     for child in root:
         node = child.find('MG_ID')
         rec_id = node.text
-        keywords = id_dict[rec_id]
         keyword_text = ""
-        for kw in keywords:
-            keyword_text = keyword_text + ","
+        if rec_id in id_dict:
+            keywords = id_dict[rec_id]
+            for kw in keywords:
+                keyword_text = keyword_text + "," + str(kw)
         newnode = etree.SubElement(child, kw_label)
         newnode.text = keyword_text.strip(',')
     # Write tree to file
@@ -228,10 +240,13 @@ def vectorize(phrase, word2vec, dim):
     for word in words:
         if word in word2vec:
             vecs.append(word2vec.get(word))
-        else:
-            vecs.append(zero_vec)
+        #else:
+        #    vecs.append(zero_vec)
     # Average vectors
-    avg_vec = numpy.average(numpy.asarray(vecs), axis=0)
-    return avg_vec
+    if len(vecs) > 0:
+        avg_vec = numpy.average(numpy.asarray(vecs), axis=0)
+        return avg_vec
+    else:
+        return None
     
 if __name__ == "__main__":main()
