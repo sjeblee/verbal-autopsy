@@ -6,6 +6,7 @@
 from lxml import etree
 from lxml.etree import tostring
 from itertools import chain
+import numpy
 import subprocess
 
 def clean_file(filename):
@@ -131,6 +132,62 @@ def load_word2vec(vecfile):
                 dim = len(vec)
     return word2vec, dim
 
+''' Labels must be integers or the empty string!
+    labels: [num_samples, seq_len]
+    returns: [num_samples, num_classes]
+'''
+def multi_hot_encoding(labels, max_label=None):
+    encoded_labels = []
+
+    # Figure out the dimensionality
+    if max_label is None:
+        max_label = 0
+        for seq in labels:
+            for item in seq:
+                if item != "":
+                    val = int(item)
+                    if val > max_label:
+                        max_label = val
+    dim = max_label+1
+    print "max_label: " + str(max_label) + ", dim: " + str(dim)
+
+    for seq in labels:
+        encoded_seq = zero_vec(dim)
+        for item in seq:
+            if item != "":
+                num = int(item)
+                encoded_seq[num] = 1
+        encoded_labels.append(encoded_seq)
+    return encoded_labels
+
+''' Convert multi-hot labels back to a text list of cluster numbers
+'''
+def decode_multi_hot(labels):
+    decoded_labels = []
+    for lab in labels:
+        label_seq = ""
+        for x in range(len(lab)):
+            val = lab[x]
+            if val >= 1:
+                label_seq = label_seq + "," + str(x)
+        decoded_labels.append(label_seq.strip(','))
+    return decoded_labels
+
+''' labels: [num_samples, num_clusters]
+    returns: a list of multi-hot vectors
+'''
+def map_to_multi_hot(labels, threshold=0.1):
+    decoded_labels = []
+    dim = len(labels[0])
+    for lab in labels:
+        label_seq = zero_vec(dim)
+        for x in range(len(lab)):
+            val = lab[x]
+            if val >= threshold:
+                label_seq[x] = 1
+        decoded_labels.append(label_seq)
+    return decoded_labels
+
 def remove_no_narrs(infile, outfile):
     # Get the xml from file
     tree = etree.parse(infile)
@@ -150,6 +207,49 @@ def remove_no_narrs(infile, outfile):
 
     print "Removed " + str(count) + " missing or empty narratives"
     tree.write(outfile)
+
+''' Scores vector labels with binary values
+    returns: avg precision, recall, f1 of 1 labels (not 0s)
+'''
+def score_vec_labels(true_labs, pred_labs):
+    p_scores = []
+    r_scores = []
+    f1_scores = []
+    assert(len(true_labs) == len(pred_labs))
+    for x in range(len(true_labs)):
+        true_lab = true_labs[x]
+        pred_lab = pred_labs[x]
+        pos = 0
+        tp = 0
+        fp = 0
+        for y in range(len(true_lab)):
+            true_val = true_lab[y]
+            pred_val = pred_lab[y]
+            if true_val == 1:
+                pos = pos+1
+                if pred_val == 1:
+                    tp = tp+1
+            else:
+                if pred_val == 1:
+                    fp = fp+1
+
+        p = 0.0
+        r = 0.0
+        if (tp+fp) > 0:
+            p = float(tp) / float(tp+fp)
+        if pos > 0:
+            r = float(tp) / float(pos)
+        if p == 0.0 and r == 0.0:
+            f1 = float(0)
+        else:
+            f1 = 2*(p*r)/(p+r)
+        p_scores.append(p)
+        r_scores.append(r)
+        f1_scores.append(f1)
+    precision = numpy.average(p_scores)
+    recall = numpy.average(r_scores)
+    f1 = numpy.average(f1_scores)
+    return precision, recall, f1
 
 ''' Get content of a tree node as a string
     node: etree.Element
