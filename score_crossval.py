@@ -5,6 +5,7 @@ from __future__ import division
 
 import argparse
 import fnmatch
+import math
 import os
 import statistics
 
@@ -28,6 +29,7 @@ def run(arg_infile, arg_outfile, arg_models):
     crossval_dir = arg_infile
     models = arg_models.split(',')
     final_scores = {}
+    final_stdevs = {}
     global p, r, f1, pccc, csmfa
     p = 'p'
     r = 'r'
@@ -55,7 +57,7 @@ def run(arg_infile, arg_outfile, arg_models):
                 elif fnmatch.fnmatch(f, 'test_adult*.stats'):
                     a_scores = get_scores(prefix + "/" + f)
                     adult_scores.append(a_scores)
-                elif fnmatch.fnmatch(f, 'test_all*.stats'):
+                elif fnmatch.fnmatch(f, '*all.narrc.stats'):
                     all_scores.append(get_scores(prefix + "/" + f))
         # Average the scores
         print "adult scores: " + str(len(adult_scores))
@@ -67,13 +69,25 @@ def run(arg_infile, arg_outfile, arg_models):
         scores['child'] = []
         scores['neonate'] = []
         scores['all'] = []
+        stdevs = {}
+        stdevs['adult'] = []
+        stdevs['child'] = []
+        stdevs['neonate'] = []
+        stdevs['all'] = []
         for metric in metrics:
             scores['adult'].append(avg_scores(adult_scores, metric))
             scores['child'].append(avg_scores(child_scores, metric))
             scores['neonate'].append(avg_scores(neonate_scores, metric))
-            scores['all'].append(avg_scores(all_scores, metric))
+            #scores['all'].append(median_scores(all_scores, metric))
+            #stdevs['adult'].append(stdev_scores(adult_scores, metric))
+            #stdevs['child'].append(stdev_scores(child_scores, metric))
+            #stdevs['neonate'].append(stdev_scores(neonate_scores, metric))
+            #stdevs['all'].append(stdev_scores(all_scores, metric))
+            #lower, upper = median_CI(neonate_scores, metric)
+            #print "95 CI " + metric + "(" + str(lower) + ", " + str(upper) + ")"
 
         final_scores[model] = scores
+        final_stdevs[model] = stdevs
 
     # write the stats to file
     output = open(arg_outfile, "w")
@@ -103,15 +117,24 @@ def run(arg_infile, arg_outfile, arg_models):
             output.write(str(final_scores[model]['neonate'][x]) + ",")
         output.write("\n")
 
-    # All
-    output.write("all\n")
-    for model in models:
-        output.write(model + ",")
-        for x in range(0,5):
-            output.write(str(final_scores[model]['all'][x]) + ",")
-        output.write("\n")
+        #output.write(model + "-stddev,")
+        #for x in range(0,5):
+        #    output.write(str(final_stdevs[model]['neonate'][x]) + ",")
+        #output.write("\n")
 
-        
+    # All
+    #output.write("all\n")
+    #for model in models:
+    #    output.write(model + ",")
+    #    for x in range(0,5):
+    #        output.write(str(final_scores[model]['all'][x]) + ",")
+    #    output.write("\n")
+
+    #    output.write(model + "-stddev,")
+    #    for x in range(0,5):
+    #        output.write(str(final_stdevs[model]['all'][x]) + ",")
+    #    output.write("\n")
+   
     output.close()
 
 def get_scores(filename):
@@ -151,5 +174,25 @@ def median_scores(scores, metric):
     for entry in scores:
         metric_scores.append(float(entry[metric]))
     return statistics.median(metric_scores)
+
+def stdev_scores(scores, metric):
+    metric_scores = []
+    for entry in scores:
+        metric_scores.append(float(entry[metric]))
+    return statistics.stdev(metric_scores)
+
+def median_CI(scores, metric):
+    values = []
+    for entry in scores:
+        values.append(float(entry[metric]))
+    n = len(values)
+    values.sort()
+    lower_index = (n/2) - (1.96*math.sqrt(n)/2)
+    upper_index = 1+(n/2) + (1.96*math.sqrt(n)/2)
+    lower_index = int(round(lower_index))
+    upper_index = int(round(upper_index))
+    lower_val = values[lower_index]
+    upper_val = values[upper_index]
+    return lower_val, upper_val
 
 if __name__ == "__main__":main()
