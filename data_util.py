@@ -215,6 +215,9 @@ def score_vec_labels(true_labs, pred_labs):
     p_scores = []
     r_scores = []
     f1_scores = []
+    micro_pos = 0
+    micro_tp = 0
+    micro_fp = 0
     assert(len(true_labs) == len(pred_labs))
     for x in range(len(true_labs)):
         true_lab = true_labs[x]
@@ -227,11 +230,14 @@ def score_vec_labels(true_labs, pred_labs):
             pred_val = pred_lab[y]
             if true_val == 1:
                 pos = pos+1
+                micro_pos = micro_pos+1
                 if pred_val == 1:
                     tp = tp+1
+                    micro_tp=micro_tp+1
             else:
                 if pred_val == 1:
                     fp = fp+1
+                    micro_fp = micro_fp+1
 
         p = 0.0
         r = 0.0
@@ -249,7 +255,17 @@ def score_vec_labels(true_labs, pred_labs):
     precision = numpy.average(p_scores)
     recall = numpy.average(r_scores)
     f1 = numpy.average(f1_scores)
-    return precision, recall, f1
+    micro_p = 0.0
+    micro_r = 0.0
+    if (micro_tp+micro_fp) > 0:
+        micro_p = float(micro_tp) / float(micro_tp+micro_fp)
+    if micro_pos > 0:
+        micro_r = float(micro_tp) / float(micro_pos)
+    if micro_p == 0.0 and micro_r == 0.0:
+        micro_f1 = float(0)
+    else:
+        micro_f1 = 2*(micro_p*micro_r)/(micro_p+micro_r)
+    return precision, recall, f1, micro_p, micro_r, micro_f1
 
 ''' Get content of a tree node as a string
     node: etree.Element
