@@ -6,8 +6,10 @@ import sys
 sys.path.append('/u/sjeblee/research/va/git/verbal-autopsy')
 import data_util
 
+from collections import Counter
 from lxml import etree
 from sklearn.cluster import AgglomerativeClustering, KMeans, SpectralClustering
+from sklearn.neighbors import KNeighborsClassifier
 from scipy.stats import mode
 import argparse
 import numpy
@@ -21,18 +23,27 @@ def main():
     argparser.add_argument('--out', action="store", dest="outfile")
     argparser.add_argument('--clusters', action="store", dest="clusterfile")
     argparser.add_argument('--vectors', action="store", dest="vecfile")
+    argparser.add_argument('--test', action="store", dest="testfile")
+    argparser.add_argument('--testout', action="store", dest="testoutfile")
+    argparser.add_argument('-n', '--num', action="store", dest="num") # number of clusters
     args = argparser.parse_args()
 
     if not (args.outfile and args.clusterfile and args.vecfile):
-        print "usage: ./cluster_keywords.py --in [file.xml] --out [file.xml] --clusters [file.csv] --vecfile [file.vectors]"
+        print "usage: ./cluster_keywords.py --in [file.xml] --out [file.xml] --clusters [file.csv] --vecfile [file.vectors] --test [file.xml] --testout [file.xml] --num [n_clusters]"
         exit()
 
-    if args.infile:
-        run(args.outfile, args.clusterfile, args.vecfile, args.infile)
-    else:
-        run(args.outfile, args.clusterfile, args.vecfile)
+    num = 20
+    if args.num:
+        num = int(args.num)
 
-def run(outfile, clusterfile, vecfile, infile=None):
+    if args.testfile and args.infile:
+        run(args.outfile, args.clusterfile, args.vecfile, args.infile, args.testfile, args.testoutfile, num)
+    if args.infile:
+        run(args.outfile, args.clusterfile, args.vecfile, args.infile, num_clusters=num)
+    else:
+        run(args.outfile, args.clusterfile, args.vecfile, num_clusters=num)
+
+def run(outfile, clusterfile, vecfile, infile=None, testfile=None, testoutfile=None, num_clusters=20):
     starttime = time.time()
 
     #stopwords = ["a", "about", "above", "after", "against", "all", "am", "an", "and", "any", "are", "aren't", "as", "at", "be", "because", "been", "before", "being", "between", "but", "by", "can't", "cannot", "could", "couldn't", "did", "didn't", "do", "does", "doesn't", "doing", "don't", "during", "each", "for", "from", "further", "had", "hadn't", "has", "hasn't", "have", "haven't", "having", "he", "he'd", "he'll", "he's", "her", "here", "here's", "hers", "him", "his", "how", "how's", "i", "i'd", "i'll", "i'm", "i've", "if", "in", "into", "is", "isn't", "it", "it's", "its", "itself", "let's", "me", "more", "most", "mustn't", "my", "myself", "no", "nor", "not", "of", "off", "on", "only", "or", "other", "ought", "our", "ours", "ourselves", "out", "over", "own", "same", "shan't", "she", "she'd", "she'll", "she's", "should", "shouldn't", "so", "some", "such", "than", "that", "that's", "the", "then", "there", "there's", "these", "they", "they'd", "they'll", "they're", "they've", "this", "those", "through", "to", "too", "under", "until", "up", "very", "was", "wasn't", "we", "we'd", "we'll", "we're", "we've", "were", "weren't", "what", "what's", "where", "where's", "which", "while", "who", "who's", "whom", "why", "why's", "with", "won't", "would", "wouldn't", "you", "you'd", "you'll", "you're", "you've", "your", "yours", "yourself", "yourselves"]
@@ -51,24 +62,7 @@ def run(outfile, clusterfile, vecfile, infile=None):
     if infile is not None:
         print "reading XML file..."
         # Get the xml from file
-        num_clusters = 50
-        root = etree.parse(infile).getroot()
-        for child in root:
-            node = child.find('MG_ID')
-            rec_id = node.text
-            kws = extract_features.get_keywords(child).split(',')
-            count = 0
-            for kw in kws:
-                kw = kw.strip()
-                if len(kw) > 0:
-                    print rec_id + " : " + kw
-                    vec = vectorize(kw, word2vec, dim)
-                    if vec is not None:
-                        ids.append(rec_id)
-                        keywords.append(kw)
-                        kw_vecs.append(vec)
-                    else:
-                        print "DROPPED"
+        ids, keywords, kw_vecs = read_xml_file(infile, word2vec, dim)
     else:
         print "reading cluster file..."
         keywords, kw_clusters_correct, kw_vecs, cluster_names = read_cluster_file(clusterfile, word2vec, dim)
@@ -86,6 +80,25 @@ def run(outfile, clusterfile, vecfile, infile=None):
     clusterer = AgglomerativeClustering(n_clusters=num_clusters, affinity='cosine', linkage='average')
     kw_clusters = clusterer.fit_predict(kw_vecs)
     #kw_clusters = map_back(clusterer.fit_predict(kw_vecs), cluster_names)
+
+    # Test
+    if testfile is not None:
+        classifier = KNeighborsClassifier(algorithm='ball_tree')
+        classifier.fit(kw_vecs, kw_clusters)
+        if ',' in testfile:
+            testfiles = testfile.split(',')
+            testoutfiles = testoutfile.split(',')
+            testnames = zip(testfiles, testoutfiles)
+            for filename, outfilename in testnames:
+                print "predicting clusters for test file: " + filename
+                testids, testkeywords, testvecs = read_xml_file(filename, word2vec, dim)
+                test_clusters = classifier.predict(testvecs)
+                write_clusters_to_xml(filename, outfilename, testids, test_clusters)
+        else:
+            print "predicting clusters for test file..."
+            testids, testkeywords, testvecs = read_xml_file(testfile, word2vec, dim)
+            test_clusters = classifier.predict(testvecs)
+            write_clusters_to_xml(testfile, testoutfile, testids, test_clusters)
 
     # Score clusters
    # print "scoring clusters..."
@@ -151,6 +164,28 @@ def read_cluster_file(clusterfile, word2vec, dim, cluster_names=None):
 
     return keywords, kw_clusters, kw_vecs, cluster_names
 
+def read_xml_file(filename, word2vec, dim):
+    ids = []
+    keywords = []
+    kw_vecs = []
+    root = etree.parse(filename).getroot()
+    for child in root:
+        node = child.find('MG_ID')
+        rec_id = node.text
+        kws = extract_features.get_keywords(child).split(',')
+        for kw in kws:
+            kw = kw.strip()
+            if len(kw) > 0:
+                print rec_id + " : " + kw
+                vec = vectorize(kw, word2vec, dim)
+                if vec is not None:
+                    ids.append(rec_id)
+                    keywords.append(kw)
+                    kw_vecs.append(vec)
+                else:
+                    print "DROPPED"
+    return ids, keywords, kw_vecs
+
 def purity(keywords, corr_clusters, pred_clusters):
     # Label clusters
     pred_cluster_map = get_cluster_map(keywords, pred_clusters)
@@ -201,9 +236,8 @@ def write_clusters_to_file(outfile, cluster_map):
         outf.write("\n")
     outf.close()
 
-def write_clusters_to_xml(xmlfile, outfile, ids, cluster_pred):
+def write_clusters_to_xml(xmlfile, outfile, ids, cluster_pred, kw_label="keyword_clusters"):
     # Create dictionary
-    kw_label = "keyword_clusters"
     id_dict = {}
     for x in range(len(ids)):
         rec_id = ids[x]
@@ -236,7 +270,7 @@ def map_back(clusters, cluster_names):
 def vectorize(phrase, word2vec, dim):
     words = phrase.split(' ')
     vecs = []
-    zero_vec = data_util.zero_vec(dim)
+    #zero_vec = data_util.zero_vec(dim)
     for word in words:
         if word in word2vec:
             vecs.append(word2vec.get(word))
@@ -248,5 +282,40 @@ def vectorize(phrase, word2vec, dim):
         return avg_vec
     else:
         return None
+
+''' Converts cluster numbers to names
+    clusters: a list of lists of cluster numbers
+    clusterfile: the file containing the dictionary of cluster numbers to all the cluster text
+    returns: a list of lists of cluster names
+'''
+def interpret_clusters(clusters, clusterfile):
+    # Read clusters from file
+    cluster_names = {}
+    cluster_map = {}
+    clusters_text = []
+    with open(clusterfile, 'r') as f:
+        for line in f.readlines():
+            phrases = line.strip().strip(',').split(',')
+            key = int(phrases[0])
+            phrases = phrases[1:]
+            cluster_map[key] = phrases
+            label = Counter(phrases).most_common(1)[0][0]
+            cluster_names[key] = label
+
+    # Write cluster name mapping to file
+    outname = clusterfile + ".names"
+    outfile = open(outname, 'w')
+    outfile.write(str(cluster_names))
+    outfile.close()
+
+    # Replace cluster names with text
+    for entry in clusters:
+        text = []
+        for num in entry.split(','):
+            if num is not '':
+                name = cluster_names[int(num)]
+                text.append(name)
+        clusters_text.append(text)
+    return clusters_text
     
 if __name__ == "__main__":main()
