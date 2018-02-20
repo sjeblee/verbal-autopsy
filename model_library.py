@@ -33,7 +33,7 @@ numpy.set_printoptions(threshold=numpy.inf)
     Y: a python list or numpy array of training labels of shape [num_samples]
     returns: the model and the modified X and Y arrays
 '''
-def nn_model(X, Y, num_nodes, act):
+def nn_model(X, Y, num_nodes, act, num_epochs=10):
     X = numpy.asarray(X)
     Y = to_categorical(Y)
     print "X.shape: " + str(X.shape)
@@ -48,7 +48,7 @@ def nn_model(X, Y, num_nodes, act):
                     Activation('softmax'),])
         
     nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
-    nn.fit(X, Y)
+    nn.fit(X, Y, epochs=num_epochs)
     nn.summary()
     return nn, X, Y
 
@@ -85,6 +85,7 @@ def rnn_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', dropout=0
         ff_feats = X2.shape[1]
         input2 = Input(shape=(ff_feats,))
         inputs.append(input2)
+        ff_feats = 100
         ff = Dense(ff_feats, activation='relu')(input2)
 
     if modelname == 'rnn':
@@ -137,7 +138,7 @@ def rnn_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', dropout=0
     Does NOT support joint training yet
     returns: the CNN model
 '''
-def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10):
+def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, return_layer=False):
     #Y = to_categorical(Y)
     X = numpy.asarray(X)
     embedding_size = X.shape[-1]
@@ -198,8 +199,236 @@ def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10):
     #except AttributeError:
     #    print "ERROR: got an exception trying to print attention weights"
 
+    if return_layer:
+        return nn, prediction
+    else:
+        return nn, X, Y
+
+''' Creates and trains a recurrent neural network model. Supports SimpleRNN, LSTM, and GRU
+    X: a list of training data
+    Y: a list of training labels
+'''
+def rnn_keyword_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', dropout=0.1, X2=[], pretrainX=[], pretrainY=[], pretrainX2=[], keywords=[], initial_states=None, windows=[1,2,3,4,5], num_epochs=15):
+    print "keyword rnn"
+    Y = to_categorical(Y)
+    X = numpy.asarray(X)
+    keywords = numpy.asarray(keywords)
+    print "train X shape: " + str(X.shape)
+    embedding_size = X.shape[-1]
+    max_seq_len = X.shape[1]
+    inputs = []
+    input_arrays = [X]
+    hybrid = False
+    pretrain = False
+
+    input_shape = (max_seq_len, embedding_size)
+    input1 = Input(shape=input_shape)
+    inputs.append(input1)
+    
+    # Keyword CNN
+    #conv_outputs = []
+    #for w in windows:
+    #    print "window: " + str(max_seq_len) + " x " + str(w)
+    #    conv_layer = Conv1D(max_seq_len, w, input_shape=input_shape)
+    #    conv = conv_layer(input1)
+    #    max_pool_layer = GlobalMaxPooling1D()
+    #    max_pool = max_pool_layer(conv)
+    #    conv_outputs.append(max_pool)
+    #    print "conv: " + str(conv_layer.output_shape) + " pool: " + str(max_pool_layer.output_shape)
+    #merged = concatenate(conv_outputs, axis=-1)
+
+    # Keyword GRU
+    kw_rnn = GRU(num_nodes, return_sequences=False, return_state=False)
+    kw_rnn_out = kw_rnn(input1)
+    kw_out = Dropout(dropout)(kw_rnn_out)
+
+    kw_prediction = Dense(keywords.shape[1], activation='softmax')(kw_out)
+    kw_model = Model(inputs=inputs, outputs=kw_prediction)
+
+    kw_model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+    kw_model.fit(input_arrays, keywords, epochs=num_epochs)
+    kw_model.summary()
+
+    # RNN Pretraining
+    if len(pretrainX) > 0 and len(pretrainY) > 0:
+        pretrain = True
+        print "Using pretraining"
+
+    print "model: " + modelname + " nodes: " + str(num_nodes) + " embedding: " + str(embedding_size) + " max_seq_len: " + str(max_seq_len)
+
+    # Handle hybrid model
+    if len(X2) > 0:
+        print "hybrid not supported yet!"
+        #hybrid = True
+        #X2 = numpy.asarray(X2)
+        #print "X2 shape: " + str(X2.shape)
+        #input_arrays.append(X2)
+        #ff_feats = X2.shape[1]
+        #input2 = Input(shape=(ff_feats,))
+        #inputs.append(input2)
+        #ff = Dense(ff_feats, activation='relu')(input2)
+
+    if modelname == 'rnn':
+        rnn = SimpleRNN(num_nodes, return_sequences=False, return_state=True)
+    if modelname == 'gru':
+        rnn = GRU(num_nodes, return_sequences=False, return_state=True)
+    else:
+        rnn = LSTM(num_nodes, return_sequences=False, return_state=True)
+
+    if initial_states == None:
+        rnn_out, rnn_states = rnn(input1)
+    else:
+        rnn_out, rnn_states = rnn(input1, initial_state=initial_states)
+    dropout_out = Dropout(dropout)(rnn_out)
+    #attn_out = attention(dropout_out, max_seq_len, embedding_size)
+
+    #if hybrid:
+        #print "ff shape: " + str(ff.output_shape)
+    #    last_out = concatenate([dropout_out, ff], axis=-1)
+    #else:
+    #    last_out = dropout_out
+
+    kw_pred_main = Dense(keywords.shape[1], activation='softmax')(kw_out)
+    last_out = concatenate([dropout_out, kw_pred_main], axis=-1)
+
+    if pretrain:
+        print "pretraining..."
+        for k in range(len(pretrainX)):
+            trainX = numpy.asarray(pretrainX[k])
+            trainY = to_categorical(pretrainY[k])
+            pretrain_input_arrays = [trainX]
+            pretrain_inputs = [Input(shape=input_shape)]
+            if hybrid:
+                trainX2 = numpy.asarray(pretrainX2[k])
+                pretrain_input_arrays.append(trainX2)
+
+            prediction = Dense(trainY.shape[1], activation='softmax')(last_out)
+            pre_nn = Model(inputs=inputs, outputs=prediction)
+            pre_nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+            pre_nn.fit(pretrain_input_arrays, trainY, epochs=num_epochs)
+
+    print "training with main data..."
+    prediction = Dense(Y.shape[1], activation='softmax')(last_out)
+    nn = Model(inputs=inputs, outputs=prediction)
+    nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+    nn.fit(input_arrays, Y, epochs=num_epochs)
+
+    nn.summary()
+    return nn, kw_model, X, Y
+
+''' Creates and trains a recurrent neural network model. Supports SimpleRNN, LSTM, and GRU
+    X: a list of training data
+    Y: a list of training labels
+'''
+def rnn_cnn_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', dropout=0.1, X2=[], pretrainX=[], pretrainY=[], pretrainX2=[], initial_states=None, windows=[1,2,3,4,5], num_epochs=15):
+    print "rnn cnn model"
+    Y = to_categorical(Y)
+    X = numpy.asarray(X)
+    print "train X shape: " + str(X.shape)
+    embedding_size = X.shape[-1]
+    max_seq_len = X.shape[1]
+    inputs = []
+    input_arrays = [X]
+    hybrid = False
+    pretrain = False
+
+    input_shape = (max_seq_len, embedding_size)
+    input1 = Input(shape=input_shape)
+    inputs.append(input1)
+
+    # CNN
+    #conv_outputs = []
+    #for w in windows:
+    #    print "window: " + str(max_seq_len) + " x " + str(w)
+    #    conv_layer = Conv1D(max_seq_len, w, input_shape=input_shape)
+    #    conv = conv_layer(input1)
+    #    max_pool_layer = GlobalMaxPooling1D()
+    #    max_pool = max_pool_layer(conv)
+    #    conv_outputs.append(max_pool)
+    #    print "conv: " + str(conv_layer.output_shape) + " pool: " + str(max_pool_layer.output_shape)
+    #pre_out = concatenate(conv_outputs, axis=-1)
+
+    # GRU
+    pre_rnn = GRU(num_nodes, return_sequences=False, return_state=False)
+    pre_rnn_out = pre_rnn(input1)
+    pre_out = Dropout(dropout)(pre_rnn_out)
+
+    #pre_prediction = Dense(keywords.shape[1], activation='softmax')(kw_out)
+    #kw_model = Model(inputs=inputs, outputs=kw_prediction)
+
+    #kw_model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+    #kw_model.fit(input_arrays, keywords, epochs=num_epochs)
+    #kw_model.summary()
+
+    # RNN Pretraining
+    if len(pretrainX) > 0 and len(pretrainY) > 0:
+        pretrain = True
+        print "Using pretraining"
+
+    print "model: " + modelname + " nodes: " + str(num_nodes) + " embedding: " + str(embedding_size) + " max_seq_len: " + str(max_seq_len)
+
+    # Handle hybrid model
+    if len(X2) > 0:
+        print "hybrid not supported yet!"
+        #hybrid = True
+        #X2 = numpy.asarray(X2)
+        #print "X2 shape: " + str(X2.shape)
+        #input_arrays.append(X2)
+        #ff_feats = X2.shape[1]
+        #input2 = Input(shape=(ff_feats,))
+        #inputs.append(input2)
+        #ff = Dense(ff_feats, activation='relu')(input2)
+
+    if modelname == 'rnn':
+        rnn = SimpleRNN(num_nodes, return_sequences=False, return_state=True)
+    if modelname == 'gru':
+        rnn = GRU(num_nodes, return_sequences=False, return_state=True)
+    else:
+        rnn = LSTM(num_nodes, return_sequences=False, return_state=True)
+
+    if initial_states == None:
+        rnn_out, rnn_states = rnn(input1)
+    else:
+        rnn_out, rnn_states = rnn(input1, initial_state=initial_states)
+    dropout_out = Dropout(dropout)(rnn_out)
+    #attn_out = attention(dropout_out, max_seq_len, embedding_size)
+
+    #if hybrid:
+        #print "ff shape: " + str(ff.output_shape)
+    #    last_out = concatenate([dropout_out, ff], axis=-1)
+    #else:
+    #    last_out = dropout_out
+
+    #kw_pred_main = Dense(keywords.shape[1], activation='softmax')(kw_out)
+    last_out = concatenate([dropout_out, pre_out], axis=-1)
+
+    if pretrain:
+        print "pretraining..."
+        for k in range(len(pretrainX)):
+            trainX = numpy.asarray(pretrainX[k])
+            trainY = to_categorical(pretrainY[k])
+            pretrain_input_arrays = [trainX]
+            pretrain_inputs = [Input(shape=input_shape)]
+            if hybrid:
+                trainX2 = numpy.asarray(pretrainX2[k])
+                pretrain_input_arrays.append(trainX2)
+
+            prediction = Dense(trainY.shape[1], activation='softmax')(last_out)
+            pre_nn = Model(inputs=inputs, outputs=prediction)
+            pre_nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+            pre_nn.fit(pretrain_input_arrays, trainY, epochs=num_epochs)
+
+    print "training with main data..."
+    prediction = Dense(Y.shape[1], activation='softmax')(last_out)
+    nn = Model(inputs=inputs, outputs=prediction)
+    nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+    nn.fit(input_arrays, Y, epochs=num_epochs)
+
+    nn.summary()
     return nn, X, Y
 
+''' TODO: Fix this
+'''
 def create_filter_rnn_model(X, Y, embedding_size, num_nodes, activation='tanh', dropout=0.1, hybrid=False, X2=[]):
     Y = to_categorical(Y)
     X = numpy.asarray(X)
