@@ -26,15 +26,16 @@ def main():
     argparser.add_argument('--test', action="store", dest="testfile")
     argparser.add_argument('--out', action="store", dest="outfile")
     argparser.add_argument('--train', action="store", dest="trainfile")
+    argparser.add_argument('--num', action="store", dest="num_clusters")
     args = argparser.parse_args()
 
-    if not (args.testfile and args.outfile and args.trainfile):
-        print "usage: ./predict_keywords.py --train [file.xml] --test [file.xml] --out [outfile.xml]"
+    if not (args.testfile and args.outfile and args.trainfile and args.num_clusters):
+        print "usage: ./predict_keywords.py --train [file.xml] --test [file.xml] --out [outfile.xml] --num [num_clusters]"
         exit()
 
-    run(args.trainfile, args.testfile, args.outfile)
+    run(args.trainfile, args.testfile, args.outfile, args.num_clusters)
 
-def run(trainfile, testfile, outfile):
+def run(trainfile, testfile, outfile, num_clusters):
     starttime = time.time()
 
     # Setup
@@ -42,7 +43,7 @@ def run(trainfile, testfile, outfile):
     train_kw_file = trainfile + ".kw_clusters"
     test_feat_file = testfile + ".feats"
     test_kw_file = testfile + ".kw_clusters"
-    vecfile = "/u/sjeblee/research/va/data/datasets/mds+rct/narr+ice+medhelp.vectors.50"
+    vecfile = "/u/sjeblee/research/va/data/datasets/mds+rct/narr+ice+medhelp.vectors.100"
 
     # Extract word vector features and keyword vectors
     if not (os.path.exists(train_feat_file) and os.path.exists(test_feat_file)):
@@ -77,8 +78,9 @@ def run(trainfile, testfile, outfile):
     #testy = model_seq.encode_labels(testy, labelencoder)
 
     # keyword multi-hot encoding
-    trainy = numpy.asarray(data_util.multi_hot_encoding(trainy, 299))
-    testy = numpy.asarray(data_util.multi_hot_encoding(testy, 299))
+    max_label = int(num_clusters) - 1
+    trainy = numpy.asarray(data_util.multi_hot_encoding(trainy, max_label))
+    testy = numpy.asarray(data_util.multi_hot_encoding(testy, max_label))
     #print "trainy len: " + str(len(trainy))
 
     # Train and test the model
@@ -93,13 +95,14 @@ def run(trainfile, testfile, outfile):
     #testy_pred = model_seq.predict_seqs(encoder, decoder, testx, output_seq_len, output_dim, True)
 
     # CNN
-    modelfile = "cnn_keyword.model"
+    modelfile = "keyword_gru.model"
     if os.path.exists(modelfile):
         print "Using existing model"
         cnn = load_model(modelfile)
     else:
         print "Training new model..."
         cnn, x, y = model_library.rnn_model(trainx, trainy, 100, modelname='gru', num_epochs=15)
+        #cnn, x, y = model_library.cnn_model(trainx, trainy, num_epochs=20, loss_func='kullback_leibler_divergence')
         cnn.save(modelfile)
 
     # Test
@@ -118,7 +121,12 @@ def run(trainfile, testfile, outfile):
     testy_pred_labels = data_util.decode_multi_hot(testy_pred)
     print "testy_pred_labels[0]: " + str(testy_pred_labels[0])
 
-    clusterfile = "/u/sjeblee/research/va/data/datasets/mds+rct/train_adult_cat_spell.clusters"
+    #kw_pred = [thing.split(',') for thing in testy_pred_labels]
+    #kw_true = [thing.split(',') for thing in data_util.decode_multi_hot(testy)]
+    clusterfile = "/u/sjeblee/research/va/data/datasets/mds+rct/train_adult_cat_spell.clusters_e2"
+    #kw_emb, kw_pred_text = cluster_keywords.cluster_embeddings(kw_pred, clusterfile, vecfile, True)
+    #kw_true_emb, kw_true_text = cluster_keywords.cluster_embeddings(kw_true, clusterfile, vecfile, True)
+
     kw_pred_text = cluster_keywords.interpret_clusters(testy_pred_labels, clusterfile)
     kw_true_text = cluster_keywords.interpret_clusters(data_util.decode_multi_hot(testy), clusterfile)
     print "kw_pred_text[0]: " + str(kw_pred_text[0])
@@ -141,7 +149,7 @@ def run(trainfile, testfile, outfile):
     #output = open(outfile, 'w')
     #output.write(str(pred_dict))
     #output.close()
-    cluster_keywords.write_clusters_to_xml(testfile, outfile, testids, testy_pred_labels)
+    cluster_keywords.write_clusters_to_xml(testfile, outfile, testids, testy_pred_labels, kw_pred_text)
 
     endtime = time.time()
     print "preprocessing took " + str(endtime - starttime) + " s"
@@ -161,7 +169,7 @@ def preprocess(filename, ids, x, feats, pad=False):
                     ids.append(vector[key])
                     #print "ID: " + vector[key]
                 else:
-                    print "key: " + key
+                    #print "key: " + key
                     # The feature matrix for word2vec can't have other features
                     features = vector[key]
                     #global max_seq_len
@@ -174,10 +182,10 @@ def preprocess(filename, ids, x, feats, pad=False):
                             features = features.split(',')
                         max_seq_len = max(max_seq_len, len(features))
                         #features = numpy.asarray(features, dtype='str')
-                        print "feature len: " + str(len(features))
+                        #print "feature len: " + str(len(features))
                     else:
                         features = numpy.asarray(features)
-                        print "feature shape: " + str(features.shape)
+                        #print "feature shape: " + str(features.shape)
                     x.append(features)
 
     # Pad keyword sequences

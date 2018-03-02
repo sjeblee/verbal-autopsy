@@ -38,7 +38,7 @@ def main():
 
     if args.testfile and args.infile:
         run(args.outfile, args.clusterfile, args.vecfile, args.infile, args.testfile, args.testoutfile, num)
-    if args.infile:
+    elif args.infile:
         run(args.outfile, args.clusterfile, args.vecfile, args.infile, num_clusters=num)
     else:
         run(args.outfile, args.clusterfile, args.vecfile, num_clusters=num)
@@ -76,7 +76,7 @@ def run(outfile, clusterfile, vecfile, infile=None, testfile=None, testoutfile=N
     print "shape: [num_keywords, dim]" # keywords listed individually
     print "generating clusters..."
     #clusterer = KMeans(n_clusters=num_clusters, n_jobs=1, precompute_distances=False, max_iter=500, n_init=15)
-    #clusterer = SpectralClustering(n_clusters=num_clusters, n_init=15, affinity='nearest_neighbors')
+    #clusterer = SpectralClustering(n_clusters=num_clusters, n_init=15, affinity='cosine', n_jobs=-1)
     clusterer = AgglomerativeClustering(n_clusters=num_clusters, affinity='cosine', linkage='average')
     kw_clusters = clusterer.fit_predict(kw_vecs)
     #kw_clusters = map_back(clusterer.fit_predict(kw_vecs), cluster_names)
@@ -172,18 +172,18 @@ def read_xml_file(filename, word2vec, dim):
     for child in root:
         node = child.find('MG_ID')
         rec_id = node.text
-        kws = extract_features.get_keywords(child).split(',')
+        kws = extract_features.get_keywords(child, "keywords_spell").split(',')
         for kw in kws:
             kw = kw.strip()
             if len(kw) > 0:
                 print rec_id + " : " + kw
                 vec = vectorize(kw, word2vec, dim)
-                if vec is not None:
+                if vec is not None and (x is True for x in numpy.isfinite(numpy.asarray(vec)).tolist()):
                     ids.append(rec_id)
                     keywords.append(kw)
                     kw_vecs.append(vec)
                 else:
-                    print "DROPPED"
+                    print "DROPPED: " + kw
     return ids, keywords, kw_vecs
 
 def purity(keywords, corr_clusters, pred_clusters):
@@ -229,22 +229,28 @@ def write_clusters_to_file(outfile, cluster_map):
     print "writing clusters to " + outfile
     outf = open(outfile, 'w')
     for key in cluster_map:
-        print "cluster " + str(key)
+        print "cluster " + str(key) + " : " + str(len(cluster_map[key])) + " keywords"
         outf.write(str(key) + ",")
         for item in cluster_map[key]:
             outf.write(str(item) + ",")
         outf.write("\n")
     outf.close()
 
-def write_clusters_to_xml(xmlfile, outfile, ids, cluster_pred, kw_label="keyword_clusters"):
+def write_clusters_to_xml(xmlfile, outfile, ids, cluster_pred, text_pred=None, kw_label="keyword_clusters"):
     # Create dictionary
     id_dict = {}
+    text_dict = {}
     for x in range(len(ids)):
         rec_id = ids[x]
         cluster = cluster_pred[x]
+        text = ""
+        if text_pred is not None:
+            text = text_pred[x]
         if rec_id not in id_dict:
             id_dict[rec_id] = []
+            text_dict[rec_id] = []
         id_dict[rec_id].append(cluster)
+        text_dict[rec_id].append(text)
     # Read xml file and add attributes
     tree = etree.parse(xmlfile)
     root = tree.getroot()
@@ -254,10 +260,13 @@ def write_clusters_to_xml(xmlfile, outfile, ids, cluster_pred, kw_label="keyword
         keyword_text = ""
         if rec_id in id_dict:
             keywords = id_dict[rec_id]
+            kw_text = text_dict[rec_id]
             for kw in keywords:
                 keyword_text = keyword_text + "," + str(kw)
         newnode = etree.SubElement(child, kw_label)
         newnode.text = keyword_text.strip(',')
+        newnode2 = etree.SubElement(child, kw_label + "_text")
+        newnode2.text = str(kw_text)
     # Write tree to file
     tree.write(outfile)
 
@@ -282,6 +291,9 @@ def vectorize(phrase, word2vec, dim):
         return avg_vec
     else:
         return None
+
+def clusters_from_file(clusterfile):
+    print "TODO"
 
 ''' Converts cluster numbers to names
     clusters: a list of lists of cluster numbers
@@ -312,10 +324,105 @@ def interpret_clusters(clusters, clusterfile):
     for entry in clusters:
         text = []
         for num in entry.split(','):
-            if num is not '':
-                name = cluster_names[int(num)]
-                text.append(name)
+            if num != '':
+                if int(num) in cluster_names:
+                    name = cluster_names[int(num)]
+                    text.append(name)
+                else:
+                    print "NOT FOUND: " + num
         clusters_text.append(text)
     return clusters_text
+
+''' Get cluster embeddings for keyword clusters
+    labels: list of lists of cluster numbers
+'''
+def cluster_embeddings(labels, clusterfile, vecfile, return_phrases=False):
+    word2vec, dim = data_util.load_word2vec(vecfile)
+    cluster_map = {}
+    cluster_names = {}
+    cluster_embeddings = []
+    with open(clusterfile, 'r') as f:
+        for line in f.readlines():
+            phrases = line.strip().strip(',').split(',')
+            key = int(phrases[0])
+            phrases = phrases[1:]
+            cluster_map[key] = phrases
+
+    # Calculate cluster centers
+    cluster_centers = {}
+    for num in cluster_map.keys():
+        vecs = []
+        phrases = cluster_map[num]
+        for phrase in phrases:
+            words = phrase.split(' ')
+            word_vecs = []
+            for word in words:
+                vec = data_util.zero_vec(dim)
+                if word in word2vec:
+                    vec = word2vec[word]
+                word_vecs.append(vec)
+            phrase_vec = numpy.average(numpy.asarray(word_vecs), axis=0)
+            vecs.append(phrase_vec)
+        cluster_vec = numpy.average(numpy.asarray(vecs), axis=0)
+        #print "cluster " + str(num) + " vec shape: " + str(cluster_vec.shape)
+        cluster_centers[num] = cluster_vec
+        # Get closest phrase
+        if return_phrases:
+            best_vec = data_util.zero_vec(dim)
+            best_phrase = ""
+            best_dist = numpy.linalg.norm(best_vec-cluster_vec)
+            for x in range(len(phrases)):
+                 phrase = phrases[x]
+                 phrase_vec = vecs[x]
+                 dist = numpy.linalg.norm(phrase_vec-cluster_vec)
+                 #print "phrase: " + phrase + ", dist: " + str(dist)
+                 if dist < best_dist:
+                     best_dist = dist
+                     best_vec = phrase_vec
+                     best_phrase = phrase
+            print "best phrase: " + best_phrase
+            cluster_names[num] = best_phrase
+
+    kw_size = 20
+    zero_vec = data_util.zero_vec(dim)
+    kw_names = []
+    for kw_list in labels:
+        #print "kw_list: " + str(type(kw_list)) + " : " + str(kw_list)
+        if type(kw_list) is str:
+            kw_list = kw_list.split(',')
+        kw_embeddings = []
+        kw_text = []
+        for cluster_num in kw_list:
+            if cluster_num != '':
+                #print "converting cluster " + cluster_num
+                num = int(cluster_num)
+                vec = cluster_centers[num]
+                #print "vec: " + str(len(vec))
+                kw_embeddings.append(vec)
+                if return_phrases:
+                    name = cluster_names[num]
+                    kw_text.append(name)
+        kw_names.append(kw_text)
+        # Pad vectors
+        while len(kw_embeddings) < kw_size:
+            kw_embeddings.insert(0, zero_vec)
+        if len(kw_embeddings) > kw_size:
+            kw_embeddings = kw_embeddings[:20]
+        print "kw_embeddings: " + str(len(kw_embeddings))
+        cluster_embeddings.append(kw_embeddings)
+
+    if return_phrases:
+        # Write cluster name mapping to file
+        outname = clusterfile + ".names"
+        outfile = open(outname, 'w')
+        for key in cluster_names.keys():
+            name = cluster_names[key]
+            phrases = cluster_map[key]
+            outfile.write(str(key) + " : " + name + " : " + str(phrases) + "\n")
+        outfile.close()
+        return cluster_embeddings, kw_names
+    else:
+        return cluster_embeddings
+
     
 if __name__ == "__main__":main()
