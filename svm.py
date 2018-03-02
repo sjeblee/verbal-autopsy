@@ -107,11 +107,11 @@ def run(arg_model, arg_train, arg_test, arg_results, arg_labels):
 
     # TODO: calculate F1 score of results
     print "calculating scores..."
-    precision = metrics.precision_score(testY, results)
+    precision = metrics.precision_score(testY, results, average="weighted")
     print "precision: " + str(precision)
-    recall = metrics.recall_score(testY, results)
+    recall = metrics.recall_score(testY, results, average="weighted")
     print "recall: " + str(recall)
-    f1score = metrics.f1_score(testY, results)
+    f1score = metrics.f1_score(testY, results, average="weighted")
     print "f1: " + str(f1score)
 
     # Write results to a file
