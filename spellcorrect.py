@@ -10,6 +10,8 @@ import kenlm
 import re
 import string
 
+import extract_features_temp as extract_features
+
 def main():
     argparser = argparse.ArgumentParser()
     argparser.add_argument('--in', action="store", dest="infile")
@@ -26,9 +28,9 @@ def main():
     else:
         run(args.infile, args.outfile)
 
-def run(infile, outfile, arg_lm=False):
+def run(infile, outfile, arg_lm=False, fix_keywords=True):
     d = enchant.DictWithPWL("en_CA", "/u/sjeblee/research/va/git/verbal-autopsy/dictionary.txt")
-    mapping = {'labor':'labour', 'laborer':'labourer', 'color':'colour', 'yeras':'years', 'elergies':'allergies', 'around12':'around 12', 'learnt':'learned', 'rigor':'rigour', 'couldn':'couldn\'t', 'didnt':'didn\'t', 'didn':'didn\'t', 'neighbor':'neighbour', 'enjury':'injury'}
+    mapping = {'labor':'labour', 'laborer':'labourer', 'color':'colour', 'yeras':'years', 'elergies':'allergies', 'around12':'around 12', 'learnt':'learned', 'rigor':'rigour', 'couldn':'couldn\'t', 'didnt':'didn\'t', 'didn':'didn\'t', 'neighbor':'neighbour', 'enjury':'injury', 'h/o':'h/o'}
 
     # Language model
     #lmfile = None
@@ -43,7 +45,7 @@ def run(infile, outfile, arg_lm=False):
     
     for child in root:
         narr = ""
-        #keywords = ""
+        keywords = ""
         node = child.find("narrative")
         if node != None:
             narr = node.text
@@ -108,7 +110,44 @@ def run(infile, outfile, arg_lm=False):
             node = etree.Element("narrative")
         node.text = narr_fixed.strip()
         #child.append(narr_spell)
-        
+
+        # Fix keyword spelling
+        if fix_keywords:
+            keywords = extract_features.get_keywords(child).replace(';',',')
+            keywords_fixed = []
+            for kw_phrase in keywords.strip().split(','):
+                kw_fixed = ""
+                prevwords = []
+                prevn = 4
+                for word in kw_phrase.split(' '):
+                    if len(word) > 0:
+                        word = word.lower()
+                        # Hand-crafted mappings
+                        if word in mapping.keys():
+                            kw_fixed = kw_fixed + " " + mapping[word]
+                            prevwords.append(mapping[word])
+                            print word + " -> " + mapping[word]
+                        elif d.check(word) or word.isdigit() or (len(word) < 3):
+                            kw_fixed = kw_fixed + " " + word
+                            prevwords.append(word)
+                        else:
+                            sugg = d.suggest(word)
+                            bestw = word
+                            ngram = get_ngram(word, prevwords)
+                            bestp = lm.score(ngram, bos=False, eos=False)
+                            bested = 3
+                            print "orig: " + ngram + " : " + str(bestp)
+                            if len(sugg) > 0 and editdistance.eval(word, sugg[0]) < bested:
+                                bestw = sugg[0]
+                            print word + " -> " + bestw
+                            kw_fixed = kw_fixed + " " + bestw
+                            prevwords.append(bestw)
+                        if len(prevwords) > prevn:
+                            del prevwords[0]
+                keywords_fixed.append(kw_fixed.strip())
+        node = etree.SubElement(child, "keywords_spell")
+        node.text = ','.join(keywords_fixed)
+
     # write the xml to file
     tree.write(outfile)
 
