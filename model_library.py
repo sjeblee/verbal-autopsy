@@ -433,9 +433,9 @@ def rnn_cnn_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', dropo
     nn.summary()
     return nn, X, Y
 
-''' Creates and trains a recurrent neural network model. Supports SimpleRNN, LSTM, and GRU
+''' Creates and trains a multi-layer neural network model. Supports SimpleRNN, LSTM, GRU, and CNN
     X: a list of training data
-    Y: a list of training labels
+    Y: a list of numpy arrays of training labels
 '''
 def stacked_model(X, Y_arrays, num_nodes, activation='sigmoid', models='gru,cnn', dropout=0.1, pretrainX=[], pretrainY=[], keywords=[], initial_states=None, windows=[1,2,3,4,5], num_epochs=15):
     print "stacked model: " + models
@@ -462,23 +462,26 @@ def stacked_model(X, Y_arrays, num_nodes, activation='sigmoid', models='gru,cnn'
 
     # Main layers
     layer_in = input1
+    layer_shape = input_shape
     last_out = None
     for modelname in models.split(','):
         if modelname == 'rnn':
-            layer = SimpleRNN(num_nodes, return_sequences=False, return_state=False)
+            layer = SimpleRNN(num_nodes, return_sequences=True, return_state=False)
             layer_out = layer(layer_in)
         if modelname == 'gru':
-            layer = GRU(num_nodes, return_sequences=False, return_state=False)
+            layer = GRU(num_nodes, return_sequences=True, return_state=False)
             layer_out = layer(layer_in)
+            print "GRU layer: " + str(num_nodes) + " nodes, shape: " + str(layer.output_shape)
+            #layer_shape = layer.output_shape
         elif modelname == 'lstm':
-            layer = LSTM(num_nodes, return_sequences=False, return_state=False)
+            layer = LSTM(num_nodes, return_sequences=True, return_state=False)
             layer_out = layer(layer_in)
         elif modelname == 'cnn':
             layer = None
             conv_outputs = []
             for w in windows:
                 print "window: " + str(max_seq_len) + " x " + str(w)
-                conv_layer = Conv1D(max_seq_len, w, input_shape=input_shape)
+                conv_layer = Conv1D(max_seq_len, w, input_shape=layer_shape)
                 conv = conv_layer(layer_in)
                 max_pool_layer = GlobalMaxPooling1D()
                 max_pool = max_pool_layer(conv)
@@ -486,13 +489,22 @@ def stacked_model(X, Y_arrays, num_nodes, activation='sigmoid', models='gru,cnn'
                 print "conv: " + str(conv_layer.output_shape) + " pool: " + str(max_pool_layer.output_shape)
             layer_out = concatenate(conv_outputs, axis=-1)
 
-        dropout_out = Dropout(dropout)(layer_out)
+        drop = Dropout(dropout)
+        dropout_out = drop(layer_out)
+        layer_shape = drop.output_shape
+        print "Dropout layer shape: " + str(layer_shape)
         layer_in = dropout_out
+
+    # GRU flattening
+    #layer_in = Flatten()(layer_in)
 
     # Prediction layers
     output_list = []
     for Y in Y_arrays:
-        prediction = Dense(Y.shape[1], activation='softmax')(layer_in)
+        print "Y shape: " + str(Y.shape)
+        dense_layer = Dense(Y.shape[-1], activation='softmax')
+        prediction = dense_layer(layer_in)
+        print "Dense: input: " + str(dense_layer.input_shape) + " output: " + str(dense_layer.output_shape)
         output_list.append(prediction)
 
     #if pretrain:
