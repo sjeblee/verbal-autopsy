@@ -8,7 +8,8 @@ import data_util
 
 from collections import Counter
 from lxml import etree
-from sklearn.cluster import AgglomerativeClustering, KMeans, SpectralClustering
+from sklearn.cluster import AgglomerativeClustering, MiniBatchKMeans, SpectralClustering
+from sklearn.metrics import calinski_harabaz_score
 from sklearn.neighbors import KNeighborsClassifier
 from scipy.stats import mode
 import argparse
@@ -75,11 +76,16 @@ def run(outfile, clusterfile, vecfile, infile=None, testfile=None, testoutfile=N
     # Generate clusters
     print "shape: [num_keywords, dim]" # keywords listed individually
     print "generating clusters..."
-    #clusterer = KMeans(n_clusters=num_clusters, n_jobs=1, precompute_distances=False, max_iter=500, n_init=15)
+    clusterer = MiniBatchKMeans(n_clusters=num_clusters, max_iter=500, n_init=20)
     #clusterer = SpectralClustering(n_clusters=num_clusters, n_init=15, affinity='cosine', n_jobs=-1)
-    clusterer = AgglomerativeClustering(n_clusters=num_clusters, affinity='cosine', linkage='average')
+    #clusterer = AgglomerativeClustering(n_clusters=num_clusters, affinity='cosine', linkage='average')
     kw_clusters = clusterer.fit_predict(kw_vecs)
     #kw_clusters = map_back(clusterer.fit_predict(kw_vecs), cluster_names)
+
+    # Unsupervised cluster metrics
+    cluster_labels = clusterer.labels_
+    chi_score = calinski_harabaz_score(kw_vecs, cluster_labels)
+    print "Calinski-Harabaz Index: " + str(chi_score)
 
     # Test
     if testfile is not None:
@@ -176,14 +182,14 @@ def read_xml_file(filename, word2vec, dim):
         for kw in kws:
             kw = kw.strip()
             if len(kw) > 0:
-                print rec_id + " : " + kw
+                #print rec_id + " : " + kw
                 vec = vectorize(kw, word2vec, dim)
                 if vec is not None and (x is True for x in numpy.isfinite(numpy.asarray(vec)).tolist()):
                     ids.append(rec_id)
                     keywords.append(kw)
                     kw_vecs.append(vec)
-                else:
-                    print "DROPPED: " + kw
+                #else:
+                #    print "DROPPED: " + kw
     return ids, keywords, kw_vecs
 
 def purity(keywords, corr_clusters, pred_clusters):
@@ -337,6 +343,7 @@ def interpret_clusters(clusters, clusterfile):
     labels: list of lists of cluster numbers
 '''
 def cluster_embeddings(labels, clusterfile, vecfile, return_phrases=False):
+    print "getting cluster embeddings"
     word2vec, dim = data_util.load_word2vec(vecfile)
     cluster_map = {}
     cluster_names = {}
@@ -380,7 +387,7 @@ def cluster_embeddings(labels, clusterfile, vecfile, return_phrases=False):
                      best_dist = dist
                      best_vec = phrase_vec
                      best_phrase = phrase
-            print "best phrase: " + best_phrase
+            #print "best phrase: " + best_phrase
             cluster_names[num] = best_phrase
 
     kw_size = 20
@@ -408,7 +415,7 @@ def cluster_embeddings(labels, clusterfile, vecfile, return_phrases=False):
             kw_embeddings.insert(0, zero_vec)
         if len(kw_embeddings) > kw_size:
             kw_embeddings = kw_embeddings[:20]
-        print "kw_embeddings: " + str(len(kw_embeddings))
+        #print "kw_embeddings: " + str(len(kw_embeddings))
         cluster_embeddings.append(kw_embeddings)
 
     if return_phrases:
