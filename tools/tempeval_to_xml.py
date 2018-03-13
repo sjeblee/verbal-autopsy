@@ -45,14 +45,7 @@ def run(arg_outfile, arg_dir):
     txt_narrs = {}
     ann_narrs = {} # map from record id to annotated narrative
     for filename in os.listdir(arg_dir):
-        record_name = filename.split(".")[0]
-        #print "temp: " + temp
-        #if '_' in temp:
-        #    parts = temp.split("_")
-        #    #print "parts: " + str(parts)
-        #    record_name = parts[0]
-        #else:
-        #    record_name = temp
+        record_name = filename.strip(".tml")
         print "record_id: " + record_name
         with open(arg_dir + '/' + filename, 'r') as f:
             text = f.read()
@@ -61,12 +54,12 @@ def run(arg_outfile, arg_dir):
             txt_narrs[record_name] = narr_text
 
     # Add the annotated narrative to the xml file
-    root = etree.Element("Record")
+    root = etree.Element("root")
     tree = etree.ElementTree(root)
     for rec_id in ann_narrs:
-        child = etree.Element("Adult_Anonymous")
+        child = etree.Element("Record")
         narr = ann_narrs[rec_id]
-        id_node = etree.Element("MG_ID")
+        id_node = etree.Element("record_id")
         id_node.text = rec_id
         child.append(id_node)
         narr_node = etree.Element("narrative")
@@ -87,7 +80,7 @@ def convert_spans_to_xml(text):
     lines = lines[1:] # ignore the xml header
     root  = etree.fromstring("<root>" + ' '.join(lines) + "</root>")
     timeml = root.find("TimeML")
-    chunks = []
+    tags = []
 
     # Get DCT
     dct_node = timeml.find("DCT")
@@ -96,37 +89,53 @@ def convert_spans_to_xml(text):
     # Get document text
     text_node = timeml.find("TEXT")
     text_text = dct_text + data_util.stringify_children(text_node)
-    print "text: " + text_text
+    #print "text: " + text_text
 
-    #build_list = etree.XPath("//")
-    chunks = text_to_list(text_text)
-    print "chunks: " + str(chunks)
+    build_list = etree.XPath("//EVENT")
+    events = build_list(text_node)
+    event_dict = {}
+    for event in events:
+        #print etree.tostring(event)
+        eventid = event.attrib['eid']
+        event_dict[eventid] = event
+
+    # Copy attributes from makeinstance to the actual event tag
+    instance_to_event = {}
+    mis = root.xpath("//MAKEINSTANCE")
+    for mi in mis:
+        #print etree.tostring(mi)
+        eventid = mi.attrib['eventID']
+        instanceid = mi.attrib['eiid']
+        instance_to_event[instanceid] = eventid
+        event = event_dict[eventid]
+        for att in mi.attrib.keys():
+            if not att == 'eventID' and not att == 'eiid':
+                event.attrib[att] = mi.attrib[att]
+
+    tlinks = root.xpath("//TLINK")
+    slinks = root.xpath("//SLINK")
+    tags = tlinks + slinks
+
+    # Convert eiids to eids in links
+    for tl in tags:
+        if 'eventInstanceID' in tl.attrib:
+            eiid = tl.attrib['eventInstanceID']
+            tl.attrib['eventID'] = instance_to_event[eiid]
+        if 'relatedToEventInstance' in tl.attrib:
+            tl.attrib['relatedToEventID'] = instance_to_event[tl.attrib['relatedToEventInstance']]
+        if 'subordinatedEventInstance' in tl.attrib:
+            tl.attrib['subordinatedEventID'] = instance_to_event[tl.attrib['subordinatedEventInstance']]
     
-    narr_text = ""
-    xml_text = ""
-    tags = []
-    in_narr = False
-    in_tags = False
+    #print "Updated node: " + etree.tostring(text_node)
 
-    # Sort tags by span start
-    #tags.sort(key=lambda x: x.start)
+    text_root = etree.fromstring("<root>" + text_text + "</root>")
+    narr_text = ''.join(text_root.xpath("//text()"))
+    xml_text = dct_text + data_util.stringify_children(text_node)
 
-    # Construct xml narrative
-    #i = 0
-    #tlinks = []
-    #for z in range(len(tags)):
-    #    tag = tags[z]
-    #    if tag.name == "TLINK":
-    #        tlinks.append(tag)
-    #    else:
-    #        if i < tag.start:
-    #            xml_text = xml_text + narr_text[i:tag.start]
-    #        xml_text = xml_text + str(tag)
-    #        i = tag.end
-    #if i < len(narr_text):
-    #    xml_text = xml_text + narr_text[i:]
-    #for t in tlinks:
-    #    xml_text = xml_text + " " + str(t)
+    for tag in tags:
+        xml_text = xml_text + etree.tostring(tag)
+    #print "narr_text: " + narr_text
+    #print "xml_text: " + xml_text
 
     return narr_text, xml_text
 
@@ -199,22 +208,22 @@ def text_to_list(text):
     in_tag = False
     in_close_tag = False
     for char in text:
-        print "char: " + char
+        #print "char: " + char
         if char == '<' and not in_tag:
-            print "in_tag"
+            #print "in_tag"
             in_tag = True
             chunks.append(string)
             string = char
         elif char == '<' and in_tag:
-            print "in_close_tag <"
+            #print "in_close_tag <"
             in_close_tag = True
             string = string + char
         elif char == "/" and in_tag and not in_close_tag:
-            print "in_close_tag /"
+            #print "in_close_tag /"
             in_close_tag = True
             string = string + char
         elif char == '>' and in_close_tag:
-            print "close tag"
+            #print "close tag"
             string = string + char
             chunks.append(string)
             string = ""
