@@ -4,6 +4,7 @@
 
 import sys
 sys.path.append('../keras-attention-mechanism')
+sys.path.append('keywords')
 
 import argparse
 import numpy
@@ -11,8 +12,8 @@ import os
 import time
 from hyperopt import hp, fmin, tpe, space_eval
 from keras.models import Model, Sequential, load_model
-from keras.layers import Input, Dense, Dropout, Activation, Flatten, Permute, Reshape
-from keras.layers import Embedding, LSTM, Merge, merge, concatenate
+from keras.layers import Input, Dense, Dropout, Activation, Flatten, Permute, Reshape, RepeatVector, BatchNormalization
+from keras.layers import Embedding, LSTM, GRU, TimeDistributed, Merge, merge, concatenate, multiply
 from keras.layers.convolutional import Conv1D
 from keras.layers.pooling import GlobalMaxPooling1D, MaxPooling1D
 from keras.layers.recurrent import SimpleRNN
@@ -30,10 +31,19 @@ from sklearn.naive_bayes import MultinomialNB
 from sklearn.pipeline import make_pipeline
 
 import attention_utils
+import cluster_keywords
+import data_util
+import model_library
 import rebalance
+from layers import Attention
 
+global anova_filter
 labelencoder = None
+labelencoder_adult = None
+labelencoder_child = None
+labelencoder_neonate = None
 vec_types = ["narr_vec", "narr_seq", "event_vec", "event_seq"]
+numpy.set_printoptions(threshold=numpy.inf)
 
 def main():
     argparser = argparse.ArgumentParser()
@@ -47,7 +57,7 @@ def main():
     args = argparser.parse_args()
 
     if not (args.infile and args.outfile and args.testfile and args.model):
-        print "usage: python model.py --in [train.features] --test [test.features] --out [test.results] --labels [ICD_cat/ICD_cat_neo/Final_code] --model [nn] --name [rnn_ngram3] --prefix [/sjeblee/research/models]"
+        print "usage: python model.py --in [train.features] --test [test.features] --out [test.results] --labels [ICD_cat/ICD_cat_neo/Final_code] --model [nn/cnn/lstm/gru/filternn] --name [rnn_ngram3] --prefix [/sjeblee/research/models]"
         exit()
 
     labelname = "Final_Code"
@@ -288,11 +298,11 @@ def obj_rf(params):
     return 1 - f1score
 
 
-def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_file, arg_prefix, arg_labelname, arg_n_feats=227, arg_anova="chi2", arg_nodes=192, arg_activation='relu', arg_dropout=0.5, arg_rebalance=""):
+def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_file, arg_prefix, arg_labelname, arg_n_feats=500, arg_anova="chi2", arg_nodes=192, arg_activation='relu', arg_dropout=0.5, arg_rebalance=""):
     total_start_time = time.time()
 
     # Special handling for neural network models
-    is_nn = arg_model == "nn" or arg_model == "lstm" or arg_model == "rnn" or arg_model == "cnn"
+    is_nn = ("nn" in arg_model) or 'gru' in arg_model or 'lstm' in arg_model
 
     # Params
     num_feats = arg_n_feats
@@ -305,6 +315,15 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     X = []               # Feature vectors
     Y = []
     X2 = [] # Extra features for hybrid model
+
+    # Figure out record type
+    rec_type = None
+    if 'adult' in arg_result_file:
+        rec_type = 'adult'
+    elif 'child' in arg_result_file:
+        rec_type = 'child'
+    elif 'neo' in arg_result_file:
+        rec_type = 'neonate'
     
     # Read in feature keys
     print "reading feature keys..."
@@ -315,7 +334,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     point_keys = [] # traditional features for other models
 
     # If a mix of traditional and vector features is requested, use a hybrid nn model
-    vec_keys, point_keys = split_feats(keys)
+    vec_keys, point_keys = split_feats(keys, arg_labelname)
     hybrid = False
     if len(vec_keys) > 0 and len(point_keys) > 2:
         hybrid = True
@@ -323,17 +342,26 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
 
     # Transform ICD codes and record types to numbers
     global labelencoder, typeencoder
-    labelencoder = preprocessing.LabelEncoder()
+    labelencoder = preprocessing.LabelEncoder()                        
     typeencoder = preprocessing.LabelEncoder()
+
+    # TEMP
+    hybrid = False
 
     # Load the features
     if hybrid:
-        Y = preprocess(arg_train_feats, trainids, trainlabels, X, Y, vec_keys, True)
-        preprocess(arg_train_feats, [], [], X2, [], point_keys, True)
+        Y = preprocess(arg_train_feats, trainids, trainlabels, X, Y, vec_keys, trainlabels=True)
+        preprocess(arg_train_feats, [], [], X2, [], point_keys, trainlabels=True)
     else:
-        Y = preprocess(arg_train_feats, trainids, trainlabels, X, Y, keys, True)
+        Y = preprocess(arg_train_feats, trainids, trainlabels, X, Y, keys, trainlabels=True, Y2_labels='keyword_clusters')
     print "X: " + str(len(X)) + " Y: " + str(len(Y))
     print "X2: " + str(len(X2))
+    x_feats = numpy.asarray(X).shape[-1]
+
+    # TEMP
+    #outfile = open('filternn_ids', 'w')
+    #outfile.write(str(trainids))
+    #outfile.close()
 
     # Rebalance
     if arg_rebalance != "":
@@ -346,16 +374,18 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     stime = time.time()
 
     # Feature selection
-    global anova_filter
+    #global anova_filter
+    anova_filter = None
     anova_function = f_classif
     if arg_anova == "chi2":
         anova_function = chi2
     print "anova_function: " + arg_anova
-    if not is_nn:
+    if ((not is_nn) or arg_model == "nn") and num_feats < x_feats:
         anova_filter, X = create_anova_filter(X, Y, anova_function, num_feats)
 
     global model
     model = None
+    cnn_model = None
 
     # Neural network models
     if is_nn:
@@ -363,21 +393,34 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
         if os.path.exists(modelfile):
             print "using pre-existing model at " + modelfile
             model = load_model(modelfile)
-            Y = to_categorical(Y)
             X = numpy.asarray(X)
         else:
             print "creating a new neural network model"
-            embedding_dim = 200 
-            if arg_model == "nn":
-                model, X, Y = create_nn_model(X, Y, anova_function, num_feats, num_nodes, 'relu')
-            elif arg_model == "lstm":
-                num_nodes = 56
-                model, X, Y = create_lstm_model(X, Y, embedding_dim, num_nodes, arg_activation, hybrid=hybrid, X2=X2)
-                #score = model.evaluate(X_test, Y_test, batch_size=16
-            elif arg_model == "rnn":
-                model, X, Y = create_rnn_model(X, Y, embedding_dim, num_nodes, arg_activation)
+            embedding_dim = 200
+            #if "keyword_clusters" in keys:
+            #    num_nodes = 100
+            #    model, cnn_model, X, Y = model_library.rnn_keyword_model(X, Y, num_nodes, arg_activation, arg_model, keywords=X2, num_epochs=15)
+            if ',' in arg_model:
+                num_nodes = 100
+                Y_arrays = [to_categorical(Y[0]), numpy.asarray(Y[1])]
+                #Y_arrays = [to_categorical(Y)]
+                model, X, Y = model_library.stacked_model(X, Y_arrays, num_nodes, arg_activation, models=arg_model)
+            elif arg_model == "nn":
+                if len(X) == 0 and len(X2) > 0:
+                    X = X2
+                Y = to_categorical(Y)
+                model, X, Y = model_library.nn_model(X, Y, num_nodes, 'relu')
+            elif arg_model == "rnn" or arg_model == "lstm" or arg_model == "gru":
+                num_nodes = 100
+                Y = to_categorical(Y)
+                model, X, Y = model_library.rnn_cnn_model(X, Y, num_nodes, arg_activation, arg_model, X2=X2)
             elif arg_model == "cnn":
+                Y = to_categorical(Y)
                 model, X, Y = create_cnn_model(X, Y, embedding_dim, hybrid=hybrid, X2=X2)
+            elif arg_model == "filternn":
+                num_nodes = 56
+                Y = to_categorical(Y)
+                model, X, Y = create_filter_rnn_model(X, Y, embedding_dim, num_nodes)
 
             # Save the model
             print "saving the model..."
@@ -406,7 +449,10 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     print "training took " + str(etime - stime) + " s"
 
     # Test
-    testids, testlabels, predictedlabels = test(arg_model, model, arg_test_feats, hybrid)
+    #if ',' in arg_model:
+    #    testids, testlabels, predictedlabels = test_multi(arg_model, model, arg_test_feats)
+    #else:
+    testids, testlabels, predictedlabels = test(arg_model, model, arg_test_feats, anova_filter, hybrid, kw_cnn=cnn_model)
 
     # Write results to a file
     output = open(arg_result_file, 'w')
@@ -421,7 +467,176 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     total_time = (time.time() - total_start_time) / 60
     print "total time: " + str(total_time) + " mins"
 
-def test(model_type, model, testfile, hybrid=False):
+def run_joint(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_results_file, arg_prefix, arg_labelname, arg_n_feats=227, arg_anova="chi2", arg_nodes=192, arg_activation='relu', arg_dropout=0.5, arg_rebalance=""):
+    total_start_time = time.time()
+
+    # Special handling for neural network models
+    is_nn = ("nn" in arg_model) or arg_model == 'gru' or arg_model == 'lstm'
+
+    # Params
+    num_feats = arg_n_feats
+    num_nodes = arg_nodes
+
+    global labelname
+    labelname = arg_labelname
+    trainids_adult = []        # VA record id
+    trainids_child = []
+    trainids_neonate = []
+    trainlabels_adult = []     # Correct ICD codes
+    trainlabels_child = []
+    trainlabels_neonate = []
+    X_adult = []               # Feature vectors
+    X_child = []
+    X_neonate = []
+    Y_adult = []
+    Y_child = []
+    Y_neonate = []
+    X2_adult = [] # Extra features for hybrid model
+    X2_child = []
+    X2_neonate = []
+    
+    # Read in feature keys
+    print "reading feature keys..."
+    global keys
+    with open(arg_train_feats[0] + ".keys", "r") as kfile:
+        keys = eval(kfile.read())
+    vec_keys = [] # vector/matrix features for CNN and RNN models
+    point_keys = [] # traditional features for other models
+
+    # If a mix of traditional and vector features is requested, use a hybrid nn model
+    vec_keys, point_keys = split_feats(keys, arg_labelname)
+    hybrid = False
+    if len(vec_keys) > 0 and len(point_keys) > 2:
+        hybrid = True
+        print "hybrid features"
+
+    # Transform ICD codes and record types to numbers
+    global labelencoder, labelencoder_adult, labelencoder_child, labelencoder_neonate
+    labelencoder = None
+    labelencoder_adult = preprocessing.LabelEncoder()
+    labelencoder_child = preprocessing.LabelEncoder()
+    labelencoder_neonate = preprocessing.LabelEncoder()
+
+    # Load the features
+    if hybrid:
+        keys = vec_keys
+        #print "hybrid not supported for joint model!"
+        #Y_adult = preprocess(arg_train_feats[0], trainids, trainlabels, X_adult, Y_adult, vec_keys, True)
+        #preprocess(arg_train_feats, [], [], X2, [], point_keys, True)
+    Y_adult = preprocess(arg_train_feats[0], trainids_adult, trainlabels_adult, X_adult, Y_adult, keys, 'adult', True)
+    Y_child = preprocess(arg_train_feats[1], trainids_child, trainlabels_child, X_child, Y_child, keys, 'child', True)
+    Y_neonate = preprocess(arg_train_feats[2], trainids_neonate, trainlabels_neonate, X_neonate, Y_neonate, keys, 'neonate', True)
+    if hybrid:
+        preprocess(arg_train_feats[0], [], [], X2_adult, [], point_keys, 'adult',  True)
+        preprocess(arg_train_feats[1], [], [], X2_child, [], point_keys, 'child', True)
+        preprocess(arg_train_feats[2], [], [], X2_neonate, [], point_keys, 'neonate', True)
+        
+    print "adult X: " + str(len(X_adult)) + " Y: " + str(len(Y_adult))
+    print "child X: " + str(len(X_child)) + " Y: " + str(len(Y_child))
+    print "neonate X: " + str(len(X_neonate)) + " Y: " + str(len(Y_neonate))
+    #print "X2: " + str(len(X2))
+    #outfile = open('filternn_ids', 'w')
+    #outfile.write(str(trainids))
+    #outfile.close()
+
+    # Rebalance
+    #if arg_rebalance != "":
+    #    print "rebalance: " + arg_rebalance
+    #    X, Y = rebalance.rebalance(X, Y, arg_rebalance)
+    #    print "X: " + str(len(X)) + "\nY: " + str(len(Y))
+
+    # Train the model
+    print "training model..."
+    stime = time.time()
+
+    global model
+    model = None
+
+    # Neural network models
+    modelfile = arg_prefix + "/" + arg_modelname + ".model"
+    #if os.path.exists(modelfile):
+    #    print "using pre-existing model at " + modelfile
+    #    model = load_model(modelfile)
+    #    Y = to_categorical(Y)
+    #    X = numpy.asarray(X)
+    #else:
+    print "creating a new neural network model"
+    embedding_dim = 200 
+        #if arg_model == "nn":
+        #    model, X, Y = create_nn_model(X, Y, anova_function, num_feats, num_nodes, 'relu')
+    if arg_model == "lstm" or arg_model == "gru" or arg_model == "rnn":
+        num_nodes = 100
+
+        # ADULT
+        print "ADULT"
+        X_pretrain = [X_child, X_neonate]
+        Y_pretrain = [Y_child, Y_neonate]
+        X2_pretrain = []
+        if hybrid:
+            X2_pretrain = [X2_child, X2_neonate]
+        model_adult, X_adult_out, Y_adult_out = model_library.rnn_model(X_adult, Y_adult, num_nodes, modelname=arg_model, X2=X2_adult, pretrainX=X_pretrain, pretrainY=Y_pretrain, pretrainX2=X2_pretrain, num_epochs=15)
+        testids_adult, testlabels_adult, predictedlabels_adult = test(arg_model, model_adult, arg_test_feats[0], hybrid, 'adult')
+
+        # CHILD
+        print "CHILD"
+        X_pretrain = [X_adult, X_neonate]
+        Y_pretrain = [Y_adult, Y_neonate]
+        X2_pretrain = []
+        if hybrid:
+            X2_pretrain = [X2_adult, X2_neonate]
+        model_child, X_child_out, Y_child_out = model_library.rnn_model(X_child, Y_child, num_nodes, modelname=arg_model, X2=X2_child, pretrainX=X_pretrain, pretrainY=Y_pretrain, pretrainX2=X2_pretrain, num_epochs=15)
+        testids_child, testlabels_child, predictedlabels_child = test(arg_model, model_child, arg_test_feats[1], hybrid, 'child')
+        
+        # NEONATE
+        print "NEONATE"
+        X_pretrain = [X_adult, X_child]
+        Y_pretrain = [Y_adult, Y_child]
+        X2_pretrain = []
+        if hybrid:
+            X2_pretrain = [X2_adult, X2_child]
+        model_neonate, X_neonate_out, Y_neonate_out = model_library.rnn_model(X_neonate, Y_neonate, num_nodes, modelname=arg_model, X2=X2_neonate, pretrainX=X_pretrain, pretrainY=Y_pretrain, pretrainX2=X2_pretrain, num_epochs=15)
+        testids_neonate, testlabels_neonate, predictedlabels_neonate = test(arg_model, model_neonate, arg_test_feats[2], hybrid, 'neonate')
+
+        #elif arg_model == "cnn":
+        #    model, X, Y = create_cnn_model(X, Y, embedding_dim, hybrid=hybrid, X2=X2)
+        #elif arg_model == "filternn":
+        #    num_nodes = 56
+        #    model, X, Y = create_filter_rnn_model(X, Y, embedding_dim, num_nodes)
+
+        # Save the model
+        #print "saving the model..."
+        #model.save(modelfile)
+        #plotname = modelfile + ".png"
+        #plot_model(model, to_file=plotname)
+
+    # Other models
+    else:
+         print "ERROR: joint does not support model " + arg_model
+
+    etime = time.time()
+    print "training took " + str(etime - stime) + " s"
+
+    # Write results to file
+    write_results(arg_results_file[0], testids_adult, testlabels_adult, predictedlabels_adult)
+    write_results(arg_results_file[1], testids_child, testlabels_child, predictedlabels_child)
+    write_results(arg_results_file[2], testids_neonate, testlabels_neonate, predictedlabels_neonate)
+
+    total_time = (time.time() - total_start_time) / 60
+    print "total time: " + str(total_time) + " mins"
+
+def write_results(filename, testids, testlabels, predictedlabels):
+
+    # Write results to a file
+    output = open(filename, 'w')
+    for i in range(len(testids)):
+        out = {}
+        out['MG_ID'] = testids[i]
+        out['Correct_ICD'] = testlabels[i]
+        out['Predicted_ICD'] = predictedlabels[i]
+        output.write(str(out) + "\n")
+    output.close()
+
+def test(model_type, model, testfile, anova_filter=None, hybrid=False, rec_type=None, kw_cnn=None):
     print "testing..."
     stime = time.time()
     testids = []
@@ -430,34 +645,145 @@ def test(model_type, model, testfile, hybrid=False):
     testX2 = []
     testY = []
     predictedY = []
+    is_nn = ('nn' in model_type or model_type == "lstm" or model_type == "gru")
     if hybrid:
-        vec_keys, point_keys = split_feats(keys)
+        vec_keys, point_keys = split_feats(keys, labelname)
         testY = preprocess(testfile, testids, testlabels, testX, testY, vec_keys)
         preprocess(testfile, [], [], testX2, [], point_keys)
     else:
-        testY = preprocess(testfile, testids, testlabels, testX, testY, keys)
-    if not model_type == "lstm" and not model_type == "rnn" and not model_type == "cnn":
+        testY = preprocess(testfile, testids, testlabels, testX, testY, keys, rec_type, Y2_labels='keyword_clusters')
+    if anova_filter is not None:
         testX = anova_filter.transform(testX)
-    if model_type == "rnn" or model_type == "lstm" or model_type == "cnn":
+    if is_nn:
         testX = numpy.asarray(testX)
+        print "testX shape: " + str(testX.shape)
 
     inputs = [testX]
     if hybrid:
         testX2 = numpy.asarray(testX2)
+        #if "keyword_clusters" not in keys:
         inputs.append(testX2)
-    print "testX shape: " + str(testX.shape)
-    if model_type == "nn" or model_type == "lstm" or model_type == "rnn":
+    if is_nn:
         predictedY = model.predict(inputs)
         results = map_back(predictedY)
-    elif model_type == "cnn":
-        predictedY = model.predict(inputs)
-        results = map_back(predictedY)
-        #attn_vec = get_attention_vector(model, testX)
-        #print "attention vector: " + str(attn_vec)
+    #elif model_type == "cnn":
+    #    attn_vec = get_attention_vector(model, testX)
+    #    print "attention vector: " + str(attn_vec)
     else:
         results = model.predict(testX)
 
-    predictedlabels = labelencoder.inverse_transform(results)
+    # Score keywords from keyword model
+    if kw_cnn is not None:
+        kw_pred = kw_cnn.predict(testX)
+        kw_pred = data_util.map_to_multi_hot(kw_pred)
+        testX2 = testX2.tolist()
+        #print "testx[0]: " + str(testx[0])
+        #print "testy[0]: " + str(type(testy[0])) + " " + str(testy[0])
+        #print "testy_pred[0]: " + str(type(testy_pred[0])) + " " + str(testy_pred[0])
+
+        # Decode labels
+        kw_pred_labels = data_util.decode_multi_hot(kw_pred)
+        print "kw_pred_labels[0]: " + str(kw_pred_labels[0])
+        clusterfile = "/u/sjeblee/research/va/data/datasets/mds+rct/train_adult_cat_spell.clusters"
+        kw_pred_text = cluster_keywords.interpret_clusters(kw_pred_labels, clusterfile)
+        kw_true_text = cluster_keywords.interpret_clusters(data_util.decode_multi_hot(testX2), clusterfile)
+        print "kw_pred_text[0]: " + str(kw_pred_text[0])
+        print "kw_true_text[0]: " + str(kw_true_text[0])
+
+        # Score results against nearest neighbor classifier
+        print "Scores for 1 class (0.1 cutoff):"
+        precision, recall, f1, micro_p, micro_r, micro_f1 = data_util.score_vec_labels(testX2, kw_pred)
+        print "Macro KW scores:"
+        print "F1: " + str(f1)
+        print "precision: " + str(precision)
+        print "recall: " + str(recall)
+        print "Micro KW scores:"
+        print "F1: " + str(micro_f1)
+        print "precision: " + str(micro_p)
+        print "recall: " + str(micro_r)
+
+    labenc = labelencoder
+    if rec_type == 'adult':
+        labenc = labelencoder_adult
+    elif rec_type == 'child':
+        labenc = labelencoder_child
+    elif rec_type == 'neonate':
+        labenc = labelencoder_neonate
+    predictedlabels = labenc.inverse_transform(results)
+    etime = time.time()
+    print "testing took " + str(etime - stime) + " s"
+    print "testY: " + str(testY)
+    print "results: " + str(results)
+    return testids, testlabels, predictedlabels
+
+def test_multi(model_type, model, testfile, rec_type=None):
+    print "testing multi..."
+    stime = time.time()
+    testids = []
+    testlabels = []
+    testX = []
+    testY2 = []
+    testY = []
+    predictedY = []
+    #if hybrid:
+    #    vec_keys, point_keys = split_feats(keys, labelname)
+    #    testY = preprocess(testfile, testids, testlabels, testX, testY, vec_keys)
+    #    preprocess(testfile, [], [], testX2, [], point_keys)
+    #else:
+    Y_arrays = preprocess(testfile, testids, testlabels, testX, testY, keys, rec_type, Y2_labels='keyword_clusters')
+    print "Y_arrays: " + str(len(Y_arrays))
+    testY = Y_arrays[0]
+    testY2 = Y_arrays[1]
+    testX = numpy.asarray(testX)
+    print "testX shape: " + str(testX.shape)
+    print "testY2 shape: " + str(len(testY2))
+    #print "testY2: " + str(type(testY2)) + " : " + str(testY2)
+
+    inputs = [testX]
+    #if hybrid:
+    #    testX2 = numpy.asarray(testX2)
+    #    #if "keyword_clusters" not in keys:
+    #    inputs.append(testX2)
+    predictedY = model.predict(inputs)
+    results = map_back(predictedY[0])
+    kw_pred = predictedY[1]
+
+    # Score keywords from keyword model
+    kw_pred = data_util.map_to_multi_hot(kw_pred)
+    #testX2 = testX2.tolist()
+    #print "testx[0]: " + str(testx[0])
+    #print "testy[0]: " + str(type(testy[0])) + " " + str(testy[0])
+    #print "testy_pred[0]: " + str(type(testy_pred[0])) + " " + str(testy_pred[0])
+
+    # Decode labels
+    kw_pred_labels = data_util.decode_multi_hot(kw_pred)
+    #print "kw_pred_labels[0]: " + str(kw_pred_labels[0])
+    clusterfile = "/u/sjeblee/research/va/data/datasets/mds+rct/train_adult_cat_spell.clusters_km2"
+    kw_pred_text = cluster_keywords.interpret_clusters(kw_pred_labels, clusterfile)
+    kw_true_text = cluster_keywords.interpret_clusters(data_util.decode_multi_hot(testY2), clusterfile)
+    print "kw_pred_text[0]: " + str(kw_pred_text[0])
+    print "kw_true_text[0]: " + str(kw_true_text[0])
+
+    # Score results against nearest neighbor classifier
+    print "Scores for 1 class (0.1 cutoff):"
+    precision, recall, f1, micro_p, micro_r, micro_f1 = data_util.score_vec_labels(testY2, kw_pred)
+    print "Macro KW scores:"
+    print "F1: " + str(f1)
+    print "precision: " + str(precision)
+    print "recall: " + str(recall)
+    print "Micro KW scores:"
+    print "F1: " + str(micro_f1)
+    print "precision: " + str(micro_p)
+    print "recall: " + str(micro_r)
+
+    labenc = labelencoder
+    if rec_type == 'adult':
+        labenc = labelencoder_adult
+    elif rec_type == 'child':
+        labenc = labelencoder_child
+    elif rec_type == 'neonate':
+        labenc = labelencoder_neonate
+    predictedlabels = labenc.inverse_transform(results)
     etime = time.time()
     print "testing took " + str(etime - stime) + " s"
     print "testY: " + str(testY)
@@ -465,12 +791,20 @@ def test(model_type, model, testfile, hybrid=False):
     return testids, testlabels, predictedlabels
 
 def create_nn_model(X, Y, anova_function, num_feats, num_nodes, act):
-    anova_filter, X = create_anova_filter(X, Y, anova_function, num_feats)
-#    X = anova_filter.transform(X)
+    X = numpy.asarray(X)
+    #if X.shape[-1] > num_feats:
+    #    print "using ANOVA filter"
+    #    global anova_filter
+    #    anova_filter, X = create_anova_filter(X, Y, anova_function, num_feats)
     Y = to_categorical(Y)
+    print "X.shape: " + str(X.shape)
+    print "Y.shape: " + str(Y.shape)
+
+    # TEMP
+    num_nodes = 100
 
     print "neural network: nodes: " + str(num_nodes) + ", feats: " + str(num_feats)
-    nn = Sequential([Dense(num_nodes, input_dim=num_feats),
+    nn = Sequential([Dense(num_nodes, input_dim=X.shape[-1]),
                     Activation(act),
                     #Dense(num_nodes, input_dim=num_feats),
                     #Activation(activation),
@@ -503,7 +837,7 @@ def create_rnn_model(X, Y, embedding_size, num_nodes, act, dropout=0.5):
     nn.summary()
     return nn, X, Y
 
-def create_lstm_model(X, Y, embedding_size, num_nodes, activation='sigmoid', dropout=0.1, hybrid=False, X2=[]):
+def create_lstm_model(X, Y, embedding_size, num_nodes, activation='sigmoid', modelname='lstm', dropout=0.1, hybrid=False, X2=[], initial_states=None):
     Y = to_categorical(Y)
     X = numpy.asarray(X)
     print "train X shape: " + str(X.shape)
@@ -511,7 +845,7 @@ def create_lstm_model(X, Y, embedding_size, num_nodes, activation='sigmoid', dro
     inputs = []
     input_arrays = [X]
 
-    print "LSTM: nodes: " + str(num_nodes) + " embedding: " + str(embedding_size) + " max_seq_len: " + str(max_seq_len)
+    print "model: " + modelname + " nodes: " + str(num_nodes) + " embedding: " + str(embedding_size) + " max_seq_len: " + str(max_seq_len)
     #nn = Sequential([Bidirectional(LSTM(256, input_dim=embedding_size, activation='sigmoid', inner_activation='hard_sigmoid', return_sequences=True), input_shape=(200, embedding_size), merge_mode='concat'),
     #nn = Sequential([LSTM(num_nodes, input_shape=(200, embedding_size), activation='sigmoid', inner_activation='hard_sigmoid', return_sequences=False),
     #                 Dropout(dropout),
@@ -529,8 +863,16 @@ def create_lstm_model(X, Y, embedding_size, num_nodes, activation='sigmoid', dro
         inputs.append(input2)
         ff = Dense(10, activation='relu')(input2)
 
-    lstm_out = LSTM(num_nodes, return_sequences=False)(input1)
-    dropout_out = Dropout(dropout)(lstm_out)
+    if modelname == 'gru':
+        rnn = GRU(num_nodes, return_sequences=False, return_state=True)
+    else:
+        rnn = LSTM(num_nodes, return_sequences=False, return_state=True)
+
+    if initial_states == None:
+        rnn_out, rnn_states = rnn(input1)
+    else:
+        rnn_out, rnn_states = rnn(input1, initial_state=initial_states)
+    dropout_out = Dropout(dropout)(rnn_out)
     #attn_out = attention(dropout_out, max_seq_len, embedding_size)
 
     if hybrid:
@@ -544,12 +886,88 @@ def create_lstm_model(X, Y, embedding_size, num_nodes, activation='sigmoid', dro
 
     nn.fit(input_arrays, Y, nb_epoch=15)
     nn.summary()
-    return nn, X, Y
+    return nn, X, Y, rnn_states
 
-def create_cnn_model(X, Y, embedding_size, act=None, window=3, hybrid=False, X2=[]):
-    Y = to_categorical(Y)
+def train_test_joint_lstm_model(X_adult, Y_adult, X_child, Y_child, X_neo, Y_neo, arg_test_feats, arg_results_file, embedding_size, num_nodes, activation='sigmoid', modelname='lstm', dropout=0.1, hybrid=False, X2=[]):
+    Y_adult = to_categorical(Y_adult)
+    X_adult = numpy.asarray(X_adult)
+    print "train X shape adult: " + str(X_adult.shape)
+    Y_child = to_categorical(Y_child)
+    X_child = numpy.asarray(X_child)
+    print "train X shape child: " + str(X_child.shape)
+    Y_neo = to_categorical(Y_neo)
+    X_neo = numpy.asarray(X_neo)
+    print "train X shape neo: " + str(X_neo.shape)
+    embedding_size = X_adult.shape[-1]
+    inputs = []
+    #input_arrays = [X]
+
+    print "model: " + modelname + " nodes: " + str(num_nodes) + " embedding: " + str(embedding_size) + " max_seq_len: " + str(max_seq_len)
+
+    rnn_states = None
+    input_shape = (max_seq_len, embedding_size)
+    input1 = Input(shape=input_shape)
+    inputs.append(input1)
+    # TODO: fix hybrid to work with joint training
+    if hybrid:
+        X2 = numpy.asarray(X2)
+        print "X2 shape: " + str(X2.shape)
+        inputs.append(X2)
+        input2 = Input(shape=(X2.shape[1],))
+        inputs.append(input2)
+        ff = Dense(10, activation='relu')(input2)
+
+    if modelname == 'gru':
+        rnn = GRU(num_nodes, return_sequences=False, return_state=True)
+    else:
+        rnn = LSTM(num_nodes, return_sequences=False, return_state=True)
+    if rnn_states == None:
+        rnn_out, rnn_states = rnn(input1)
+    else:
+        rnn_out, rnn_states = rnn(input1, initial_state=rnn_states)
+    dropout_out = Dropout(dropout)(rnn_out)
+    #attn_out = attention(dropout_out, max_seq_len, embedding_size)
+
+    if hybrid:
+        #print "ff shape: " + str(ff.output_shape)
+        merged = concatenate([dropout_out, ff], axis=-1)
+
+    prediction_adult = Dense(Y_adult.shape[1], activation='softmax')(dropout_out)
+    prediction_child = Dense(Y_child.shape[1], activation='softmax')(dropout_out)
+    prediction_neo = Dense(Y_neo.shape[1], activation='softmax')(dropout_out)
+    
+    model_adult = Model(inputs=inputs, outputs=prediction_adult)
+    model_adult.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+    model_child = Model(inputs=inputs, outputs=prediction_child)
+    model_child.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+    model_neo = Model(inputs=inputs, outputs=prediction_neo)
+    model_neo.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+
+    model_adult.fit(X_adult, Y_adult, epochs=15)
+    model_adult.summary()
+    print "test feats: " + arg_test_feats[0]
+    testids_adult, testlabels_adult, predictedlabels_adult = test(modelname, model_adult, arg_test_feats[0], hybrid, 'adult')
+    write_results(arg_results_file[0], testids_adult, testlabels_adult, predictedlabels_adult)
+    
+    model_child.fit(X_child, Y_child, epochs=15)
+    model_child.summary()
+    print "test feats: " + arg_test_feats[1]
+    testids_child, testlabels_child, predictedlabels_child = test(modelname, model_child, arg_test_feats[1], hybrid, 'child')
+    write_results(arg_results_file[1], testids_child, testlabels_child, predictedlabels_child)
+    
+    model_neo.fit(X_neo, Y_neo, epochs=15)
+    model_neo.summary()
+    print "test feats: " + arg_test_feats[2]
+    testids_neonate, testlabels_neonate, predictedlabels_neonate = test(modelname, model_neo, arg_test_feats[2], hybrid, 'neonate')
+    write_results(arg_results_file[2], testids_neonate, testlabels_neonate, predictedlabels_neonate)
+
+    return model_adult, model_child, model_neo
+
+def create_cnn_model(X, Y, act=None, window=3, hybrid=False, X2=[], num_epochs=10):
+    #Y = to_categorical(Y)
     X = numpy.asarray(X)
     embedding_size = X.shape[-1]
+    max_seq_len = X.shape[1]
     print "train X shape: " + str(X.shape)
     print "CNN: embedding: " + str(embedding_size)
     print "max_seq_len: " + str(max_seq_len)
@@ -599,7 +1017,7 @@ def create_cnn_model(X, Y, embedding_size, act=None, window=3, hybrid=False, X2=
     nn = Model(inputs=inputs, outputs=prediction)
 
     nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
-    nn.fit(input_arrays, Y, epochs=10)
+    nn.fit(input_arrays, Y, epochs=num_epochs)
     nn.summary()
 
     #try:
@@ -608,6 +1026,88 @@ def create_cnn_model(X, Y, embedding_size, act=None, window=3, hybrid=False, X2=
     #    print "ERROR: got an exception trying to print attention weights"
 
     return nn, X, Y
+
+def create_filter_rnn_model(X, Y, embedding_size, num_nodes, activation='tanh', dropout=0.1, hybrid=False, X2=[]):
+    Y = to_categorical(Y)
+    X = numpy.asarray(X)
+    print "train X shape: " + str(X.shape)
+    embedding_size = X.shape[-1]
+    inputs = []
+    input_arrays = [X]
+    num_nodes = 56
+    num_epochs = 30
+    dropout = 0.2
+
+    print "GRU: nodes: " + str(num_nodes) + " embedding: " + str(embedding_size) + " max_seq_len: " + str(max_seq_len)
+    input_shape = (max_seq_len, embedding_size)
+    input1 = Input(shape=input_shape)
+    inputs.append(input1)
+    #if hybrid:
+    #    X2 = numpy.asarray(X2)
+    #    print "X2 shape: " + str(X2.shape)
+    #    input_arrays.append(X2)
+    #    input2 = Input(shape=(X2.shape[1],))
+    #    inputs.append(input2)
+    #    ff = Dense(10, activation='relu')(input2)
+
+    rnn1 = GRU(num_nodes, return_sequences=True)
+    rnn1_out = rnn1(input1)
+    print "rnn1 output_shape: " + str(rnn1.output_shape)
+    dense0_out = TimeDistributed(Dense(num_nodes, activation='tanh'))(rnn1_out)
+    dense1 = TimeDistributed(Dense(1, activation='softmax'), name='dense1')
+    weights = dense1(dense0_out)
+    print "dense1 output_shape: " + str(dense1.output_shape)
+    #norm_weights = BatchNormalization(name='norm_weights')
+    #norm_weights_out = norm_weights(weights) # TODO: normalize values to 0 to 1
+
+    # Repeat the weights across embedding dimensions
+    #permute1 = Permute((2,1))
+    #permuted_weights = permute1(norm_weights)
+    #print "permute1 output_shape: " + str(permute1.output_shape)
+    
+    repeat = TimeDistributed(RepeatVector(embedding_size))
+    repeated_weights = repeat(weights)
+
+    print "repeat input_shape: " + str(repeat.input_shape)
+    print "repeat output_shape: " + str(repeat.output_shape)
+    final_weights = Reshape(input_shape)(repeated_weights)
+    #TODO: mutiply layer - need to convert 1d weight to embedding_size vector?
+    filter_out = multiply([input1, final_weights])
+    #filter_out = merge([input1, norm_weights], mode=scalarMult, output_shape=input_shape) 
+    #TODO: masking layer???
+    #Masking(mask_value) # but want <= mask_value, not just ==
+    # TODO: save the weights for each word so we can look at them
+
+    rnn2_out = GRU(num_nodes, return_sequences=False)(filter_out)
+    dropout_out = Dropout(dropout)(rnn2_out)
+
+    #if hybrid:
+    #   print "ff shape: " + str(ff.output_shape)
+    #    merged = concatenate([dropout_out, ff], axis=-1)
+
+    prediction = Dense(Y.shape[1], activation='softmax')(dropout_out)
+    nn = Model(inputs=inputs, outputs=prediction)
+
+    nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+
+    nn.fit(input_arrays, Y, epochs=num_epochs)
+    nn.summary()
+
+    # Save weights
+    print "saving weights for train data"
+    weight_model = Model(inputs=inputs, outputs=nn.get_layer('dense1').output)
+    train_weights = weight_model.predict(X)
+    filename = "filternn_weights"
+    outfile = open(filename, 'w')
+    outfile.write(str(train_weights))
+    outfile.close()
+    
+    return nn, X, Y    
+
+def scalarMult(layersList):
+    vector = layersList[0]
+    scalar = layersList[1]
+    return vector * scalar
 
 def attention(inputs, time_steps, input_dim):
     #input_dim = int(inputs.shape[-1])
@@ -651,15 +1151,19 @@ def create_anova_filter(X, Y, function, num_feats):
     feats: a list of the names of the features to extract
     trainlabels: True if this is the trainset, we need to train the label embedding
 '''
-def preprocess(filename, ids, labels, x, y, feats, trainlabels=False):
-    global labelencoder
+def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=False, Y2_labels=None):
+    global labelencoder, labelencoder_adult, labelencoder_child, labelencoder_neonate
     ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4"]
 
     # Read in the feature vectors
     starttime = time.time()
     print "preprocessing features: " + str(feats)
     types = []
+    kw_clusters = []
     vec_feats = False
+    Y_arrays = []
+    labels2 = []
+    extra_labels = False
     with open(filename, 'r') as f:
         for line in f:
             vector = eval(line)
@@ -674,6 +1178,12 @@ def preprocess(filename, ids, labels, x, y, feats, trainlabels=False):
                     if key == "CL_type":
                         print "CL_type: " + vector[key]
                         types.append(vector[key])
+                    elif key == "keyword_clusters":
+                        kw_text = vector[key]
+                        kw_list = []
+                        if kw_text is not None:
+                            kw_list = vector[key].split(',')
+                        kw_clusters.append(kw_list)
                     elif key in vec_types:
                         # The feature matrix for word2vec can't have other features
                         features = vector[key]
@@ -707,17 +1217,55 @@ def preprocess(filename, ids, labels, x, y, feats, trainlabels=False):
         keys.remove("CL_type")
         keys.append("CL_type")
 
+    # Convert the keyword clusters to multi-hot vectors
+    if len(kw_clusters) > 0:
+        if Y2_labels == 'keyword_clusters':
+            print "converting keyword clusters to multi-hot vectors"
+            cluster_feats = data_util.multi_hot_encoding(kw_clusters, 299)
+            labels2 = cluster_feats
+            #keys.remove("keyword_clusters")
+            extra_labels = True
+
+        else:
+            # Convert keywords to cluster embeddings
+            print "converting clusters to embeddings..."
+            clusterfile = "/u/sjeblee/research/va/data/datasets/mds+rct/train_adult_cat_spell.clusters_e2"
+            vecfile = "/u/sjeblee/research/va/data/datasets/mds+rct/narr+ice+medhelp.vectors.100"
+            cluster_feats = cluster_keywords.cluster_embeddings(kw_clusters, clusterfile, vecfile)
+
+            # Update keys and features
+            for i in range(len(x)):
+                x[i] = x[i] + cluster_feats[i]
+            keys.remove("keyword_clusters")
+            keys.append("keyword_clusters")
+            vec_feats = True
+
     # Convert ICD codes to numerical labels
+    labenc = labelencoder
+    if rec_type == 'adult':
+        print "using adult labelencoder"
+        labenc = labelencoder_adult
+    elif rec_type == 'child':
+        print "using child labelencoder"
+        labenc = labelencoder_child
+    elif rec_type == 'neonate':
+        print "using neonate labelencoder"
+        labenc = labelencoder_neonate
     if trainlabels:
-        labelencoder.fit(labels)
-    y = labelencoder.transform(labels)
+        labenc.fit(labels)
+    y = labenc.transform(labels)
 
     # Normalize features to 0 to 1 (if not word vectors)
     if not vec_feats:
         preprocessing.minmax_scale(x, copy=False)
     endtime = time.time()
-    print "preprocessing took " + str(endtime - starttime) + " s"
-    return y
+    mins = float(endtime-starttime)/60
+    print "preprocessing took " + str(mins) + " mins"
+    if extra_labels:
+        print "returning extra labels"
+        return [y, labels2]
+    else:
+        return y
 
 def map_back(results):
     output = []
@@ -727,13 +1275,14 @@ def map_back(results):
         output.append(val)
     return output
 
-def split_feats(keys):
+def split_feats(keys, labelname):
+    ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4"]
     vec_keys = [] # vector/matrix features for CNN and RNN models
     point_keys = [] # traditional features for other models
     for key in keys:
         if key in vec_types:
             vec_keys.append(key)
-        else:
+        elif key == labelname or key not in ignore_feats:
             point_keys.append(key)
     print "vec_keys: " + str(vec_keys)
     print "point_keys: " + str(point_keys)

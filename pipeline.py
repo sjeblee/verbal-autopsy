@@ -3,20 +3,22 @@
 
 import sys
 sys.path.append('./temporal')
-
-import argparse
+sys.path.append('./keywords')
+import cluster_keywords
 import extract_features
 import heidel_tag
 import medttk_tag
 import model
-import nn
-import os
-import rebalance
+#import rebalance
 import results_stats
 import spellcorrect
+import tag_symptoms
+import word2vec
+
+import argparse
+import os
 import subprocess
 import svm
-import tag_symptoms
 import time
 
 from contextlib import contextmanager
@@ -32,12 +34,13 @@ def main():
     argparser.add_argument('-g', '--dataset', action="store", dest="data")
     argparser.add_argument('-l', '--labels', action="store", dest="labels")
     argparser.add_argument('-m', '--model', action="store", dest="model")
-    argparser.add_argument('-v', '--modelname', action="store", dest="modelname")
+    argparser.add_argument('-w', '--modelname', action="store", dest="modelname")
     argparser.add_argument('-n', '--name', action="store", dest="name")
     argparser.add_argument('-p', '--preprocess', action="store", dest="preprocess")
     argparser.add_argument('-f', '--features', action="store", dest="features")
     argparser.add_argument('-z', '--featurename', action="store", dest="featurename")
     argparser.add_argument('-b', '--rebalance', action="store", dest="rebalance")
+    argparser.add_argument('-v', '--vectors', action="store", dest="vecfile")
     args = argparser.parse_args()
 
     if not (args.train and args.name):
@@ -46,12 +49,12 @@ def main():
         print "--test [test.features]"
         print "--out [test.results]"
         print "--labels [ICD_cat/ICD_cat_neo/Final_code] (optional)"
-        print "--features [type/dem/narr_count/narr_vec/narr_tfidf/kw_count/kw_tfidf/lda/symp_train/narr_medttk_count]"
+        print "--features [type/dem/narr_count/narr_vec/narr_tfidf/kw_count/kw_tfidf/lda/symp_train/narr_medttk_count/keyword_clusters]"
         print "--featurename [feature_set_name]"
-        print "--model [nn/lstm/svm/rf/nb]"
+        print "--model [nn/lstm/cnn/filternn/svm/rf/nb]"
         print "--modelname [nn1_all] (optional)"
         print "--name [rnn_ngram3]"
-        print "--preprocess [spell/heidel/symp/stem/lemma/medttk] (optional, default: spell)"
+        print "--preprocess [spell/heidel/symp/stem/lemma/medttk/kwc] (optional, default: spell)"
         print "--ex [traintest/hyperopt] (optional, default: traintest)"
         print "--dataset [mds_one/mds_tr/mds_one+tr] (optional, default: mds_one)"
         print "--rebalance [adasyn/smote](optional, default: no rebalancing"
@@ -114,7 +117,7 @@ def main():
         n_feats = 414
         anova = "chi2"
     elif args.model == "svm":
-        n_feats = 378
+        n_feats = 350
         anova = "chi2"
     elif args.model == "nn":
         if args.train == "neonate" or args.train == "child_neo":
@@ -128,11 +131,11 @@ def main():
     #nodes = 600
 
     if experiment == "traintest":
-        run(args.model, modelname, args.train, testset, args.features, fn, args.name, pre, labels, arg_dev=dev, arg_hyperopt=False, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes, arg_dataset=dataset, arg_rebalance=rebal)
+        run(args.model, modelname, args.train, testset, args.features, fn, args.name, pre, labels, arg_dev=dev, arg_hyperopt=False, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes, arg_dataset=dataset, arg_rebalance=rebal, arg_vecfile=args.vecfile)
     elif experiment == "hyperopt":
         run(args.model, modelname, args.train, testset, args.features, fn, args.name, pre, labels, arg_dev=dev, arg_hyperopt=True, arg_dataset=dataset)
     elif experiment == "crossval":
-        crossval(modelname, models, args.train, args.features, fn, args.name, pre, labels, args.data)
+        crossval(models, args.train, args.features, fn, args.name, pre, labels, args.data, arg_vecfile=args.vecfile)
 
     end_time = time.time()
     total_time = end_time - start_time
@@ -141,18 +144,18 @@ def main():
     else:
         print "Total time: " + str(total_time/60) + " mins"
 
-def crossval(arg_modelname, arg_models, arg_train, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dataset="mds_one"):
+def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dataset="mds+rct", arg_vecfile=""):
     print "10-fold cross-validation"
     models = arg_models.split(',')
     dataloc = "/u/sjeblee/research/va/data/datasets"
+    vecfile = None
 
     # Records should be one per line, no xml header or footer
     dset = arg_dataset
-    datafile_child = dataloc + "/" + dset + "/all_child_cat_spell.txt"
-    datafile_neo = dataloc + "/" + dset + "/all_neonate_cat_spell.txt"
-    datafile_adult = dataloc + "/" + dset + "/all_adult_cat_spell.txt"
-    datafile = dataloc + "/" + dset + "/all_" + arg_train + "_cat_spell.txt"
-    records = []
+    datafile_child = dataloc + "/" + dset + "/all_child_cat.txt"
+    datafile_neo = dataloc + "/" + dset + "/all_neonate_cat.txt"
+    datafile_adult = dataloc + "/" + dset + "/all_adult_cat.txt"
+    datafile = dataloc + "/" + dset + "/all_" + arg_train + "_cat.txt"
     data = {}
     datasets = []
     train_extra = []
@@ -166,38 +169,41 @@ def crossval(arg_modelname, arg_models, arg_train, arg_features, arg_featurename
     # Set up file paths
     datadir = "/u/sjeblee/research/va/data/" + arg_name
     datapath = datadir + "/" + arg_dataset
-    create_datasets = True
+    #create_datasets = True
     if os.path.exists(datapath):
         print "Data files already exist, re-using them"
-        #create_datasets = False
+        create_datasets = False
     else:
         os.mkdir(datapath)
 
-    # TODO; If dirs exist already, don't recreate the datasets, just re-run the models that don't have output
+    create_datasets = False
+    # TODO: If dirs exist already, don't recreate the datasets, just re-run the models that don't have output
     if create_datasets:
-        # Extra training data
-        print "Loading extra training data..."
         train_extra = []
-        if arg_train == "adult":
-            train_extra = train_extra + get_recs(datafile_child)
-            train_extra = train_extra + get_recs(datafile_neo)
-        elif arg_train == "child":
-            train_extra = train_extra + get_recs(datafile_adult)
-            train_extra = train_extra + get_recs(datafile_neo)
-        #elif arg_train == "neonate":
-        #    train_extra = train_extra + get_recs(datafile_child)
+        use_extra_data = False
+        # Extra training data
+        if use_extra_data:
+            print "Loading extra training data..."
+            if arg_train == "adult":
+                train_extra = train_extra + get_recs(datafile_child)
+                train_extra = train_extra + get_recs(datafile_neo)
+            elif arg_train == "child":
+                train_extra = train_extra + get_recs(datafile_adult)
+                train_extra = train_extra + get_recs(datafile_neo)
+                #elif arg_train == "neonate":
+                #    train_extra = train_extra + get_recs(datafile_child)
 
-        print "train_extra: " + str(len(train_extra))
+            print "train_extra: " + str(len(train_extra))
 
         # Read data file
         print "Reading main data file..."
         total = 0
         with open(datafile, 'r') as f:
             for line in f:
-                print "line: " + line
+                #print "line: " + line
                 cat = 15
                 child = etree.fromstring(line)
-                node = child.find("ICD_cat")
+                node = child.find(arg_labels)
                 if node != None:
                     cat = node.text
                 if not cat in data:
@@ -239,7 +245,7 @@ def crossval(arg_modelname, arg_models, arg_train, arg_features, arg_featurename
         for z in range(10):
             # Construct train and test sets
             testset = datasets[z]
-            trainset = [] + train_extra
+            trainset = train_extra
             if z > 0:
                 for u in range(0, z):
                     trainset = trainset + datasets[u]
@@ -255,8 +261,8 @@ def crossval(arg_modelname, arg_models, arg_train, arg_features, arg_featurename
 
             # Write train and test sets to file
             trainname = arg_train + "_" + str(z)
-            trainfile = datapath + "/train_" + trainname +  "_cat_spell.xml"
-            testfile = datapath + "/test_" + trainname + "_cat_spell.xml"
+            trainfile = datapath + "/train_" + trainname +  "_cat.xml"
+            testfile = datapath + "/test_" + trainname + "_cat.xml"
             outfile = open(trainfile, 'w')
             outfile.write(xml_header + "\n")
             for item in trainset:
@@ -274,6 +280,17 @@ def crossval(arg_modelname, arg_models, arg_train, arg_features, arg_featurename
     # Run models
     for z in range(10):
         trainname = arg_train + "_" + str(z)
+        vec_feats = "narr_vec" in arg_features or "kw_vec" in arg_features
+        vecfile = arg_vecfile
+
+        # Retrain word vectors for this set
+        #if vec_feats:
+        #    print "Training word vectors..."
+        #    trainfile = datapath + "/train_" + trainname +  "_cat_spell.xml"
+        #    dim = 100
+        #    shouldstem = "stem" in arg_preprocess
+        #    vecfile = word2vec.run(trainfile, dim, shouldstem) #TODO: pass extra training files
+        
         for m in models:
             name = arg_name + "/" + m + "_" + str(z)
             modelname = m + "_" + str(z) + "_" + arg_train
@@ -282,28 +299,26 @@ def crossval(arg_modelname, arg_models, arg_train, arg_features, arg_featurename
             print "Running " + name
 
             # Model parameters
-            n_feats = 200
+            n_feats = 350
             anova = "f_classif"
             nodes = 297
             if m == "rf":
                 n_feats = 414
                 anova = "chi2"
             elif m == "svm":
-                n_feats = 378
+                n_feats = 350
                 anova = "chi2"
             elif m == "nn":
                 if arg_train == "neonate":
-                    n_feats = 227
+                    #n_feats = 227
                     nodes = 192
                     anova = "chi2"
                 else:
-                    n_feats = 378
+                    n_feats = 350
             
-            run(m, modelname, trainname, trainname, arg_features, arg_featurename, name, arg_preprocess, arg_labels, arg_dev=False, arg_hyperopt=False, arg_dataset=dset, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes, dataloc=datadir)
+            run(m, modelname, trainname, trainname, arg_features, arg_featurename, name, arg_preprocess, arg_labels, arg_dev=False, arg_hyperopt=False, arg_dataset=dset, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes, dataloc=datadir, arg_vecfile=vecfile)
 
-def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev=True, arg_hyperopt=False, arg_dataset="mds", arg_n_feats=398, arg_anova="f_classif", arg_nodes=297, dataloc="/u/sjeblee/research/va/data/datasets", arg_rebalance=""):
-
-    dataloc = dataloc + "/" + arg_dataset
+def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, arg_dataloc, arg_vecfile):
     trainname = arg_train + "_cat" # all, adult, child, or neonate
     devname = arg_test + "_cat"
     pre = arg_preprocess
@@ -311,14 +326,14 @@ def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_feature
     labels = arg_labels
     featureset = arg_featurename # Name of the feature set for feature file
     features = arg_features # type, checklist, narr_bow, narr_tfidf, narr_count, narr_vec, kw_bow, kw_tfidf, symp_train
-    modeltype = arg_model # svm, knn, nn, lstm, nb, rf
+    #modeltype = arg_model # svm, knn, nn, lstm, nb, rf
     modelname = arg_modelname
-    #resultsloc_name = arg_name
 
     # Location of data files
+    dataloc = arg_dataloc
     resultsloc="/u/sjeblee/research/va/data/" + arg_name
     heideldir="/u/sjeblee/tools/heideltime/heideltime-standalone"
-    scriptdir="/u/sjeblee/research/va/git/verbal-autopsy"
+    #scriptdir="/u/sjeblee/research/va/git/verbal-autopsy"
 
     # Setup
     if not os.path.exists(resultsloc):
@@ -383,7 +398,6 @@ def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_feature
 
     if "medttk" in pre:
         print "Running medttk..."
-        #with cd(heideldir):
         trainh = dataloc + "/train_" + trainname + "_medttk.xml"
         if not os.path.exists(trainh):
             medttk_tag.run(trainset, trainh)
@@ -404,8 +418,8 @@ def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_feature
 
     if "symp" in pre:
         print "Tagging symptoms..."
-        sympname = "symp"
-        tagger = "crf"
+        sympname = "medttk"
+        tagger_name = "medttk"
         trainsp = dataloc + "/train_" + trainname + "_" + sympname + ".xml"
         devsp = ""
         if arg_dev:
@@ -414,17 +428,35 @@ def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_feature
             devsp = dataloc + "/test_" + devname + "_" + sympname + ".xml"
         if not os.path.exists(trainsp):
             print "tag_symptoms on train data..."
-            tag_symptoms.run(trainset, trainsp, tagger)
+            tag_symptoms.run(trainset, trainsp, tagger=tagger_name)
             #fixtags(trainsp)
         if not os.path.exists(devsp):
             print "tag_symptoms on test data..."
-            tag_symptoms.run(devset, devsp, tagger)
+            tag_symptoms.run(devset, devsp, tagger=tagger_name)
         #    fixtags(devsp)
 
         trainset = trainsp
         devset = devsp
         devname = devname + "_" + sympname
         trainname = trainname + "_" + sympname
+
+    if "kwc" in pre:
+        kwname = "kwe2"
+        # TODO: move this setup to a function
+        trainkw = dataloc + "/train_" + trainname + "_" + kwname + ".xml"
+        devkw = ""
+        if arg_dev:
+            devkw = dataloc + "/dev_" + devname + "_" + kwname + ".xml"
+        else:
+            devkw = dataloc + "/test_" + devname + "_" + kwname + ".xml"
+        if not os.path.exists(trainkw and devkw):
+            print "Keyword clustering..."
+            clusterfile = trainkw + ".clusters"
+            cluster_keywords.run(trainkw, clusterfile, arg_vecfile, trainset, devset, devkw)
+        trainset = trainkw
+        devset = devkw
+        devname = devname + "_" + kwname
+        trainname = trainname + "_" + kwname
 
     # Feature Extraction
     if arg_dev:
@@ -447,14 +479,34 @@ def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_feature
     print "stem: " + str(stem) + " lemma: " + str(lemma)
     if not (os.path.exists(trainfeatures) and os.path.exists(devfeatures)):
         print "Extracting features..."
-        extract_features.run(trainset, trainfeatures, devset, devfeatures, features, labels, stem, lemma, element)
+        if arg_vecfile is not None:
+            extract_features.run(trainset, trainfeatures, devset, devfeatures, features, labels, stem, lemma, element, arg_vecfile=arg_vecfile)
+        else:
+            extract_features.run(trainset, trainfeatures, devset, devfeatures, features, labels, stem, lemma, element)
+    return trainfeatures, devfeatures, devresults
 
-    # Rebalance dataset?
-    #if arg_rebalance != "":
-    #    rebalancedfeatures = trainfeatures + "." + arg_rebalance
-    #    rebalance.run(trainfeatures, rebalancedfeatures, labels, arg_rebalance)
-    #    trainfeatures = rebalancedfeatures
+def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev=True, arg_hyperopt=False, arg_dataset="mds", arg_n_feats=398, arg_anova="f_classif", arg_nodes=297, dataloc="/u/sjeblee/research/va/data/datasets", arg_rebalance="", arg_vecfile=None):
 
+    dataloc = dataloc + "/" + arg_dataset
+    resultsloc="/u/sjeblee/research/va/data/" + arg_name
+    joint = False
+    if arg_train == 'all' and arg_test == 'all':
+        joint = True
+
+    if joint:
+        trainfeatures_adult, devfeatures_adult, devresults_adult = setup(arg_modelname, 'adult', 'adult', arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, dataloc, arg_vecfile)
+        trainfeatures_child, devfeatures_child, devresults_child = setup(arg_modelname, 'child', 'child', arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, dataloc, arg_vecfile)
+        trainfeatures_neonate, devfeatures_neonate, devresults_neonate = setup(arg_modelname, 'neonate', 'neonate', arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, dataloc, arg_vecfile)
+        trainfeatures = [trainfeatures_adult, trainfeatures_child, trainfeatures_neonate]
+        devfeatures = [devfeatures_adult, devfeatures_child, devfeatures_neonate]
+        devresults = [devresults_adult, devresults_child, devresults_neonate]
+    else:
+        trainfeatures, devfeatures, devresults = setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, dataloc, arg_vecfile)
+
+    labels = arg_labels
+    modeltype = arg_model # svm, knn, nn, lstm, nb, rf
+    modelname = arg_modelname
+        
     # Model
     if arg_hyperopt:
         print "Running hyperopt..."
@@ -463,14 +515,20 @@ def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_feature
         print "Creating model..."
         if modeltype == "nb":
             svm.run(modeltype, trainfeatures, devfeatures, devresults, labels)
-        #elif modeltype == "cnn":
-        #    model_temp.run(modeltype, modelname, trainfeatures, devfeatures, devresults, resultsloc, labels, arg_n_feats, arg_anova, arg_nodes)
+        elif joint:
+            # The feature files here are lists
+            model.run_joint(modeltype, modelname, trainfeatures, devfeatures, devresults, resultsloc, labels, arg_n_feats, arg_anova, arg_nodes, arg_rebalance)
         else:
             model.run(modeltype, modelname, trainfeatures, devfeatures, devresults, resultsloc, labels, arg_n_feats, arg_anova, arg_nodes, arg_rebalance)
 
         # Results statistics
         print "Calculating scores..."
-        results_stats.run(devresults, devresults + ".stats")
+        if joint:
+            results_stats.run(devresults[0], devresults[0] + ".stats")
+            results_stats.run(devresults[1], devresults[1] + ".stats")
+            results_stats.run(devresults[2], devresults[2] + ".stats")
+        else:
+            results_stats.run(devresults, devresults + ".stats")
 
     print "Done"
 
