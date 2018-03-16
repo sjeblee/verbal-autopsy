@@ -449,10 +449,10 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     print "training took " + str(etime - stime) + " s"
 
     # Test
-    #if ',' in arg_model:
-    #    testids, testlabels, predictedlabels = test_multi(arg_model, model, arg_test_feats)
-    #else:
-    testids, testlabels, predictedlabels = test(arg_model, model, arg_test_feats, anova_filter, hybrid, kw_cnn=cnn_model)
+    if ',' in arg_model:
+        testids, testlabels, predictedlabels = test_multi(arg_model, model, arg_test_feats)
+    else:
+        testids, testlabels, predictedlabels = test(arg_model, model, arg_test_feats, anova_filter, hybrid, kw_cnn=cnn_model)
 
     # Write results to a file
     output = open(arg_result_file, 'w')

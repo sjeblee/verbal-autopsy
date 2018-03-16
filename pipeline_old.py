@@ -5,10 +5,10 @@ import sys
 sys.path.append('./temporal')
 
 import argparse
-import extract_features
+import extract_features_old as extract_features
 import heidel_tag
 import medttk_tag
-import model
+import model_old as model
 import nn
 import os
 import rebalance
@@ -166,14 +166,14 @@ def crossval(arg_modelname, arg_models, arg_train, arg_features, arg_featurename
     # Set up file paths
     datadir = "/u/sjeblee/research/va/data/" + arg_name
     datapath = datadir + "/" + arg_dataset
-    #create_datasets = True
+    create_datasets = True
     if os.path.exists(datapath):
         print "Data files already exist, re-using them"
         create_datasets = False
     else:
         os.mkdir(datapath)
 
-    # TODO; If dirs exist already, don't recreate the datasets, just re-run the models that don't have output
+    # TODO: If dirs exist already, don't recreate the datasets, just re-run the models that don't have output
     if create_datasets:
         # Extra training data
         print "Loading extra training data..."

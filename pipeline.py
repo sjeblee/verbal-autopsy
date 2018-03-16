@@ -441,7 +441,7 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
         trainname = trainname + "_" + sympname
 
     if "kwc" in pre:
-        kwname = "kwe2"
+        kwname = "kwkm4"
         # TODO: move this setup to a function
         trainkw = dataloc + "/train_" + trainname + "_" + kwname + ".xml"
         devkw = ""
