@@ -8,15 +8,19 @@ import data_util
 
 from collections import Counter
 from lxml import etree
+from numpy import array
 from sklearn.cluster import AgglomerativeClustering, MiniBatchKMeans, SpectralClustering
 from sklearn.metrics import calinski_harabaz_score
 from sklearn.neighbors import KNeighborsClassifier
 from scipy.stats import mode
 import argparse
 import numpy
+import os
 import time
 
 import extract_features_temp as extract_features
+
+numpy.set_printoptions(threshold=numpy.nan)
 
 def main():
     argparser = argparse.ArgumentParser()
@@ -76,7 +80,7 @@ def run(outfile, clusterfile, vecfile, infile=None, testfile=None, testoutfile=N
     # Generate clusters
     print "shape: [num_keywords, dim]" # keywords listed individually
     print "generating clusters..."
-    clusterer = MiniBatchKMeans(n_clusters=num_clusters, max_iter=500, n_init=20)
+    clusterer = MiniBatchKMeans(n_clusters=num_clusters, max_iter=1000, n_init=50)
     #clusterer = SpectralClustering(n_clusters=num_clusters, n_init=15, affinity='cosine', n_jobs=-1)
     #clusterer = AgglomerativeClustering(n_clusters=num_clusters, affinity='cosine', linkage='average')
     kw_clusters = clusterer.fit_predict(kw_vecs)
@@ -84,6 +88,7 @@ def run(outfile, clusterfile, vecfile, infile=None, testfile=None, testoutfile=N
 
     # Unsupervised cluster metrics
     cluster_labels = clusterer.labels_
+    cluster_centers = list(clusterer.cluster_centers_)
     chi_score = calinski_harabaz_score(kw_vecs, cluster_labels)
     print "Calinski-Harabaz Index: " + str(chi_score)
 
@@ -116,6 +121,12 @@ def run(outfile, clusterfile, vecfile, infile=None, testfile=None, testoutfile=N
     write_clusters_to_xml(infile, outfile, ids, kw_clusters)
     print "Writing clusters to csv file..."
     write_clusters_to_file(clusterfile, get_cluster_map(keywords, kw_clusters))
+
+    # Save the cluster centers
+    outf = open(clusterfile + ".centers", 'w')
+    outf.write(str(cluster_centers))
+    outf.close()
+
     #outf = open(outfile + ".vecs", 'w')
     #outf.write(str(get_cluster_map(kw_vecs, kw_clusters_correct, cluster_names)))
     #outf.close()
@@ -342,7 +353,7 @@ def interpret_clusters(clusters, clusterfile):
 ''' Get cluster embeddings for keyword clusters
     labels: list of lists of cluster numbers
 '''
-def cluster_embeddings(labels, clusterfile, vecfile, return_phrases=False):
+def cluster_embeddings(labels, clusterfile, vecfile, return_phrases=False, max_length=10):
     print "getting cluster embeddings"
     word2vec, dim = data_util.load_word2vec(vecfile)
     cluster_map = {}
@@ -355,9 +366,17 @@ def cluster_embeddings(labels, clusterfile, vecfile, return_phrases=False):
             phrases = phrases[1:]
             cluster_map[key] = phrases
 
-    # Calculate cluster centers
+    # Get cluster centers
     cluster_centers = {}
+    cluster_vecs = {}
+    center_file = clusterfile + ".centers"
+    calculate_centers = True
+    if os.path.exists(center_file):
+        cluster_centers = get_cluster_centers(clusterfile)
+        calculate_centers = False
+    # Get the vectors for each phrase in the clusters
     for num in cluster_map.keys():
+        #print "cluster " + str(num)
         vecs = []
         phrases = cluster_map[num]
         for phrase in phrases:
@@ -368,13 +387,25 @@ def cluster_embeddings(labels, clusterfile, vecfile, return_phrases=False):
                 if word in word2vec:
                     vec = word2vec[word]
                 word_vecs.append(vec)
-            phrase_vec = numpy.average(numpy.asarray(word_vecs), axis=0)
+            if len(word_vecs) == 0:
+                #print "ZERO VEC: " + phrase
+                phrase_vec = data_util.zero_vec(dim)
+            else:
+                phrase_vec = numpy.average(numpy.asarray(word_vecs), axis=0)
             vecs.append(phrase_vec)
-        cluster_vec = numpy.average(numpy.asarray(vecs), axis=0)
-        #print "cluster " + str(num) + " vec shape: " + str(cluster_vec.shape)
-        cluster_centers[num] = cluster_vec
-        # Get closest phrase
-        if return_phrases:
+        cluster_vecs[num] = vecs
+        if calculate_centers:
+            cluster_vec = numpy.average(numpy.asarray(vecs), axis=0)
+            #print "cluster " + str(num) + " vec shape: " + str(cluster_vec.shape)
+            cluster_centers[num] = cluster_vec
+
+    # Get closest phrase
+    if return_phrases:
+        for num in cluster_map.keys():
+            cluster_vec = cluster_centers[num]
+            phrases = cluster_map[num]
+            vecs = cluster_vecs[num]
+            #print 'phrases: ' + str(len(phrases)) + ', vecs: ' + str(len(vecs))
             best_vec = data_util.zero_vec(dim)
             best_phrase = ""
             best_dist = numpy.linalg.norm(best_vec-cluster_vec)
@@ -390,7 +421,6 @@ def cluster_embeddings(labels, clusterfile, vecfile, return_phrases=False):
             #print "best phrase: " + best_phrase
             cluster_names[num] = best_phrase
 
-    kw_size = 20
     zero_vec = data_util.zero_vec(dim)
     kw_names = []
     for kw_list in labels:
@@ -411,10 +441,10 @@ def cluster_embeddings(labels, clusterfile, vecfile, return_phrases=False):
                     kw_text.append(name)
         kw_names.append(kw_text)
         # Pad vectors
-        while len(kw_embeddings) < kw_size:
+        while len(kw_embeddings) < max_length:
             kw_embeddings.insert(0, zero_vec)
-        if len(kw_embeddings) > kw_size:
-            kw_embeddings = kw_embeddings[:20]
+        if len(kw_embeddings) > max_length:
+            kw_embeddings = kw_embeddings[:max_length]
         #print "kw_embeddings: " + str(len(kw_embeddings))
         cluster_embeddings.append(kw_embeddings)
 
@@ -431,5 +461,43 @@ def cluster_embeddings(labels, clusterfile, vecfile, return_phrases=False):
     else:
         return cluster_embeddings
 
+'''
+    Convert cluster embeddings back to cluster numbers by finding the closest cluster center
+    embeddings: a list of lists of vectors (as a python list)
+    clusterfile: the name of the cluster file without the .centers extension
+    returns: a list of lists of cluster numbers (as a python list)
+'''
+def embeddings_to_clusters(embeddings, clusterfile):
+    cluster_centers = get_cluster_centers(clusterfile)
+    cluster_nums = []
+    for seq in embeddings:
+        cluster_list = []
+        for row in seq:
+            vec = numpy.asarray(row)
+            best_num = 0
+            best_dist = float("inf")
+            for num in cluster_centers.keys():
+                cluster_vec = cluster_centers[num]
+                dist = numpy.linalg.norm(vec-cluster_vec)
+                if dist < best_dist:
+                    best_dist = dist
+                    best_num = num
+            cluster_list.append(best_num)
+        cluster_nums.append(cluster_list)
+    return cluster_nums
+
+def get_cluster_centers(filename):
+    cluster_centers = {}
+    center_file = filename + ".centers"
+    #if os.path.isfile(center_file):
+    infile = open(center_file, 'r')
+    text = infile.read()
+    infile.close()
+    center_list = eval(text)
+    for x in range(len(center_list)):
+        cluster_centers[x] = center_list[x]
+    #else:
+    #    print "WARNING: cluster centers file not found: " + filename
+    return cluster_centers
     
 if __name__ == "__main__":main()
