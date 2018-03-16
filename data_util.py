@@ -337,6 +337,12 @@ def write_to_file(matrix, dict_keys, outfile):
     key_output.close()
     return dict_keys
 
+def xml_to_txt(filename):
+    name = filename.split(".")[0]
+    sed_command = r"sed '$d' < " + filename + r" | sed '1d' > " + name + ".txt"
+    ps = subprocess.Popen(sed_command, shell=True, stdout=subprocess.PIPE)
+    ps.communicate()
+
 def zero_vec(dim):
     vec = []
     for x in range(dim):
