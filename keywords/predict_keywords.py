@@ -4,6 +4,7 @@
 
 import sys
 sys.path.append('/u/sjeblee/research/va/git/verbal-autopsy')
+sys.path.append('/u/sjeblee/research/va/git/verbal-autopsy/temporal')
 
 from lxml import etree
 from sklearn import metrics
@@ -19,7 +20,8 @@ import data_util
 import extract_features_temp as extract_features
 import cluster_keywords
 import model_library
-#import model_seq
+import model_library_torch
+import model_seq
 
 def main():
     argparser = argparse.ArgumentParser()
@@ -27,15 +29,17 @@ def main():
     argparser.add_argument('--out', action="store", dest="outfile")
     argparser.add_argument('--train', action="store", dest="trainfile")
     argparser.add_argument('--num', action="store", dest="num_clusters")
+    argparser.add_argument('--clusters', action="store", dest="clusterfile")
+    argparser.add_argument('--model', action="store", dest="model")
     args = argparser.parse_args()
 
     if not (args.testfile and args.outfile and args.trainfile and args.num_clusters):
-        print "usage: ./predict_keywords.py --train [file.xml] --test [file.xml] --out [outfile.xml] --num [num_clusters]"
+        print "usage: ./predict_keywords.py --train [file.xml] --test [file.xml] --out [outfile.xml] --num [num_clusters] --clusters [clusterfile] -- model [cnn/seq/encoder-decoder]"
         exit()
 
-    run(args.trainfile, args.testfile, args.outfile, args.num_clusters)
+    run(args.trainfile, args.testfile, args.outfile, args.num_clusters, model=args.model, clusterfile=args.clusterfile)
 
-def run(trainfile, testfile, outfile, num_clusters):
+def run(trainfile, testfile, outfile, num_clusters, model='seq', clusterfile=None):
     starttime = time.time()
 
     # Setup
@@ -44,6 +48,7 @@ def run(trainfile, testfile, outfile, num_clusters):
     test_feat_file = testfile + ".feats"
     test_kw_file = testfile + ".kw_clusters"
     vecfile = "/u/sjeblee/research/va/data/datasets/mds+rct/narr+ice+medhelp.vectors.100"
+    #clusterfile = "/u/sjeblee/research/va/data/datasets/mds+rct/train_adult_cat_spell.clusters_km50"
 
     # Extract word vector features and keyword vectors
     if not (os.path.exists(train_feat_file) and os.path.exists(test_feat_file)):
@@ -68,68 +73,106 @@ def run(trainfile, testfile, outfile, num_clusters):
         rec_id = testids[y]
         testy.append(list(test_kw_dict[rec_id]))
 
-    # keyword one-hot encoding
-    #keywords = []
-    #for item in trainy:
-    #    for kw in item:
-    #        keywords.append(kw)
-    #labelencoder = model_seq.create_labelencoder(keywords)
-    #trainy = model_seq.encode_labels(trainy, labelencoder)
-    #testy = model_seq.encode_labels(testy, labelencoder)
+    print "trainy[0]: " + str(trainy[0])
+    trainy_vecs = None
+    trainy_phrases = None
+    testy_vecs = None
+    testy_phrases = None
+    y_pred = []
 
+    # keyword one-hot encoding
+    if model == 'seq':
+        keywords = []
+        for item in trainy:
+            for kw in item:
+                keywords.append(kw)
+        labelencoder = model_seq.create_labelencoder(keywords)
+        trainy_vecs = model_seq.encode_labels(trainy, labelencoder)
+        testy_vecs = model_seq.encode_labels(testy, labelencoder)
+        print "trainy_vecs[0]: " + str(trainy_vecs[0])
+    
     # keyword multi-hot encoding
     max_label = int(num_clusters) - 1
-    trainy = numpy.asarray(data_util.multi_hot_encoding(trainy, max_label))
-    testy = numpy.asarray(data_util.multi_hot_encoding(testy, max_label))
-    #print "trainy len: " + str(len(trainy))
+    if model == 'cnn':
+        trainy = data_util.multi_hot_encoding(trainy, max_label)
+        testy = data_util.multi_hot_encoding(testy, max_label)
+
+    if model == 'encoder-decoder':
+        trainy_vecs, trainy_phrases = cluster_keywords.cluster_embeddings(trainy, clusterfile, vecfile, return_phrases=True)
+        testy_vecs, testy_phrases = cluster_keywords.cluster_embeddings(testy, clusterfile, vecfile, return_phrases=True)
 
     # Train and test the model
-    print "trainy shape: " + str(trainy.shape)
+    print "trainy size: " + str(len(trainy))
     #output_seq_len = numpy.asarray(trainy).shape[1]
     #print "output_seq_len: " + str(output_seq_len)
     #print "trainx[0]: " + str(trainx[0])
     print "trainy[0]: " + str(trainy[0])
+    #print "trainy_phrases[0]: " + str(trainy_phrases[0])
 
-    # Seq2seq
-    #model, encoder, decoder, output_dim = model_seq.train_seq2seq(trainx, trainy, True)
-    #testy_pred = model_seq.predict_seqs(encoder, decoder, testx, output_seq_len, output_dim, True)
+    # Seq2seq - with sequences of one-hot encodings
+    if model == 'seq':
+        print "seq model"
+        output_seq_len = 10
+        nodes = 128
+        model, encoder, decoder, output_dim = model_seq.train_seq2seq(trainx, trainy_vecs, nodes, True)
+        y_pred = model_seq.predict_seqs(encoder, decoder, testx, output_seq_len, output_dim, True)
+        testy_pred_labs = model_seq.decode_all_labels(y_pred, labelencoder)
+        testy_pred_labels = [','.join(row) for row in testy_pred_labs] 
+        #testy_pred_labels = cluster_keywords.embeddings_to_clusters(y_pred, clusterfile)
+        #kw_true_text = testy_phrases
+        testy = data_util.multi_hot_encoding(testy, max_label)
+        testy_pred = data_util.multi_hot_encoding(testy_pred_labs, max_label)
+        #testy_pred = data_util.map_to_multi_hot(y_pred)
+        #testy_pred_labels = data_util.decode_multi_hot(testy_pred)
+        print "testy_pred_labels[0]: " + str(testy_pred_labels[0])
+
+    # Torch encoder-decoder
+    elif model == 'encoder-decoder':
+        print "torch encoder-decoder"
+        output_seq_len = 10
+        nodes = 100 # TODO: does this have to be the same as the word vector dim?
+        encoder, decoder, output_dim = model_library_torch.encoder_decoder_model(trainx, trainy_vecs, nodes, num_epochs=5)
+        y_pred = model_library_torch.test_encoder_decoder(encoder, decoder, testx, output_seq_len, output_dim)
+        testy_pred_labels = cluster_keywords.embeddings_to_clusters(y_pred, clusterfile)
+        kw_true_text = testy_phrases
+        testy = data_util.multi_hot_encoding(testy, max_label)
+        testy_pred = data_util.multi_hot_encoding(testy_pred_labels, max_label)
 
     # CNN
-    modelfile = "keyword_gru.model"
-    if os.path.exists(modelfile):
-        print "Using existing model"
-        cnn = load_model(modelfile)
-    else:
-        print "Training new model..."
-        cnn, x, y = model_library.rnn_model(trainx, trainy, 100, modelname='gru', num_epochs=15)
-        #cnn, x, y = model_library.cnn_model(trainx, trainy, num_epochs=20, loss_func='kullback_leibler_divergence')
-        cnn.save(modelfile)
+    elif model == 'cnn':
+        modelfile = "keyword_kwkm50_stacked.model"
+        nodes = 128
+        if os.path.exists(modelfile):
+            print "Using existing model"
+            cnn = load_model(modelfile)
+        else:
+            print "Training new model..."
+            #cnn, x, y = model_library.rnn_model(trainx, trainy, 100, modelname='gru', num_epochs=15)
+            #cnn, x, y = model_library.cnn_model(trainx, numpy.asarray(trainy), num_epochs=15, loss_func='mean_squared_error')
+            cnn, x, y = model_library.stacked_model(trainx, [numpy.asarray(trainy)], nodes, models='gru,cnn', num_epochs=15, loss_func='categorical_crossentropy')
+            cnn.save(modelfile)
+        # Test
+        y_pred = cnn.predict(numpy.asarray(testx))
+        #testy_pred_0 = data_util.map_to_multi_hot(testy_pred, 0.5)
+        testy_pred = data_util.map_to_multi_hot(y_pred)
+        # Decode labels
+        testy_pred_labels = data_util.decode_multi_hot(testy_pred)
+        print "testy_pred_labels[0]: " + str(testy_pred_labels[0])
+        kw_pred = [thing.split(',') for thing in testy_pred_labels]
+        kw_true = [thing.split(',') for thing in data_util.decode_multi_hot(testy)]
+        kw_emb, kw_pred_text = cluster_keywords.cluster_embeddings(kw_pred, clusterfile, vecfile, True)
+        kw_true_emb, kw_true_text = cluster_keywords.cluster_embeddings(kw_true, clusterfile, vecfile, True)
 
-    # Test
-    testy_pred = cnn.predict(numpy.asarray(testx))
-    #testy_pred_0 = data_util.map_to_multi_hot(testy_pred, 0.5)
-    testy_pred = data_util.map_to_multi_hot(testy_pred)
+        #testy = testy.tolist()
+        print "testx[0]: " + str(testx[0])
+        print "testy[0]: " + str(type(testy[0])) + " " + str(testy[0])
+        print "tesy_pred[0]: " + str(type(testy_pred[0])) + " " + str(testy_pred[0])
 
-    #for x in range(len(testy)):
-    #    testy[x] = testy[x].tolist()
-    testy = testy.tolist()
-    print "testx[0]: " + str(testx[0])
-    print "testy[0]: " + str(type(testy[0])) + " " + str(testy[0])
-    print "tesy_pred[0]: " + str(type(testy_pred[0])) + " " + str(testy_pred[0])
-
-    # Decode labels
-    testy_pred_labels = data_util.decode_multi_hot(testy_pred)
-    print "testy_pred_labels[0]: " + str(testy_pred_labels[0])
-
-    #kw_pred = [thing.split(',') for thing in testy_pred_labels]
-    #kw_true = [thing.split(',') for thing in data_util.decode_multi_hot(testy)]
-    clusterfile = "/u/sjeblee/research/va/data/datasets/mds+rct/train_adult_cat_spell.clusters_e2"
-    #kw_emb, kw_pred_text = cluster_keywords.cluster_embeddings(kw_pred, clusterfile, vecfile, True)
-    #kw_true_emb, kw_true_text = cluster_keywords.cluster_embeddings(kw_true, clusterfile, vecfile, True)
-
+    testy_pred_2 = data_util.map_to_multi_hot(y_pred, 0.2)
+    testy_pred_3 = data_util.map_to_multi_hot(y_pred, 0.3)
     kw_pred_text = cluster_keywords.interpret_clusters(testy_pred_labels, clusterfile)
     kw_true_text = cluster_keywords.interpret_clusters(data_util.decode_multi_hot(testy), clusterfile)
-    print "kw_pred_text[0]: " + str(kw_pred_text[0])
+    #print "kw_pred_text[0]: " + str(kw_pred_text[0])
     print "kw_true_text[0]: " + str(kw_true_text[0])
 
     # Score results against nearest neighbor classifier
@@ -143,7 +186,31 @@ def run(trainfile, testfile, outfile, num_clusters):
     print "F1: " + str(micro_f1)
     print "precision: " + str(micro_p)
     print "recall: " + str(micro_r)
-    
+
+    # Score results against nearest neighbor classifier
+    print "Scores for 1 class (0.2 cutoff):"
+    precision, recall, f1, micro_p, micro_r, micro_f1 = data_util.score_vec_labels(testy, testy_pred_2)
+    print "Macro KW scores:"
+    print "F1: " + str(f1)
+    print "precision: " + str(precision)
+    print "recall: " + str(recall)
+    print "Micro KW scores:"
+    print "F1: " + str(micro_f1)
+    print "precision: " + str(micro_p)
+    print "recall: " + str(micro_r)
+
+    # Score results against nearest neighbor classifier
+    print "Scores for 1 class (0.3 cutoff):"
+    precision, recall, f1, micro_p, micro_r, micro_f1 = data_util.score_vec_labels(testy, testy_pred_3)
+    print "Macro KW scores:"
+    print "F1: " + str(f1)
+    print "precision: " + str(precision)
+    print "recall: " + str(recall)
+    print "Micro KW scores:"
+    print "F1: " + str(micro_f1)
+    print "precision: " + str(micro_p)
+    print "recall: " + str(micro_r)
+
     # Save ouput to file
     #pred_dict = dict(zip(testids, testy_pred_labels))
     #output = open(outfile, 'w')
