@@ -48,6 +48,7 @@ def main():
     argparser.add_argument('-o', '--out', action="store", dest="outfile")
     argparser.add_argument('-v', '--vectors', action="store", dest="vecfile")
     argparser.add_argument('-m', '--model', action="store", dest="model")
+    argparser.add_argument('-r', '--relset', action="store", dest="relset")
     args = argparser.parse_args()
 
     if not (args.trainfile):
@@ -60,11 +61,14 @@ def main():
     outfile = None
     if args.outfile:
         outfile = args.outfile
-    run(args.model, args.trainfile, "", testfile, outfile)
+    relset = 'exact'
+    if args.relset:
+        relset = args.relset
+    run(args.model, args.trainfile, "", testfile, outfile, relset)
 
-def run(model, trainfile, vecfile, testfile, outfile):
+def run(model, trainfile, vecfile, testfile, outfile, relation_set='exact'):
     st = time.time()
-    train_ids, train_feats, train_labels = extract_features(trainfile, True)
+    train_ids, train_feats, train_labels = extract_features(trainfile, relation_set, True)
 
     print("train_feats: ", str(len(train_feats)), " train_labels: ", str(len(train_labels)))
 
@@ -82,7 +86,7 @@ def run(model, trainfile, vecfile, testfile, outfile):
     print("model training took ", str(time.time()-mst), "s")
 
     if testfile is not None:
-        test_ids, test_feats, test_labels = extract_features(testfile)
+        test_ids, test_feats, test_labels = extract_features(testfile, relation_set)
         print("test_feats: ", str(len(test_feats)), " test_labels: ", str(len(test_labels)))
 
         # Test the model
@@ -102,7 +106,7 @@ def run(model, trainfile, vecfile, testfile, outfile):
         # TODO: write output to file
     print("total time: ", print_time(time.time()-st))
 
-def extract_features(filename, train=False):
+def extract_features(filename, relation_set='exact', train=False):
     print("extracting features...")
     starttime = time.time()
     # Get the xml from file
@@ -116,7 +120,7 @@ def extract_features(filename, train=False):
         rec_id = id_node.text
         node = child.find("narr_timeml_simple")
         if node != None:
-            pairs, pair_labels = extract_pairs(node)
+            pairs, pair_labels = extract_pairs(node, relation_set)
             for x in range(len(pair_labels)):
                 labels.append(pair_labels[x])
                 ids.append(rec_id)
@@ -147,19 +151,19 @@ def extract_features(filename, train=False):
     print("features_scaled[0]: ", str(features_scaled[0]))
 
     # Encode the actual labels
-    #if train:
-    #    global relationencoder
-    #    relationencoder = LabelEncoder()
-    #    relationencoder.fit(labels)
-    #encoded_labels = relationencoder.transform(labels)
+    if train:
+        global relationencoder
+        relationencoder = LabelEncoder()
+        relationencoder.fit(labels)
+        print("labels: ", str(relationencoder.classes_))
+    encoded_labels = relationencoder.transform(labels)
 
     print("feature extraction took ", print_time(time.time()-starttime))
-    return ids, features_scaled, labels
+    return ids, features_scaled, encoded_labels
 
 ''' Extract time-event pairs from xml data
 '''
-def extract_pairs(xml_node):
-    relation_set = 'binary'
+def extract_pairs(xml_node, relation_set='exact'):
     pairs = []
     labels = []
     events = xml_node.xpath("EVENT")
