@@ -6,6 +6,7 @@ import sys
 sys.path.append('/u/sjeblee/research/va/git/verbal-autopsy')
 sys.path.append('/u/sjeblee/research/va/git/verbal-autopsy/temporal')
 
+from collections import Counter
 from lxml import etree
 from sklearn import metrics
 from sklearn.feature_extraction.text import CountVectorizer
@@ -31,15 +32,16 @@ def main():
     argparser.add_argument('--num', action="store", dest="num_clusters")
     argparser.add_argument('--clusters', action="store", dest="clusterfile")
     argparser.add_argument('--model', action="store", dest="model")
+    argparser.add_argument('--vectors', action="store", dest="vecfile")
     args = argparser.parse_args()
 
     if not (args.testfile and args.outfile and args.trainfile and args.num_clusters):
         print "usage: ./predict_keywords.py --train [file.xml] --test [file.xml] --out [outfile.xml] --num [num_clusters] --clusters [clusterfile] -- model [cnn/seq/encoder-decoder]"
         exit()
 
-    run(args.trainfile, args.testfile, args.outfile, args.num_clusters, model=args.model, clusterfile=args.clusterfile)
+    run(args.trainfile, args.testfile, args.outfile, args.num_clusters, model=args.model, clusterfile=args.clusterfile, vecfile=args.vecfile)
 
-def run(trainfile, testfile, outfile, num_clusters, model='seq', clusterfile=None):
+def run(trainfile, testfile, outfile, num_clusters, model='seq', clusterfile=None, vecfile=None):
     starttime = time.time()
 
     # Setup
@@ -47,8 +49,10 @@ def run(trainfile, testfile, outfile, num_clusters, model='seq', clusterfile=Non
     train_kw_file = trainfile + ".kw_clusters"
     test_feat_file = testfile + ".feats"
     test_kw_file = testfile + ".kw_clusters"
-    vecfile = "/u/sjeblee/research/va/data/datasets/mds+rct/narr+ice+medhelp.vectors.100"
+    if vecfile is None:
+        vecfile = "/u/sjeblee/research/va/data/datasets/mds+rct/narr+ice+medhelp.vectors.100"
     #clusterfile = "/u/sjeblee/research/va/data/datasets/mds+rct/train_adult_cat_spell.clusters_km50"
+    max_label = int(num_clusters) - 1
 
     # Extract word vector features and keyword vectors
     if not (os.path.exists(train_feat_file) and os.path.exists(test_feat_file)):
@@ -62,6 +66,18 @@ def run(trainfile, testfile, outfile, num_clusters, model='seq', clusterfile=Non
     
     testyids, testkws = preprocess(test_kw_file, [], [], ["keyword_clusters"])
     test_kw_dict = dict(zip(testyids, testkws))
+
+    # Calculate majority class
+    kw_list = []
+    for kw_items in trainkws:
+        for item in kw_items:
+            if item != "":
+                kw_list.append(int(item))
+    counter = Counter(kw_list)
+    majority_kw = counter.most_common(1)[0][0]
+    print "majority kw: " + str(majority_kw)
+    majority_vec = data_util.multi_hot_encoding([[majority_kw]], max_label)[0]
+    print "majority_vec: " + str(majority_vec)
 
     # Match up the kw vectors with the trainids and testids
     trainy = []
@@ -92,7 +108,6 @@ def run(trainfile, testfile, outfile, num_clusters, model='seq', clusterfile=Non
         print "trainy_vecs[0]: " + str(trainy_vecs[0])
     
     # keyword multi-hot encoding
-    max_label = int(num_clusters) - 1
     if model == 'cnn':
         trainy = data_util.multi_hot_encoding(trainy, max_label)
         testy = data_util.multi_hot_encoding(testy, max_label)
@@ -131,7 +146,7 @@ def run(trainfile, testfile, outfile, num_clusters, model='seq', clusterfile=Non
         print "torch encoder-decoder"
         output_seq_len = 10
         nodes = 100 # TODO: does this have to be the same as the word vector dim?
-        encoder, decoder, output_dim = model_library_torch.encoder_decoder_model(trainx, trainy_vecs, nodes, num_epochs=5)
+        encoder, decoder, output_dim = model_library_torch.encoder_decoder_model(trainx, trainy_vecs, nodes, num_epochs=1)
         y_pred = model_library_torch.test_encoder_decoder(encoder, decoder, testx, output_seq_len, output_dim)
         testy_pred_labels = cluster_keywords.embeddings_to_clusters(y_pred, clusterfile)
         kw_true_text = testy_phrases
@@ -140,19 +155,25 @@ def run(trainfile, testfile, outfile, num_clusters, model='seq', clusterfile=Non
 
     # CNN
     elif model == 'cnn':
-        modelfile = "keyword_kwkm50_stacked.model"
-        nodes = 128
+        #modelfile = "keyword_cnn_kwkm" + str(num_clusters) + ".model"
+        modelfile = "/u/sjeblee/research/va/data/crossval_kw/gru_cnn_1/gru_cnn_1_adult.model"
+        nodes = 100
         if os.path.exists(modelfile):
             print "Using existing model"
             cnn = load_model(modelfile)
         else:
             print "Training new model..."
             #cnn, x, y = model_library.rnn_model(trainx, trainy, 100, modelname='gru', num_epochs=15)
-            #cnn, x, y = model_library.cnn_model(trainx, numpy.asarray(trainy), num_epochs=15, loss_func='mean_squared_error')
-            cnn, x, y = model_library.stacked_model(trainx, [numpy.asarray(trainy)], nodes, models='gru,cnn', num_epochs=15, loss_func='categorical_crossentropy')
+            #cnn, x, y = model_library.cnn_model(trainx, numpy.asarray(trainy), num_epochs=10, loss_func='mean_squared_error')
+            cnn, x, y = model_library.stacked_model(trainx, [numpy.asarray(trainy)], nodes, models='gru_cnn', num_epochs=15, loss_func='mean_squared_error')
             cnn.save(modelfile)
         # Test
-        y_pred = cnn.predict(numpy.asarray(testx))
+        #y_pred = cnn.predict(numpy.asarray(testx))
+        
+        # TEMP for multi model
+        y_pred = cnn.predict(numpy.asarray(testx))[1].tolist()
+        print "y_pred: " + str(len(y_pred))
+        
         #testy_pred_0 = data_util.map_to_multi_hot(testy_pred, 0.5)
         testy_pred = data_util.map_to_multi_hot(y_pred)
         # Decode labels
@@ -164,16 +185,22 @@ def run(trainfile, testfile, outfile, num_clusters, model='seq', clusterfile=Non
         kw_true_emb, kw_true_text = cluster_keywords.cluster_embeddings(kw_true, clusterfile, vecfile, True)
 
         #testy = testy.tolist()
-        print "testx[0]: " + str(testx[0])
-        print "testy[0]: " + str(type(testy[0])) + " " + str(testy[0])
-        print "tesy_pred[0]: " + str(type(testy_pred[0])) + " " + str(testy_pred[0])
+        #print "testx[0]: " + str(testx[0])
+        print "testy[0]: " + str(len(testy[0])) + " " + str(testy[0])
+        print "testy_pred[0]: " + str(len(testy_pred[0])) + " " + str(testy_pred[0])
 
     testy_pred_2 = data_util.map_to_multi_hot(y_pred, 0.2)
     testy_pred_3 = data_util.map_to_multi_hot(y_pred, 0.3)
-    kw_pred_text = cluster_keywords.interpret_clusters(testy_pred_labels, clusterfile)
-    kw_true_text = cluster_keywords.interpret_clusters(data_util.decode_multi_hot(testy), clusterfile)
-    #print "kw_pred_text[0]: " + str(kw_pred_text[0])
+    #kw_pred_text = cluster_keywords.interpret_clusters(testy_pred_labels, clusterfile)
+    #kw_true_text = cluster_keywords.interpret_clusters(data_util.decode_multi_hot(testy), clusterfile)
+    print "kw_pred_text[0]: " + str(kw_pred_text[0])
     print "kw_true_text[0]: " + str(kw_true_text[0])
+
+    testy_pred_majority = []
+    for x in range(len(testy_pred)):
+        testy_pred_majority.append(majority_vec)
+
+    #print "testy_pred: " + str(testy_pred)
 
     # Score results against nearest neighbor classifier
     print "Scores for 1 class (0.1 cutoff):"
@@ -200,8 +227,8 @@ def run(trainfile, testfile, outfile, num_clusters, model='seq', clusterfile=Non
     print "recall: " + str(micro_r)
 
     # Score results against nearest neighbor classifier
-    print "Scores for 1 class (0.3 cutoff):"
-    precision, recall, f1, micro_p, micro_r, micro_f1 = data_util.score_vec_labels(testy, testy_pred_3)
+    print "Scores for 1 class (majority baseline):"
+    precision, recall, f1, micro_p, micro_r, micro_f1 = data_util.score_vec_labels(testy, testy_pred_majority)
     print "Macro KW scores:"
     print "F1: " + str(f1)
     print "precision: " + str(precision)
@@ -216,7 +243,7 @@ def run(trainfile, testfile, outfile, num_clusters, model='seq', clusterfile=Non
     #output = open(outfile, 'w')
     #output.write(str(pred_dict))
     #output.close()
-    cluster_keywords.write_clusters_to_xml(testfile, outfile, testids, testy_pred_labels, kw_pred_text)
+    cluster_keywords.write_clusters_to_xml(testfile, outfile, testids, kw_pred, kw_pred_text)
 
     endtime = time.time()
     print "preprocessing took " + str(endtime - starttime) + " s"

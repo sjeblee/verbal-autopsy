@@ -16,9 +16,11 @@ from scipy.stats import mode
 import argparse
 import numpy
 import os
+import textrank
 import time
 
 import extract_features_temp as extract_features
+import word2vec
 
 numpy.set_printoptions(threshold=numpy.nan)
 
@@ -37,7 +39,7 @@ def main():
         print "usage: ./cluster_keywords.py --in [file.xml] --out [file.xml] --clusters [file.csv] --vecfile [file.vectors] --test [file.xml] --testout [file.xml] --num [n_clusters]"
         exit()
 
-    num = 20
+    num = 100
     if args.num:
         num = int(args.num)
 
@@ -48,14 +50,14 @@ def main():
     else:
         run(args.outfile, args.clusterfile, args.vecfile, num_clusters=num)
 
-def run(outfile, clusterfile, vecfile, infile=None, testfile=None, testoutfile=None, num_clusters=20):
+def run(outfile, clusterfile, vecfile, infile=None, testfile=None, testoutfile=None, num_clusters=100):
     starttime = time.time()
 
     #stopwords = ["a", "about", "above", "after", "against", "all", "am", "an", "and", "any", "are", "aren't", "as", "at", "be", "because", "been", "before", "being", "between", "but", "by", "can't", "cannot", "could", "couldn't", "did", "didn't", "do", "does", "doesn't", "doing", "don't", "during", "each", "for", "from", "further", "had", "hadn't", "has", "hasn't", "have", "haven't", "having", "he", "he'd", "he'll", "he's", "her", "here", "here's", "hers", "him", "his", "how", "how's", "i", "i'd", "i'll", "i'm", "i've", "if", "in", "into", "is", "isn't", "it", "it's", "its", "itself", "let's", "me", "more", "most", "mustn't", "my", "myself", "no", "nor", "not", "of", "off", "on", "only", "or", "other", "ought", "our", "ours", "ourselves", "out", "over", "own", "same", "shan't", "she", "she'd", "she'll", "she's", "should", "shouldn't", "so", "some", "such", "than", "that", "that's", "the", "then", "there", "there's", "these", "they", "they'd", "they'll", "they're", "they've", "this", "those", "through", "to", "too", "under", "until", "up", "very", "was", "wasn't", "we", "we'd", "we'll", "we're", "we've", "were", "weren't", "what", "what's", "where", "where's", "which", "while", "who", "who's", "whom", "why", "why's", "with", "won't", "would", "wouldn't", "you", "you'd", "you'll", "you're", "you've", "your", "yours", "yourself", "yourselves"]
 
     # Load word2vec vectors
     print "loading vectors..."
-    word2vec, dim = extract_features.load_word2vec(vecfile)
+    vec_model, dim = word2vec.load(vecfile)
     
     # Extract keywords
     ids = [] # ids can occur more than once!
@@ -67,30 +69,40 @@ def run(outfile, clusterfile, vecfile, infile=None, testfile=None, testoutfile=N
     if infile is not None:
         print "reading XML file..."
         # Get the xml from file
-        ids, keywords, kw_vecs = read_xml_file(infile, word2vec, dim)
+        ids, keywords, kw_vecs = read_xml_file(infile, vec_model, dim)
     else:
         print "reading cluster file..."
-        keywords, kw_clusters_correct, kw_vecs, cluster_names = read_cluster_file(clusterfile, word2vec, dim)
+        keywords, kw_clusters_correct, kw_vecs, cluster_names = read_cluster_file(clusterfile, vec_model, dim)
         num_clusters = len(cluster_names)
     print "num_keywords: " + str(len(keywords))
     print "num_clusters: " + str(num_clusters)
     print "dim: " + str(dim)
-    print "cluster_names: " + str(cluster_names)
+    #print "cluster_names: " + str(cluster_names)
 
     # Generate clusters
-    print "shape: [num_keywords, dim]" # keywords listed individually
+    kw_vecs_np = numpy.asarray(kw_vecs)
+    print "shape: [num_keywords, dim]: " + str(kw_vecs_np.shape) # keywords listed individually
+    print "kw_vecs[0]: " + str(kw_vecs[0])
     print "generating clusters..."
-    clusterer = MiniBatchKMeans(n_clusters=num_clusters, max_iter=1000, n_init=50)
+    clusterer = MiniBatchKMeans(n_clusters=num_clusters, max_iter=1000, n_init=100, batch_size=500, reassignment_ratio=0.03, max_no_improvement=50)
     #clusterer = SpectralClustering(n_clusters=num_clusters, n_init=15, affinity='cosine', n_jobs=-1)
     #clusterer = AgglomerativeClustering(n_clusters=num_clusters, affinity='cosine', linkage='average')
-    kw_clusters = clusterer.fit_predict(kw_vecs)
+    kw_clusters = clusterer.fit_predict(kw_vecs_np)
     #kw_clusters = map_back(clusterer.fit_predict(kw_vecs), cluster_names)
+    
 
     # Unsupervised cluster metrics
     cluster_labels = clusterer.labels_
     cluster_centers = list(clusterer.cluster_centers_)
     chi_score = calinski_harabaz_score(kw_vecs, cluster_labels)
     print "Calinski-Harabaz Index: " + str(chi_score)
+
+    print "Writing clusters to csv file..."
+    write_clusters_to_file(clusterfile, get_cluster_map(keywords, kw_clusters))
+    # Save the cluster centers
+    outf = open(clusterfile + ".centers", 'w')
+    outf.write(str(cluster_centers))
+    outf.close()
 
     # Test
     if testfile is not None:
@@ -102,30 +114,26 @@ def run(outfile, clusterfile, vecfile, infile=None, testfile=None, testoutfile=N
             testnames = zip(testfiles, testoutfiles)
             for filename, outfilename in testnames:
                 print "predicting clusters for test file: " + filename
-                testids, testkeywords, testvecs = read_xml_file(filename, word2vec, dim)
+                testids, testkeywords, testvecs = read_xml_file(filename, vec_model, dim)
                 test_clusters = classifier.predict(testvecs)
-                write_clusters_to_xml(filename, outfilename, testids, test_clusters)
+                testids_collapsed, clusters_collapsed = collapse(testids, test_clusters)
+                test_emb, test_clusters_text = cluster_embeddings(clusters_collapsed, clusterfile, vecfile, return_phrases=True)
+                write_clusters_to_xml(filename, outfilename, testids, clusters_collapsed, test_clusters_text)
         else:
             print "predicting clusters for test file..."
-            testids, testkeywords, testvecs = read_xml_file(testfile, word2vec, dim)
+            testids, testkeywords, testvecs = read_xml_file(testfile, vec_model, dim)
             test_clusters = classifier.predict(testvecs)
-            write_clusters_to_xml(testfile, testoutfile, testids, test_clusters)
+            testids_collapsed, clusters_collapsed = collapse(testids, test_clusters)
+            test_emb, test_clusters_text = cluster_embeddings(clusters_collapsed, clusterfile, vecfile, return_phrases=True)
+            write_clusters_to_xml(testfile, testoutfile, testids_collapsed, clusters_collapsed, test_clusters_text)
 
-    # Score clusters
-   # print "scoring clusters..."
-   # purity_score = purity(keywords, kw_clusters_correct, kw_clusters)
-   # print "purity: " + str(purity_score)
+    # Get text interpretation of clusters
+    ids_collapsed, clusters_collapsed = collapse(ids, kw_clusters)
+    kw_emb, kw_clusters_text = cluster_embeddings(clusters_collapsed, clusterfile, vecfile, return_phrases=True)
 
     # Write results to file
     print "Adding cluster labels to xml tree..."
-    write_clusters_to_xml(infile, outfile, ids, kw_clusters)
-    print "Writing clusters to csv file..."
-    write_clusters_to_file(clusterfile, get_cluster_map(keywords, kw_clusters))
-
-    # Save the cluster centers
-    outf = open(clusterfile + ".centers", 'w')
-    outf.write(str(cluster_centers))
-    outf.close()
+    write_clusters_to_xml(infile, outfile, ids_collapsed, clusters_collapsed, kw_clusters_text)
 
     #outf = open(outfile + ".vecs", 'w')
     #outf.write(str(get_cluster_map(kw_vecs, kw_clusters_correct, cluster_names)))
@@ -144,10 +152,7 @@ def read_cluster_file(clusterfile, word2vec, dim, cluster_names=None):
     kw_vecs = []
     kw_clusters = []
 
-    zero_vec = []
-    for x in range(dim):
-        zero_vec.append(0)
-    zero_vec = numpy.array(zero_vec)
+    zero_vec = numpy.array(data_util.zero_vec(dim))
 
     with open(clusterfile, 'r') as f:
             for line in f:
@@ -181,7 +186,8 @@ def read_cluster_file(clusterfile, word2vec, dim, cluster_names=None):
 
     return keywords, kw_clusters, kw_vecs, cluster_names
 
-def read_xml_file(filename, word2vec, dim):
+def read_xml_file(filename, vec_model, dim):
+    print "read_xml_file: " + filename
     ids = []
     keywords = []
     kw_vecs = []
@@ -194,7 +200,7 @@ def read_xml_file(filename, word2vec, dim):
             kw = kw.strip()
             if len(kw) > 0:
                 #print rec_id + " : " + kw
-                vec = vectorize(kw, word2vec, dim)
+                vec = vectorize(kw, vec_model, dim)
                 if vec is not None and (x is True for x in numpy.isfinite(numpy.asarray(vec)).tolist()):
                     ids.append(rec_id)
                     keywords.append(kw)
@@ -253,27 +259,34 @@ def write_clusters_to_file(outfile, cluster_map):
         outf.write("\n")
     outf.close()
 
+''' xmlfile: the xml file to add key phrases to
+    ids: the list of record ids (collapsed)
+    cluster_pred: a list of lists of cluster numbers (collapsed)
+    text_pred: a list of lists of strings representing the cluster names (collapsed)
+'''
 def write_clusters_to_xml(xmlfile, outfile, ids, cluster_pred, text_pred=None, kw_label="keyword_clusters"):
     # Create dictionary
     id_dict = {}
     text_dict = {}
     for x in range(len(ids)):
         rec_id = ids[x]
-        cluster = cluster_pred[x]
-        text = ""
-        if text_pred is not None:
-            text = text_pred[x]
-        if rec_id not in id_dict:
-            id_dict[rec_id] = []
-            text_dict[rec_id] = []
-        id_dict[rec_id].append(cluster)
-        text_dict[rec_id].append(text)
+        id_dict[rec_id] = cluster_pred[x]
+        text_dict[rec_id] = text_pred[x]
+
     # Read xml file and add attributes
     tree = etree.parse(xmlfile)
     root = tree.getroot()
     for child in root:
         node = child.find('MG_ID')
         rec_id = node.text
+        narr_node = child.find('narrative')
+        # Add textrank key phrases for comparison
+        if narr_node is not None:
+            narr = narr_node.text
+            kw_textrank = textrank.extract_key_phrases(narr)
+            #print "kw_textrank: " + str(kw_textrank)
+            tr_node = etree.SubElement(child, 'textrank_keyphrases')
+            tr_node.text = str(kw_textrank)
         keyword_text = ""
         if rec_id in id_dict:
             keywords = id_dict[rec_id]
@@ -287,27 +300,41 @@ def write_clusters_to_xml(xmlfile, outfile, ids, cluster_pred, text_pred=None, k
     # Write tree to file
     tree.write(outfile)
 
+def collapse(ids, clusters):
+    ids_collapsed = []
+    feats_collapsed = []
+    id_dict = {}
+    for x in range(len(ids)):
+        rec_id = ids[x]
+        cluster = clusters[x]
+        if rec_id not in id_dict:
+            id_dict[rec_id] = []
+        id_dict[rec_id].append(cluster)
+    ids_collapsed = id_dict.keys()
+    for idc in ids_collapsed:
+        feats_collapsed.append(id_dict[idc])
+    return ids_collapsed, feats_collapsed
+
 def map_back(clusters, cluster_names):
     cluster_vals = []
     for val in clusters:
         cluster_vals.append(cluster_names[val])
     return cluster_vals
 
-def vectorize(phrase, word2vec, dim):
+def vectorize(phrase, vec_model, dim):
+    stopwords = ['and', 'or', 'with', 'in', 'of', 'at', 'had', 'ho']
     words = phrase.split(' ')
     vecs = []
-    #zero_vec = data_util.zero_vec(dim)
+    zero_vec = numpy.asarray(data_util.zero_vec(dim))
     for word in words:
-        if word in word2vec:
-            vecs.append(word2vec.get(word))
-        #else:
-        #    vecs.append(zero_vec)
+        if word not in stopwords:
+            vecs.append(word2vec.get(word, vec_model))
     # Average vectors
     if len(vecs) > 0:
         avg_vec = numpy.average(numpy.asarray(vecs), axis=0)
         return avg_vec
     else:
-        return None
+        return zero_vec
 
 def clusters_from_file(clusterfile):
     print "TODO"
@@ -408,11 +435,14 @@ def cluster_embeddings(labels, clusterfile, vecfile, return_phrases=False, max_l
             #print 'phrases: ' + str(len(phrases)) + ', vecs: ' + str(len(vecs))
             best_vec = data_util.zero_vec(dim)
             best_phrase = ""
-            best_dist = numpy.linalg.norm(best_vec-cluster_vec)
+            best_dist = 10000000.0
             for x in range(len(phrases)):
                  phrase = phrases[x]
+                 phrase_len = len(phrase.split(' '))
                  phrase_vec = vecs[x]
-                 dist = numpy.linalg.norm(phrase_vec-cluster_vec)
+                 dist_temp = numpy.linalg.norm(phrase_vec-cluster_vec)
+                 # Length penalty
+                 dist = dist_temp * phrase_len
                  #print "phrase: " + phrase + ", dist: " + str(dist)
                  if dist < best_dist:
                      best_dist = dist
