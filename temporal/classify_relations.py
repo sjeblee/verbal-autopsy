@@ -8,7 +8,7 @@ sys.path.append('/u/sjeblee/research/va/git/verbal-autopsy')
 
 from lxml import etree
 from sklearn.feature_selection import f_classif
-from sklearn.metrics import precision_score, recall_score, f1_score
+from sklearn.metrics import classification_report, precision_score, recall_score, f1_score
 from sklearn.preprocessing import LabelEncoder, scale
 from sklearn.svm import SVC
 import argparse
@@ -49,9 +49,10 @@ def main():
     argparser.add_argument('-v', '--vectors', action="store", dest="vecfile")
     argparser.add_argument('-m', '--model', action="store", dest="model")
     argparser.add_argument('-r', '--relset', action="store", dest="relset")
+    argparser.add_argument('-e', '--type', action="store", dest="pairtype")
     args = argparser.parse_args()
 
-    if not (args.trainfile):
+    if not (args.trainfile and args.model and args.pairtype):
         print("usage: ./timeline.py -m [svm] --train [file_timeml.xml] --vectors [vecfile] (--test [file.xml] --out [file.xml])")
         exit()
 
@@ -64,11 +65,11 @@ def main():
     relset = 'exact'
     if args.relset:
         relset = args.relset
-    run(args.model, args.trainfile, "", testfile, outfile, relset)
+    run(args.model, args.pairtype, args.trainfile, "", testfile, outfile, relset)
 
-def run(model, trainfile, vecfile, testfile, outfile, relation_set='exact'):
+def run(model, pairtype, trainfile, vecfile, testfile, outfile, relation_set='exact'):
     st = time.time()
-    train_ids, train_feats, train_labels = extract_features(trainfile, relation_set, True)
+    train_ids, train_feats, train_labels = extract_features(trainfile, relation_set, pairtype, True)
 
     print("train_feats: ", str(len(train_feats)), " train_labels: ", str(len(train_labels)))
 
@@ -86,7 +87,7 @@ def run(model, trainfile, vecfile, testfile, outfile, relation_set='exact'):
     print("model training took ", str(time.time()-mst), "s")
 
     if testfile is not None:
-        test_ids, test_feats, test_labels = extract_features(testfile, relation_set)
+        test_ids, test_feats, test_labels = extract_features(testfile, relation_set, pairtype)
         print("test_feats: ", str(len(test_feats)), " test_labels: ", str(len(test_labels)))
 
         # Test the model
@@ -96,18 +97,19 @@ def run(model, trainfile, vecfile, testfile, outfile, relation_set='exact'):
             print(str(x), " : ", str(y_pred[x]))
 
         # Score the output
-        p = precision_score(test_labels, y_pred)
-        r = recall_score(test_labels, y_pred)
-        f1 = f1_score(test_labels, y_pred)
-        print("P: ", str(p), " R: ", str(r), " F1: ", str(f1))
+        print(classification_report(test_labels, y_pred, target_names=relationencoder.classes_))
+        #p = precision_score(test_labels, y_pred)
+        #r = recall_score(test_labels, y_pred)
+        #f1 = f1_score(test_labels, y_pred)
+        #print("P: ", str(p), " R: ", str(r), " F1: ", str(f1))
 
         # TODO: use the TempEval3 evaluation script
 
         # TODO: write output to file
     print("total time: ", print_time(time.time()-st))
 
-def extract_features(filename, relation_set='exact', train=False):
-    print("extracting features...")
+def extract_features(filename, relation_set='exact', pairtype='ee', train=False):
+    print("extracting features: ", relation_set, pairtype)
     starttime = time.time()
     # Get the xml from file
     tree = etree.parse(filename)
@@ -120,11 +122,11 @@ def extract_features(filename, relation_set='exact', train=False):
         rec_id = id_node.text
         node = child.find("narr_timeml_simple")
         if node != None:
-            pairs, pair_labels = extract_pairs(node, relation_set)
+            pairs, pair_labels = extract_pairs(node, relation_set, pairtype)
             for x in range(len(pair_labels)):
                 labels.append(pair_labels[x])
                 ids.append(rec_id)
-                feats = pair_features(pairs[x])
+                feats = pair_features(pairs[x], pairtype)
                 features.append(feats)
     for x in range(10):
         print("features[", str(x), "]: ", str(features[x]))
@@ -163,7 +165,7 @@ def extract_features(filename, relation_set='exact', train=False):
 
 ''' Extract time-event pairs from xml data
 '''
-def extract_pairs(xml_node, relation_set='exact'):
+def extract_pairs(xml_node, relation_set='exact', pairtype='ee'):
     pairs = []
     labels = []
     events = xml_node.xpath("EVENT")
@@ -180,26 +182,45 @@ def extract_pairs(xml_node, relation_set='exact'):
         event.attrib['position'] = str(event_position)
 
         # Make a pair out of this event and all time phrases
-        for time in times:
-            time_id = time.attrib['tid']
-            # Get the position of the time
-            if not 'position' in time.attrib.keys():
-                time_position = xml_node.index(time)
-                time.attrib['position'] = str(time_position)
-            pairs.append((event, time))
-            labels.append(map_rel_type(none_label, relation_set))
+        if pairtype == 'et' or pairtype == 'te':
+            for time in times:
+                time_id = time.attrib['tid']
+                # Get the position of the time
+                if not 'position' in time.attrib.keys():
+                    time_position = xml_node.index(time)
+                    time.attrib['position'] = str(time_position)
+                pairs.append((event, time))
+                labels.append(map_rel_type(none_label, relation_set))
+        # Make pairs of events
+        elif pairtype == 'ee':
+            for event2 in events:
+                pairs.append((event, event2))
+                labels.append(map_rel_type(none_label, relation_set))
 
     # Find actual relations
     for tlink in tlinks:
-        if 'relatedToTime' in tlink.attrib and 'eventID' in tlink.attrib:
-            event_id = tlink.attrib['eventID']
-            time_id = tlink.attrib['relatedToTime']
-            rel_type = tlink.attrib['relType']
-            mapped_type = map_rel_type(rel_type, relation_set)
-            for x in range(len(labels)):
-                pair = pairs[x]
-                if pair[0].attrib['eid'] == event_id and pair[1].attrib['tid'] == time_id:
-                    labels[x] = mapped_type
+        if pairtype == 'ee':
+            if 'relatedToEventID' in tlink.attrib and 'eventID' in tlink.attrib:
+                event_id = tlink.attrib['eventID']
+                event2_id = tlink.attrib['relatedToEventID']
+                rel_type = tlink.attrib['relType']
+                mapped_type = map_rel_type(rel_type, relation_set)
+                for x in range(len(labels)):
+                    pair = pairs[x]
+                    if pair[0].attrib['eid'] == event_id and pair[1].attrib['eid'] == event2_id:
+                        labels[x] = mapped_type
+        else:
+            if 'relatedToTime' in tlink.attrib and 'eventID' in tlink.attrib:
+                event_id = tlink.attrib['eventID']
+                time_id = tlink.attrib['relatedToTime']
+                rel_type = tlink.attrib['relType']
+                mapped_type = map_rel_type(rel_type, relation_set)
+                for x in range(len(labels)):
+                    pair = pairs[x]
+                    if pair[0].attrib['eid'] == event_id and pair[1].attrib['tid'] == time_id:
+                        labels[x] = mapped_type
+    # TODO: undersample the NONE examples
+
     return pairs, labels
 
 def map_rel_type(rel_type, relation_set):
@@ -210,12 +231,45 @@ def map_rel_type(rel_type, relation_set):
             return 0
         else:
             return 1
-    # TODO: map other relation types
+    elif relation_set == 'simple':
+        if rel_type == 'NONE':
+              return rel_type
+        elif rel_type in ['BEFORE', 'IBEFORE']:
+            return 'BEFORE'
+        elif rel_type in ['AFTER', 'IAFTER']:
+            return 'AFTER'
+        else:
+            return 'OVERLAP'
 
-def pair_features(pair):
+def pair_features(pair, pairtype):
     feats = []
     event = pair[0]
-    time = pair[1]
+    
+    event_feats = event_features(event)
+    event_position = event.attrib['position']
+
+    if pairtype == 'ee':
+        event2 = pair[1]
+        second_feats = event_features(event2)
+        second_position = event2.attrib['position']
+    else:
+        time = pair[1]
+        time_type = time.attrib['type']
+        time_func = unk
+        if 'temporalFunction' in time.attrib:
+            time_func = time.attrib['temporalFunction']
+        time_doc = unk
+        if 'functionInDocument' in time.attrib:
+            time_doc = time.attrib['functionInDocument']
+        second_position = time.attrib['position']
+        second_feats = [time_type, time_func, time_doc]
+
+    distance = math.fabs(int(event_position) - int(second_position))
+    feats = [distance] + event_feats + second_feats
+    #print("feats: ", str(feats))
+    return feats
+
+def event_features(event):
     event_class = unk
     if 'class' in event.attrib:
         event_class = event.attrib['class']
@@ -228,20 +282,8 @@ def pair_features(pair):
     event_pos = unk
     if 'pos' in event.attrib:
         event_pos = event.attrib['pos']
-    event_position = event.attrib['position']
-    time_type = time.attrib['type']
-    time_func = unk
-    if 'temporalFunction' in time.attrib:
-        time_func = time.attrib['temporalFunction']
-    time_doc = unk
-    if 'functionInDocument' in time.attrib:
-        time_doc = time.attrib['functionInDocument']
-    time_position = time.attrib['position']
-    distance = math.fabs(int(event_position) - int(time_position))
 
-    feats = [distance, event_class, event_tense, event_polarity, event_pos, time_type, time_func, time_doc]
-    #print("feats: ", str(feats))
-    return feats
+    return [event_class, event_tense, event_polarity, event_pos]
 
 def print_time(t):
     unit = "s"
