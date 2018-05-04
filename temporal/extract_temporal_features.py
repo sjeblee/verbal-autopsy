@@ -4,8 +4,7 @@
 
 import sys
 sys.path.append('/u/sjeblee/research/va/git/verbal-autopsy')
-#import data_util
-import word2vec
+import data_util3
 
 from gensim.models import KeyedVectors
 from lxml import etree
@@ -27,6 +26,7 @@ unk = "UNK"
 none_label = "NONE"
 labelenc_map = {}
 relationencoder = None
+undersample = 0.9
 
 def main():
     argparser = argparse.ArgumentParser()
@@ -56,12 +56,14 @@ def extract_features(filename, relation_set='exact', pairtype='ee', vecfile=None
     tree = etree.parse(filename)
     root = tree.getroot()
     features = []
+    vec_features = []
     labels = []
     ids = []
     vec_model = None
 
     if vecfile is not None:
-        vec_model = KeyedVectors.load_word2vec_format(vecfile, binary=False)
+        print("Loading vectors: ", vecfile)
+        vec_model = KeyedVectors.load_word2vec_format(vecfile, binary=True)
     
     for child in root:
         id_node = child.find("record_id")
@@ -72,10 +74,15 @@ def extract_features(filename, relation_set='exact', pairtype='ee', vecfile=None
             for x in range(len(pair_labels)):
                 labels.append(pair_labels[x])
                 ids.append(rec_id)
-                feats = pair_features(pairs[x], pairtype, vec_model)
+                feats, vec_feats = pair_features(pairs[x], pairtype, vec_model)
                 features.append(feats)
-    for x in range(10):
+                if vec_feats is not None:
+                    vec_features.append(vec_feats)
+
+    # Print the first few feature vectors as a sanity check
+    for x in range(2):
         print("features[", str(x), "]: ", str(features[x]))
+        print("vec_features[", str(x), "]: len ", str(len(vec_features[x])))
         print("labels[", str(x), "]: ", str(labels[x]))
 
     # Normalize features
@@ -98,6 +105,17 @@ def extract_features(filename, relation_set='exact', pairtype='ee', vecfile=None
     features_scaled = scale(features)
     print("features_scaled[0]: ", str(features_scaled[0]))
 
+    # Merge the two feature sets
+    features_final = []
+    if len(vec_features) > 0:
+        for z in range(len(vec_features)):
+            #feats_sc = []
+            #for item in features_scaled[z].tolist():
+            #    feats_sc.append(numpy.asscalar(item))
+            features_final.append(features_scaled[z].tolist() + vec_features[z])
+    else:
+        features_final = features_scaled
+
     # Encode the actual labels
     if train:
         global relationencoder
@@ -106,8 +124,8 @@ def extract_features(filename, relation_set='exact', pairtype='ee', vecfile=None
         print("labels: ", str(relationencoder.classes_))
     encoded_labels = relationencoder.transform(labels)
 
-    print("feature extraction took ", print_time(time.time()-starttime))
-    return ids, features_scaled, encoded_labels
+    print("feature extraction took ", tutil.print_time(time.time()-starttime))
+    return ids, features_final, encoded_labels
 
 ''' Extract time-event pairs from xml data
 '''
@@ -166,14 +184,27 @@ def extract_pairs(xml_node, relation_set='exact', pairtype='ee'):
                     pair = pairs[x]
                     if pair[0].attrib['eid'] == event_id and pair[1].attrib['tid'] == time_id:
                         labels[x] = mapped_type
-    # TODO: undersample the NONE examples
+    # Undersample the NONE examples
+    #print("undersampling NONE class: ", str(undersample))
+    index = 0
+    while index < len(labels):
+        if labels[index] == 'NONE':
+            #r = 0 # Temp for no NONE class
+            r = numpy.random.random() # undersampling probability
+            if r < undersample:
+                del labels[index]
+                del pairs[index]
+                index = index-1
+        index = index+1
 
     return pairs, labels
 
 def pair_features(pair, pairtype, vec_model=None):
     feats = []
+    vec_feats = None
     event = pair[0]
-    
+
+    # Structured features
     event_feats = event_features(event, vec_model)
     event_position = event.attrib['position']
 
@@ -193,16 +224,19 @@ def pair_features(pair, pairtype, vec_model=None):
         second_position = time.attrib['position']
         second_feats = [time_type, time_func, time_doc]
 
-        if vec_model is not None:
-            time_emb = word_vector_features(time, vec_model)
-            second_feats = second_feats + time_emb
+    # Word embedding features
+    if vec_model is not None:
+        first_emb = word_vector_features(event, vec_model)
+        second_emb = word_vector_features(pair[1], vec_model)
+        vec_feats = first_emb + second_emb
 
     distance = math.fabs(int(event_position) - int(second_position))
     feats = [distance] + event_feats + second_feats
     #print("feats: ", str(feats))
-    return feats
+    return feats, vec_feats
 
 def event_features(event, vec_model=None):
+    second_feats = None
     event_class = unk
     if 'class' in event.attrib:
         event_class = event.attrib['class']
@@ -218,27 +252,41 @@ def event_features(event, vec_model=None):
     feats = [event_class, event_tense, event_polarity, event_pos] 
 
     # Word embeddings
-    if vec_model is not None:
-        event_emb = word_vector_features(event, vec_model)
-        feats = feats + event_emb
+    #if vec_model is not None:
+    #    second_feats = word_vector_features(event, vec_model)
+    #    feats = feats + event_emb
 
     return feats
+
+def get_relation_classes():
+    if relationencoder is None:
+        print("WARNING: relationencoder is None")
+        return None
+    else:
+        return relationencoder.classes_
 
 ''' Get the average word embedding for the text of an element
     returns: a 1xd vector where d is the embedding dim
 '''
 def word_vector_features(element, vec_model):
     text = element.text
-    words = text.strip()split(' ')
+    words = text.strip().split(' ')
 
     if len(words) == 1:
         word = words[0]
-        return word2vec.get(word, vec_model)
+        return get_vec(word, vec_model)
     else:
         vecs = []
         for word in words:
-            vecs.append(word2vec.get(word, vec_model))
+            vecs.append(get_vec(word, vec_model))
         avg_vec = torch.mean(torch.Tensor(vecs), 0).tolist()
         return avg_vec
+
+def get_vec(word, model):
+    dim = model.vector_size
+    if word in model: #.wv.vocab:
+        return model[word].tolist()
+    else:
+        return data_util3.zero_vec(dim)
 
 if __name__ == "__main__":main()
