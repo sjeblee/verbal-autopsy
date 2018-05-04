@@ -20,7 +20,7 @@ from keras.layers.recurrent import SimpleRNN
 from keras.layers.wrappers import Bidirectional
 from keras.utils.np_utils import to_categorical
 from keras.utils import plot_model
-from numpy import array, int32
+from numpy import array, int32, float32
 from sklearn import metrics
 from sklearn import neighbors
 from sklearn import preprocessing
@@ -346,7 +346,8 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     typeencoder = preprocessing.LabelEncoder()
 
     # TEMP
-    hybrid = False
+    #if "keyword_clusters" in keys:
+    #    hybrid = False
 
     # Load the features
     if hybrid:
@@ -396,15 +397,15 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
             X = numpy.asarray(X)
         else:
             print "creating a new neural network model"
-            embedding_dim = 200
+            embedding_dim = 100
             #if "keyword_clusters" in keys:
             #    num_nodes = 100
             #    model, cnn_model, X, Y = model_library.rnn_keyword_model(X, Y, num_nodes, arg_activation, arg_model, keywords=X2, num_epochs=15)
-            if ',' in arg_model:
+            if '_' in arg_model:
                 num_nodes = 100
                 Y_arrays = [to_categorical(Y[0]), numpy.asarray(Y[1])]
-                #Y_arrays = [to_categorical(Y)]
-                model, X, Y = model_library.stacked_model(X, Y_arrays, num_nodes, arg_activation, models=arg_model)
+                #Y_arrays = [numpy.asarray(Y[1])]
+                model, X, Y = model_library.stacked_model(X, Y_arrays, num_nodes, arg_activation, models=arg_model, loss_func='mean_squared_error')
             elif arg_model == "nn":
                 if len(X) == 0 and len(X2) > 0:
                     X = X2
@@ -412,11 +413,15 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
                 model, X, Y = model_library.nn_model(X, Y, num_nodes, 'relu')
             elif arg_model == "rnn" or arg_model == "lstm" or arg_model == "gru":
                 num_nodes = 100
+                #Y = to_categorical(Y)
+                model, X, Y = model_library.rnn_model(X, Y, num_nodes, arg_activation, arg_model, X2=X2)
+            elif arg_model == "rnn_cnn":
                 Y = to_categorical(Y)
+                num_nodes = 100
                 model, X, Y = model_library.rnn_cnn_model(X, Y, num_nodes, arg_activation, arg_model, X2=X2)
             elif arg_model == "cnn":
                 Y = to_categorical(Y)
-                model, X, Y = create_cnn_model(X, Y, embedding_dim, hybrid=hybrid, X2=X2)
+                model, X, Y = model_library.cnn_model(X, Y, X2=X2)
             elif arg_model == "filternn":
                 num_nodes = 56
                 Y = to_categorical(Y)
@@ -449,7 +454,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     print "training took " + str(etime - stime) + " s"
 
     # Test
-    if ',' in arg_model:
+    if '_' in arg_model:
         testids, testlabels, predictedlabels = test_multi(arg_model, model, arg_test_feats)
     else:
         testids, testlabels, predictedlabels = test(arg_model, model, arg_test_feats, anova_filter, hybrid, kw_cnn=cnn_model)
@@ -523,17 +528,20 @@ def run_joint(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_res
         #print "hybrid not supported for joint model!"
         #Y_adult = preprocess(arg_train_feats[0], trainids, trainlabels, X_adult, Y_adult, vec_keys, True)
         #preprocess(arg_train_feats, [], [], X2, [], point_keys, True)
-    Y_adult = preprocess(arg_train_feats[0], trainids_adult, trainlabels_adult, X_adult, Y_adult, keys, 'adult', True)
-    Y_child = preprocess(arg_train_feats[1], trainids_child, trainlabels_child, X_child, Y_child, keys, 'child', True)
-    Y_neonate = preprocess(arg_train_feats[2], trainids_neonate, trainlabels_neonate, X_neonate, Y_neonate, keys, 'neonate', True)
+    Y_adult = preprocess(arg_train_feats[0], trainids_adult, trainlabels_adult, X_adult, Y_adult, keys, rec_type='adult', trainlabels=True)
+    Y_child = preprocess(arg_train_feats[1], trainids_child, trainlabels_child, X_child, Y_child, keys, rec_type='child', trainlabels=True)
+    Y_neonate = preprocess(arg_train_feats[2], trainids_neonate, trainlabels_neonate, X_neonate, Y_neonate, keys, rec_type='neonate', trainlabels=True)
     if hybrid:
-        preprocess(arg_train_feats[0], [], [], X2_adult, [], point_keys, 'adult',  True)
-        preprocess(arg_train_feats[1], [], [], X2_child, [], point_keys, 'child', True)
-        preprocess(arg_train_feats[2], [], [], X2_neonate, [], point_keys, 'neonate', True)
+        preprocess(arg_train_feats[0], [], [], X2_adult, [], point_keys, rec_type='adult', trainlabels=True)
+        preprocess(arg_train_feats[1], [], [], X2_child, [], point_keys, rec_type='child', trainlabels=True)
+        preprocess(arg_train_feats[2], [], [], X2_neonate, [], point_keys, rec_type='neonate', trainlabels=True)
         
     print "adult X: " + str(len(X_adult)) + " Y: " + str(len(Y_adult))
     print "child X: " + str(len(X_child)) + " Y: " + str(len(Y_child))
     print "neonate X: " + str(len(X_neonate)) + " Y: " + str(len(Y_neonate))
+    #Y_adult = to_categorical(Y_adult)
+    #Y_child = to_categorical(Y_child)
+    #Y_neonate = to_categorical(Y_neonate)
     #print "X2: " + str(len(X2))
     #outfile = open('filternn_ids', 'w')
     #outfile.write(str(trainids))
@@ -564,7 +572,7 @@ def run_joint(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_res
     embedding_dim = 200 
         #if arg_model == "nn":
         #    model, X, Y = create_nn_model(X, Y, anova_function, num_feats, num_nodes, 'relu')
-    if arg_model == "lstm" or arg_model == "gru" or arg_model == "rnn":
+    if arg_model == "lstm" or arg_model == "gru" or arg_model == "rnn" or arg_model=="cnn":
         num_nodes = 100
 
         # ADULT
@@ -574,8 +582,11 @@ def run_joint(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_res
         X2_pretrain = []
         if hybrid:
             X2_pretrain = [X2_child, X2_neonate]
-        model_adult, X_adult_out, Y_adult_out = model_library.rnn_model(X_adult, Y_adult, num_nodes, modelname=arg_model, X2=X2_adult, pretrainX=X_pretrain, pretrainY=Y_pretrain, pretrainX2=X2_pretrain, num_epochs=15)
-        testids_adult, testlabels_adult, predictedlabels_adult = test(arg_model, model_adult, arg_test_feats[0], hybrid, 'adult')
+        if arg_model == "cnn":
+            model_adult, X_adult_out, Y_adult_out = model_library.cnn_model(X_adult, to_categorical(Y_adult), X2=X2_adult, pretrainX=X_pretrain, pretrainY=Y_pretrain, pretrainX2=X2_pretrain, num_epochs=10)
+        else:
+            model_adult, X_adult_out, Y_adult_out = model_library.rnn_model(X_adult, Y_adult, num_nodes, modelname=arg_model, X2=X2_adult, pretrainX=X_pretrain, pretrainY=Y_pretrain, pretrainX2=X2_pretrain, num_epochs=10)
+        testids_adult, testlabels_adult, predictedlabels_adult = test(arg_model, model_adult, arg_test_feats[0], hybrid=hybrid, rec_type='adult')
 
         # CHILD
         print "CHILD"
@@ -584,8 +595,11 @@ def run_joint(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_res
         X2_pretrain = []
         if hybrid:
             X2_pretrain = [X2_adult, X2_neonate]
-        model_child, X_child_out, Y_child_out = model_library.rnn_model(X_child, Y_child, num_nodes, modelname=arg_model, X2=X2_child, pretrainX=X_pretrain, pretrainY=Y_pretrain, pretrainX2=X2_pretrain, num_epochs=15)
-        testids_child, testlabels_child, predictedlabels_child = test(arg_model, model_child, arg_test_feats[1], hybrid, 'child')
+        if arg_model == "cnn":
+             model_child, X_child_out, Y_child_out = model_library.cnn_model(X_child, to_categorical(Y_child), X2=X2_child, pretrainX=X_pretrain, pretrainY=Y_pretrain, pretrainX2=X2_pretrain, num_epochs=15)
+        else:
+             model_child, X_child_out, Y_child_out = model_library.rnn_model(X_child, Y_child, num_nodes, modelname=arg_model, X2=X2_child, pretrainX=X_pretrain, pretrainY=Y_pretrain, pretrainX2=X2_pretrain, num_epochs=15)
+        testids_child, testlabels_child, predictedlabels_child = test(arg_model, model_child, arg_test_feats[1], hybrid=hybrid, rec_type='child')
         
         # NEONATE
         print "NEONATE"
@@ -594,8 +608,11 @@ def run_joint(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_res
         X2_pretrain = []
         if hybrid:
             X2_pretrain = [X2_adult, X2_child]
-        model_neonate, X_neonate_out, Y_neonate_out = model_library.rnn_model(X_neonate, Y_neonate, num_nodes, modelname=arg_model, X2=X2_neonate, pretrainX=X_pretrain, pretrainY=Y_pretrain, pretrainX2=X2_pretrain, num_epochs=15)
-        testids_neonate, testlabels_neonate, predictedlabels_neonate = test(arg_model, model_neonate, arg_test_feats[2], hybrid, 'neonate')
+        if arg_model == "cnn":
+            model_neonate, X_neonate_out, Y_neonate_out = model_library.cnn_model(X_neonate, to_categorical(Y_neonate), X2=X2_neonate, pretrainX=X_pretrain, pretrainY=Y_pretrain, pretrainX2=X2_pretrain, num_epochs=15)
+        else:
+            model_neonate, X_neonate_out, Y_neonate_out = model_library.rnn_model(X_neonate, Y_neonate, num_nodes, modelname=arg_model, X2=X2_neonate, pretrainX=X_pretrain, pretrainY=Y_pretrain, pretrainX2=X2_pretrain, num_epochs=15)
+        testids_neonate, testlabels_neonate, predictedlabels_neonate = test(arg_model, model_neonate, arg_test_feats[2], hybrid=hybrid, rec_type='neonate')
 
         #elif arg_model == "cnn":
         #    model, X, Y = create_cnn_model(X, Y, embedding_dim, hybrid=hybrid, X2=X2)
@@ -744,9 +761,12 @@ def test_multi(model_type, model, testfile, rec_type=None):
     #    testX2 = numpy.asarray(testX2)
     #    #if "keyword_clusters" not in keys:
     #    inputs.append(testX2)
+
     predictedY = model.predict(inputs)
     results = map_back(predictedY[0])
     kw_pred = predictedY[1]
+    #kw_pred = model.predict(inputs)
+    print "kw_pred: " + str(len(kw_pred))
 
     # Score keywords from keyword model
     kw_pred = data_util.map_to_multi_hot(kw_pred)
@@ -757,12 +777,12 @@ def test_multi(model_type, model, testfile, rec_type=None):
 
     # Decode labels
     kw_pred_labels = data_util.decode_multi_hot(kw_pred)
-    #print "kw_pred_labels[0]: " + str(kw_pred_labels[0])
-    clusterfile = "/u/sjeblee/research/va/data/datasets/mds+rct/train_adult_cat_spell.clusters_km2"
-    kw_pred_text = cluster_keywords.interpret_clusters(kw_pred_labels, clusterfile)
-    kw_true_text = cluster_keywords.interpret_clusters(data_util.decode_multi_hot(testY2), clusterfile)
-    print "kw_pred_text[0]: " + str(kw_pred_text[0])
-    print "kw_true_text[0]: " + str(kw_true_text[0])
+    print "kw_pred_labels[0]: " + str(kw_pred_labels[0])
+    #clusterfile = "/u/sjeblee/research/va/data/datasets/mds+rct/train_adult_cat_spell.clusters_km2"
+    #kw_pred_text = cluster_keywords.interpret_clusters(kw_pred_labels, clusterfile)
+    #kw_true_text = cluster_keywords.interpret_clusters(data_util.decode_multi_hot(testY2), clusterfile)
+    #print "kw_pred_text[0]: " + str(kw_pred_text[0])
+    #print "kw_true_text[0]: " + str(kw_true_text[0])
 
     # Score results against nearest neighbor classifier
     print "Scores for 1 class (0.1 cutoff):"
@@ -789,6 +809,7 @@ def test_multi(model_type, model, testfile, rec_type=None):
     print "testY: " + str(testY)
     print "results: " + str(results)
     return testids, testlabels, predictedlabels
+    #return testids, testlabels, testlabels
 
 def create_nn_model(X, Y, anova_function, num_feats, num_nodes, act):
     X = numpy.asarray(X)
@@ -1219,12 +1240,14 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
 
     # Convert the keyword clusters to multi-hot vectors
     if len(kw_clusters) > 0:
-        if Y2_labels == 'keyword_clusters':
+        use_multi_hot = True
+        #use_multi_hot = (Y2_labels == 'keyword_clusters')
+        if use_multi_hot:
             print "converting keyword clusters to multi-hot vectors"
-            cluster_feats = data_util.multi_hot_encoding(kw_clusters, 299)
+            cluster_feats = data_util.multi_hot_encoding(kw_clusters, 100)
             labels2 = cluster_feats
             #keys.remove("keyword_clusters")
-            extra_labels = True
+            #extra_labels = True
 
         else:
             # Convert keywords to cluster embeddings
@@ -1232,13 +1255,14 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
             clusterfile = "/u/sjeblee/research/va/data/datasets/mds+rct/train_adult_cat_spell.clusters_e2"
             vecfile = "/u/sjeblee/research/va/data/datasets/mds+rct/narr+ice+medhelp.vectors.100"
             cluster_feats = cluster_keywords.cluster_embeddings(kw_clusters, clusterfile, vecfile)
-
-            # Update keys and features
-            for i in range(len(x)):
-                x[i] = x[i] + cluster_feats[i]
-            keys.remove("keyword_clusters")
-            keys.append("keyword_clusters")
             vec_feats = True
+
+        # Update keys and features
+        for i in range(len(x)):
+            x[i] = x[i] + cluster_feats[i]
+        keys.remove("keyword_clusters")
+        keys.append("keyword_clusters")
+        #vec_feats = True
 
     # Convert ICD codes to numerical labels
     labenc = labelencoder

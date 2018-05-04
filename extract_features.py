@@ -93,7 +93,7 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
 
     # LDA feature params
     global num_topics
-    num_topics = 200
+    num_topics = 100
 
     global translate_table
     not_letters_or_digits = u'!"#%\'()*+,-./:;<=>?@[\]^_`{|}~'
@@ -111,7 +111,7 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
                 stopwords.append(line.strip())                                    
 
     global tfidfVectorizer
-    global ldaModel
+    global lda_model
 
     keys = extract(arg_train_in, arg_train_out, None, stem, lemma, arg_element, arg_vecfile=vecfile)
     print "dict_keys: " + str(keys)
@@ -264,6 +264,9 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
         elif kw_count in featurenames or kw_tfidf in featurenames:
             documents = keywords
             print "keywords: " + str(len(keywords))
+        count_feats = False
+        if narr_count in featurenames or narr_tfidf in featurenames or kw_count in featurenames:
+            count_feats = True
 
         # Create count matrix
         global count_vectorizer
@@ -271,7 +274,8 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
             print "training count_vectorizer"
             count_vectorizer = sklearn.feature_extraction.text.CountVectorizer(ngram_range=(min_ngram,max_ngram),stop_words=stopwords)
             count_vectorizer.fit(documents)
-            dict_keys = dict_keys + count_vectorizer.get_feature_names()
+            if count_feats:
+                dict_keys = dict_keys + count_vectorizer.get_feature_names()
         print "transforming data with count_vectorizer"
         count_matrix = count_vectorizer.transform(documents)
         matrix_keys = count_vectorizer.get_feature_names()
@@ -282,12 +286,13 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
         out_matrix.close()
 
         # Add count features to the dictionary
-        for x in range(len(matrix)):
-            feat = matrix[x]
-            for i in range(len(matrix_keys)):
-                key = matrix_keys[i]
-                val = count_matrix[x,i]
-                feat[key] = val
+        if count_feats:
+            for x in range(len(matrix)):
+                feat = matrix[x]
+                for i in range(len(matrix_keys)):
+                    key = matrix_keys[i]
+                    val = count_matrix[x,i]
+                    feat[key] = val
 
         # Convert counts to TFIDF
         if (narr_tfidf in featurenames) or (kw_tfidf in featurenames):
@@ -317,11 +322,11 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
 
         # LDA topic modeling features
         if lda in featurenames:
-            global ldaModel
+            global lda_model
             if train:
-                ldaModel = LatentDirichletAllocation(n_topics=num_topics)
-                ldaModel.fit(count_matrix)
-            lda_matrix = ldaModel.transform(count_matrix)
+                lda_model = LatentDirichletAllocation(n_topics=num_topics)
+                lda_model.fit(count_matrix)
+            lda_matrix = lda_model.transform(count_matrix)
             for t in range(0,num_topics):
                 dict_keys.append("lda_topic_" + str(t))
             for x in range(len(matrix)):
@@ -329,10 +334,29 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
                     val = lda_matrix[x][y]
                     matrix[x]["lda_topic_" + str(y)] = val
 
-            # TODO: Print LDA topics
+            # Save LDA topics
+            vocab = count_vectorizer.get_feature_names()
+            topic_words = {}
+            for topic, comp in enumerate(lda_model.components_):
+                    # for the n-dimensional array "arr":
+                    # argsort() returns a ranked n-dimensional array of arr, call it "ranked_array"
+                    # which contains the indices that would sort arr in a descending fashion
+                    # for the ith element in ranked_array, ranked_array[i] represents the index of the
+                    # element in arr that should be at the ith index in ranked_array
+                    # ex. arr = [3,7,1,0,3,6]
+                    # np.argsort(arr) -> [3, 2, 0, 4, 5, 1]
+                    # word_idx contains the indices in "topic" of the top num_top_words most relevant
+                    # to a given topic ... it is sorted ascending to begin with and then reversed (desc. now)
+                    word_idx = numpy.argsort(comp)[::-1]
+                    # store the words most relevant to the topic
+                    topic_words[topic] = [vocab[i] for i in word_idx]
+            print "writing lda topics to file"
+            out_lda = open(infile + ".lda_topics", "w")
+            out_lda.write(str(topic_words))
+            out_lda.close()
 
     # WORD2VEC features
-    elif narr_vec in featurenames or event_vec in featurenames or event_seq in featurenames or kw_vec in featurenames:
+    if narr_vec in featurenames or event_vec in featurenames or event_seq in featurenames or kw_vec in featurenames:
         feat_name = narr_vec
         text = narratives
         if event_vec in featurenames:
@@ -346,7 +370,7 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
         matrix, dict_keys = vector_features(feat_name, text, matrix, dict_keys, arg_vecfile)
 
     # narr_seq for RNN
-    elif narr_seq in featurenames:
+    if narr_seq in featurenames:
         global vocab_size, max_seq_len
         if train:
             dict_keys.append(narr_seq)
@@ -553,7 +577,7 @@ def get_narrs(filename, element="narrative"):
             # Uncomment for removing punctuation
             narr_words = [w.strip() for w in narr_string.lower().translate(string.maketrans("",""), string.punctuation).split(' ')]
             narr_string = " ".join(narr_words)
-            print narr_string.strip().lower()
+            #print narr_string.strip().lower()
             narratives.append(narr_string.strip().lower())
     return narratives
 

@@ -35,8 +35,8 @@ numpy.set_printoptions(threshold=numpy.inf)
     returns: the model and the modified X and Y arrays
 '''
 def nn_model(X, Y, num_nodes, act, num_epochs=10):
-    X = numpy.asarray(X)
-    Y = to_categorical(Y)
+    #X = numpy.asarray(X)
+    #Y = to_categorical(Y)
     print "X.shape: " + str(X.shape)
     print "Y.shape: " + str(Y.shape)
 
@@ -58,9 +58,10 @@ def nn_model(X, Y, num_nodes, act, num_epochs=10):
     Y: a list of training labels
 '''
 def rnn_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', dropout=0.1, X2=[], pretrainX=[], pretrainY=[], pretrainX2=[], initial_states=None, num_epochs=15, loss_func='categorical_crossentropy'):
-    #Y = to_categorical(Y)
+    Y = to_categorical(Y)
     X = numpy.asarray(X)
     print "train X shape: " + str(X.shape)
+    print "train Y shape: " + str(Y.shape)
     embedding_size = X.shape[-1]
     max_seq_len = X.shape[1]
     inputs = []
@@ -136,10 +137,10 @@ def rnn_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', dropout=0
 
 ''' Create and train a CNN model
     Hybrid features supported - pass structured feats as X2
-    Does NOT support joint training yet
+    Joint training supported - pass pretrainX, pretrainY and pretrainX2
     returns: the CNN model
 '''
-def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, return_layer=False, loss_func='categorical_crossentropy'):
+def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, return_layer=False, loss_func='categorical_crossentropy', pretrainX=[], pretrainY=[], pretrainX2=[],):
     #Y = to_categorical(Y)
     X = numpy.asarray(X)
     embedding_size = X.shape[-1]
@@ -151,6 +152,10 @@ def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, return_
     inputs = []
     input_arrays = [X]
     hybrid = False
+    pretrain = False
+    if len(pretrainX) > 0 and len(pretrainY) > 0:
+        pretrain = True
+        print "Using pretraining"
 
     # Keras functional API with attention
     # Input layers
@@ -164,7 +169,7 @@ def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, return_
         input_arrays.append(X2)
         input2 = Input(shape=(X2.shape[1],))
         inputs.append(input2)
-        ff = Dense(10, activation='relu')(input2)
+        ff = Dense(100, activation='relu')(input2)
 
     # Attention
     #attn_out = attention(inputs, max_seq_len, embedding_size)
@@ -186,6 +191,22 @@ def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, return_
     if hybrid:
         #print "ff shape: " + str(ff.output_shape)
         merged = concatenate([merged, ff], axis=-1)
+
+    if pretrain:
+        print "pretraining..."
+        for k in range(len(pretrainX)):
+            trainX = numpy.asarray(pretrainX[k])
+            trainY = to_categorical(pretrainY[k])
+            pretrain_input_arrays = [trainX]
+            pretrain_inputs = [Input(shape=input_shape)]
+            if hybrid:
+                trainX2 = numpy.asarray(pretrainX2[k])
+                pretrain_input_arrays.append(trainX2)
+
+            prediction = Dense(trainY.shape[1], activation='softmax')(merged)
+            pre_nn = Model(inputs=inputs, outputs=prediction)
+            pre_nn.compile(optimizer='rmsprop', loss=loss_func, metrics=['accuracy'])
+            pre_nn.fit(pretrain_input_arrays, trainY, epochs=num_epochs)
 
     # Prediction
     prediction = Dense(Y.shape[1], activation='softmax')(merged)
@@ -437,7 +458,7 @@ def rnn_cnn_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', dropo
     X: a list of training data
     Y: a list of numpy arrays of training labels
 '''
-def stacked_model(X, Y_arrays, num_nodes, activation='sigmoid', models='gru,cnn', dropout=0.1, pretrainX=[], pretrainY=[], keywords=[], initial_states=None, windows=[1,2,3,4,5], num_epochs=15):
+def stacked_model(X, Y_arrays, num_nodes, activation='sigmoid', models='gru_cnn', dropout=0.1, pretrainX=[], pretrainY=[], keywords=[], initial_states=None, windows=[1,2,3,4,5], num_epochs=15, loss_func='categorical_crossentropy'):
     print "stacked model: " + models
     X = numpy.asarray(X)
     print "train X shape: " + str(X.shape)
@@ -464,11 +485,11 @@ def stacked_model(X, Y_arrays, num_nodes, activation='sigmoid', models='gru,cnn'
     layer_in = input1
     layer_shape = input_shape
     last_out = None
-    for modelname in models.split(','):
+    for modelname in models.split('_'):
         if modelname == 'rnn':
             layer = SimpleRNN(num_nodes, return_sequences=True, return_state=False)
             layer_out = layer(layer_in)
-        if modelname == 'gru':
+        elif modelname == 'gru':
             layer = GRU(num_nodes, return_sequences=True, return_state=False)
             layer_out = layer(layer_in)
             print "GRU layer: " + str(num_nodes) + " nodes, shape: " + str(layer.output_shape)
@@ -489,23 +510,31 @@ def stacked_model(X, Y_arrays, num_nodes, activation='sigmoid', models='gru,cnn'
                 print "conv: " + str(conv_layer.output_shape) + " pool: " + str(max_pool_layer.output_shape)
             layer_out = concatenate(conv_outputs, axis=-1)
 
-        drop = Dropout(dropout)
-        dropout_out = drop(layer_out)
-        layer_shape = drop.output_shape
-        print "Dropout layer shape: " + str(layer_shape)
-        layer_in = dropout_out
+        if modelname.strip() != "":
+            drop = Dropout(dropout)
+            dropout_out = drop(layer_out)
+            layer_shape = drop.output_shape
+            print "Dropout layer shape: " + str(layer_shape)
+            layer_in = dropout_out
 
     # GRU flattening
     #layer_in = Flatten()(layer_in)
 
     # Prediction layers
     output_list = []
+    num = 0
+    loss_map = {}
+    loss_weight_map = {}
     for Y in Y_arrays:
         print "Y shape: " + str(Y.shape)
-        dense_layer = Dense(Y.shape[-1], activation='softmax')
-        prediction = dense_layer(layer_in)
+        layer_name = "output" + str(num)
+        num = num+1
+        dense_layer = Dense(Y.shape[-1], activation='softmax', name=layer_name)
+        prediction = dense_layer(layer_out)
         print "Dense: input: " + str(dense_layer.input_shape) + " output: " + str(dense_layer.output_shape)
         output_list.append(prediction)
+        loss_map[layer_name] = loss_func
+        loss_weight_map[layer_name] = 1.
 
     #if pretrain:
     #    print "pretraining..."
@@ -525,7 +554,10 @@ def stacked_model(X, Y_arrays, num_nodes, activation='sigmoid', models='gru,cnn'
 
     print "training with main data..."
     nn = Model(inputs=inputs, outputs=output_list)
-    nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
+    if len(output_list) == 2:
+        nn.compile(optimizer='rmsprop', metrics=['accuracy'], loss={'output0': 'categorical_crossentropy', 'output1': 'mean_squared_error'}, loss_weights={'output0': 1., 'output1': .1})
+    else:
+        nn.compile(optimizer='rmsprop', metrics=['accuracy'], loss=loss_func)
     nn.fit(input_arrays, Y_arrays, epochs=num_epochs)
 
     nn.summary()

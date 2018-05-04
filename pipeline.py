@@ -5,6 +5,7 @@ import sys
 sys.path.append('./temporal')
 sys.path.append('./keywords')
 import cluster_keywords
+import data_util
 import extract_features
 import heidel_tag
 import medttk_tag
@@ -149,40 +150,47 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
     models = arg_models.split(',')
     dataloc = "/u/sjeblee/research/va/data/datasets"
     vecfile = None
+    joint_training = False
+    if arg_train == 'all':
+        joint_training = True
 
     # Records should be one per line, no xml header or footer
     dset = arg_dataset
-    datafile_child = dataloc + "/" + dset + "/all_child_cat.txt"
-    datafile_neo = dataloc + "/" + dset + "/all_neonate_cat.txt"
-    datafile_adult = dataloc + "/" + dset + "/all_adult_cat.txt"
-    datafile = dataloc + "/" + dset + "/all_" + arg_train + "_cat.txt"
-    data = {}
-    datasets = []
+    datafile_child = dataloc + "/" + dset + "/all_child_cat_spell.txt"
+    datafile_neo = dataloc + "/" + dset + "/all_neonate_cat_spell.txt"
+    datafile_adult = dataloc + "/" + dset + "/all_adult_cat_spell.txt"
+    datafile = dataloc + "/" + dset + "/all_" + arg_train + "_cat_spell.txt"
     train_extra = []
 
     #if "spell" in arg_preprocess:
     # TODO: check for spell version if spell in preprocessing
 
-    xml_header = '<dataroot xmlns:od="urn:schemas-microsoft-com:officedata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="Adult_Anonymous_23Sept2016.xsd" generated="2016-09-23T12:57:36">'
-    xml_footer = '</dataroot>'
+    xml_header = '<root>'
+    xml_footer = '</root>'
 
     # Set up file paths
-    datadir = "/u/sjeblee/research/va/data/" + arg_name
+    datadir = "/nbb/sjeblee/va/data/" + arg_name
+    #datadir = "/u/sjeblee/research/va/data/" + arg_name
     datapath = datadir + "/" + arg_dataset
-    #create_datasets = True
+    create_datasets = True
     if os.path.exists(datapath):
         print "Data files already exist, re-using them"
         create_datasets = False
     else:
         os.mkdir(datapath)
 
-    create_datasets = False
+    #create_datasets = False
     # TODO: If dirs exist already, don't recreate the datasets, just re-run the models that don't have output
     if create_datasets:
+        main_files = []
+        if joint_training:
+            main_files = [datafile_adult, datafile_child, datafile_neo]
+        else:
+            main_files = [datafile]
         train_extra = []
         use_extra_data = False
         # Extra training data
-        if use_extra_data:
+        if use_extra_data and not joint_training:
             print "Loading extra training data..."
             if arg_train == "adult":
                 train_extra = train_extra + get_recs(datafile_child)
@@ -195,102 +203,143 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
 
             print "train_extra: " + str(len(train_extra))
 
-        # Read data file
-        print "Reading main data file..."
-        total = 0
-        with open(datafile, 'r') as f:
-            for line in f:
-                #print "line: " + line
-                cat = 15
-                child = etree.fromstring(line)
-                node = child.find(arg_labels)
-                if node != None:
-                    cat = node.text
-                if not cat in data:
-                    data[cat] = []
-                data[cat].append(line.strip())
-                total = total + 1
-        print "Records in main data file: " + str(total)
+        for filename in main_files:
+            # Read data file
+            print "Reading main data file: " + filename
+            data = {}
+            datasets = []
+            total = 0
+            with open(filename, 'r') as f:
+                for line in f:
+                    #print "line: " + line
+                    cat = None
+                    child = etree.fromstring(line)
+                    node = child.find(arg_labels)
+                    if node != None:
+                        cat = node.text
+                    if not cat in data:
+                        data[cat] = []
+                    if cat is not None:
+                        data[cat].append(line.strip())
+                        total = total + 1
+            print "Records in main data file: " + str(total)
 
-        # Determine how many records we need from each category
-        num = {}
-        for category in data:
-            recs = data[category]
-            n = len(recs)/10
-            shuffle(data[category])
-            if n == 0:
-                n = 1
-            num[category] = n
-        print "Num of recs from each cat: " + str(num)
-
-        for x in range(10):
-            # Construct datasets
-            print "Constructing dataset " + str(x)
-            recset = []
+            # Determine how many records we need from each category
+            num = {}
             for category in data:
-                numrecs = num[category]
+                recs = data[category]
+                n = len(recs)/10
+                shuffle(data[category])
+                if n == 0:
+                    n = 1
+                num[category] = n
+            print "Num of recs from each cat: " + str(num)
 
-                # Add recs to the set and remove from original list
-                if len(data[category]) > numrecs:
-                    recset = recset + data[category][0:numrecs]
-                    del data[category][0:numrecs]
-                elif len(data[category]) > 0:
-                    recset = recset + data[category]
-                    data[category] = []
+            for x in range(10):
+                # Construct datasets
+                print "Constructing dataset " + str(x)
+                recset = []
+                for category in data:
+                    numrecs = num[category]
+
+                    # Add recs to the set and remove from original list
+                    if len(data[category]) > numrecs:
+                        recset = recset + data[category][0:numrecs]
+                        del data[category][0:numrecs]
+                    elif len(data[category]) > 0:
+                        recset = recset + data[category]
+                        data[category] = []
+                    else:
+                        print "no recs added from cat " + str(category) + " because it was empty"
+                datasets.append(recset)
+                print "total recs: " + str(len(recset))
+
+            for z in range(10):
+                # Construct train and test sets
+                testset = datasets[z]
+                trainset = train_extra
+                if z > 0:
+                    for u in range(0, z):
+                        trainset = trainset + datasets[u]
+                if z < 9:
+                    for v in range(z+1, 10):
+                        trainset = trainset + datasets[v]
+
+                shuffle(trainset)
+                shuffle(testset)
+
+                print "Train: " + str(len(trainset))
+                print "Test: " + str(len(testset))
+
+                # Write train and test sets to file
+                if joint_training:
+                    if 'adult' in filename:
+                        trainname = "adult_" + str(z)
+                    elif 'child' in filename:
+                        trainname = "child_" + str(z)
+                    elif 'neonate' in filename:
+                        trainname = "neonate_" + str(z)
                 else:
-                    print "no recs added from cat " + str(category) + " because it was empty"
-            datasets.append(recset)
-            print "total recs: " + str(len(recset))
+                    trainname = arg_train + "_" + str(z)
+                trainfile = datapath + "/train_" + trainname +  "_cat.xml"
+                testfile = datapath + "/test_" + trainname + "_cat.xml"
+                outfile = open(trainfile, 'w')
+                outfile.write(xml_header + "\n")
+                for item in trainset:
+                    outfile.write(item + "\n")
+                outfile.write(xml_footer + "\n")
+                outfile.close()
 
-        for z in range(10):
-            # Construct train and test sets
-            testset = datasets[z]
-            trainset = train_extra
-            if z > 0:
-                for u in range(0, z):
-                    trainset = trainset + datasets[u]
-            if z < 9:
-                for v in range(z+1, 10):
-                    trainset = trainset + datasets[v]
-
-            shuffle(trainset)
-            shuffle(testset)
-
-            print "Train: " + str(len(trainset))
-            print "Test: " + str(len(testset))
-
-            # Write train and test sets to file
-            trainname = arg_train + "_" + str(z)
-            trainfile = datapath + "/train_" + trainname +  "_cat.xml"
-            testfile = datapath + "/test_" + trainname + "_cat.xml"
-            outfile = open(trainfile, 'w')
-            outfile.write(xml_header + "\n")
-            for item in trainset:
-                outfile.write(item + "\n")
-            outfile.write(xml_footer + "\n")
-            outfile.close()
-
-            outfile2 = open(testfile, 'w')
-            outfile2.write(xml_header + "\n")
-            for item in testset:
-                outfile2.write(item + "\n")
-            outfile2.write(xml_footer + "\n")
-            outfile2.close()
+                outfile2 = open(testfile, 'w')
+                outfile2.write(xml_header + "\n")
+                for item in testset:
+                    outfile2.write(item + "\n")
+                outfile2.write(xml_footer + "\n")
+                outfile2.close()
 
     # Run models
-    for z in range(10):
+    for z in range(9, 10):
         trainname = arg_train + "_" + str(z)
+        if joint_training:
+            trainname = 'all'
         vec_feats = "narr_vec" in arg_features or "kw_vec" in arg_features
-        vecfile = arg_vecfile
+        #vecfile = arg_vecfile
 
         # Retrain word vectors for this set
-        #if vec_feats:
-        #    print "Training word vectors..."
-        #    trainfile = datapath + "/train_" + trainname +  "_cat_spell.xml"
-        #    dim = 100
-        #    shouldstem = "stem" in arg_preprocess
-        #    vecfile = word2vec.run(trainfile, dim, shouldstem) #TODO: pass extra training files
-        
+        if vec_feats:
+            print "Training word vectors..."
+            if joint_training:
+                # Concatenate training files
+                trainfile = datapath + "/train_all_" + str(z) + "_cat.txt"
+                adult_xml = datapath + "/train_adult_" + str(z) + "_cat.xml"
+                adult_file = datapath + "/train_adult_" + str(z) + "_cat.txt"
+                child_xml = datapath + "/train_child_" + str(z) + "_cat.xml"
+                child_file = datapath + "/train_child_" + str(z) + "_cat.txt"
+                neonate_xml = datapath + "/train_neonate_" + str(z) + "_cat.xml"
+                neonate_file = datapath + "/train_neonate_" + str(z) + "_cat.txt"
+                data_util.xml_to_txt(adult_xml)
+                data_util.xml_to_txt(child_xml)
+                data_util.xml_to_txt(neonate_xml)
+                
+                filenames = [adult_file, child_file, neonate_file]
+                with open(trainfile, 'w') as outfile:
+                    outfile.write(xml_header + "\n")
+                    for fname in filenames:
+                        with open(fname) as infile:
+                            for line in infile:
+                                outfile.write(line)
+                    outfile.write(xml_footer + "\n")
+            else:
+                trainfile = datapath + "/train_" + trainname +  "_cat_spell.xml"
+
+            #TEMP for keyphrase crossval
+            trainfile = datapath + "/train_all_" + str(z) + "_cat.txt"
+
+            dim = 100
+            shouldstem = "stem" in arg_preprocess
+            name = "ice+medhelp+narr_all_" + str(z)
+            vecfile = word2vec.run(trainfile, dim, name, stem=shouldstem)
+
         for m in models:
             name = arg_name + "/" + m + "_" + str(z)
             modelname = m + "_" + str(z) + "_" + arg_train
@@ -316,11 +365,17 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
                 else:
                     n_feats = 350
             
-            run(m, modelname, trainname, trainname, arg_features, arg_featurename, name, arg_preprocess, arg_labels, arg_dev=False, arg_hyperopt=False, arg_dataset=dset, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes, dataloc=datadir, arg_vecfile=vecfile)
+            run(m, modelname, trainname, trainname, arg_features, arg_featurename, name, arg_preprocess, arg_labels, arg_dev=False, arg_hyperopt=False, arg_dataset=dset, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes, dataloc=datadir, arg_vecfile=vecfile, arg_crossval_num=z)
 
-def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, arg_dataloc, arg_vecfile):
-    trainname = arg_train + "_cat" # all, adult, child, or neonate
-    devname = arg_test + "_cat"
+def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, arg_dataloc, arg_vecfile, crossval_num=None):
+    if crossval_num is not None:
+        trainname = arg_train + "_" + str(crossval_num)
+        devname = arg_test + "_" + str(crossval_num)
+    else:
+        trainname = arg_train
+        devname = arg_test
+    trainname = trainname + "_cat" # all, adult, child, or neonate
+    devname = devname + "_cat"
     pre = arg_preprocess
     print "pre: " + pre
     labels = arg_labels
@@ -334,6 +389,8 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
     resultsloc="/u/sjeblee/research/va/data/" + arg_name
     heideldir="/u/sjeblee/tools/heideltime/heideltime-standalone"
     #scriptdir="/u/sjeblee/research/va/git/verbal-autopsy"
+    if crossval_num is not None:
+        resultsloc = "/nbb/sjeblee/va/data/" + arg_name
 
     # Setup
     if not os.path.exists(resultsloc):
@@ -441,7 +498,8 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
         trainname = trainname + "_" + sympname
 
     if "kwc" in pre:
-        kwname = "kwkm4"
+        numc = "100"
+        kwname = "kwkm" + str(numc)
         # TODO: move this setup to a function
         trainkw = dataloc + "/train_" + trainname + "_" + kwname + ".xml"
         devkw = ""
@@ -451,8 +509,9 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
             devkw = dataloc + "/test_" + devname + "_" + kwname + ".xml"
         if not os.path.exists(trainkw and devkw):
             print "Keyword clustering..."
-            clusterfile = trainkw + ".clusters"
-            cluster_keywords.run(trainkw, clusterfile, arg_vecfile, trainset, devset, devkw)
+            #clusterfile = trainkw + ".clusters"
+            clusterfile = dataloc + "/train_" + trainname + ".clusters_km100"
+            cluster_keywords.run(trainkw, clusterfile, arg_vecfile, trainset, devset, devkw, num_clusters=numc)
         trainset = trainkw
         devset = devkw
         devname = devname + "_" + kwname
@@ -485,18 +544,20 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
             extract_features.run(trainset, trainfeatures, devset, devfeatures, features, labels, stem, lemma, element)
     return trainfeatures, devfeatures, devresults
 
-def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev=True, arg_hyperopt=False, arg_dataset="mds", arg_n_feats=398, arg_anova="f_classif", arg_nodes=297, dataloc="/u/sjeblee/research/va/data/datasets", arg_rebalance="", arg_vecfile=None):
+def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev=True, arg_hyperopt=False, arg_dataset="mds", arg_n_feats=398, arg_anova="f_classif", arg_nodes=297, dataloc="/u/sjeblee/research/va/data/datasets", arg_rebalance="", arg_vecfile=None, arg_crossval_num=None):
 
     dataloc = dataloc + "/" + arg_dataset
     resultsloc="/u/sjeblee/research/va/data/" + arg_name
+    if arg_crossval_num is not None:
+        resultsloc = "/nbb/sjeblee/va/data/" + arg_name
     joint = False
     if arg_train == 'all' and arg_test == 'all':
         joint = True
 
     if joint:
-        trainfeatures_adult, devfeatures_adult, devresults_adult = setup(arg_modelname, 'adult', 'adult', arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, dataloc, arg_vecfile)
-        trainfeatures_child, devfeatures_child, devresults_child = setup(arg_modelname, 'child', 'child', arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, dataloc, arg_vecfile)
-        trainfeatures_neonate, devfeatures_neonate, devresults_neonate = setup(arg_modelname, 'neonate', 'neonate', arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, dataloc, arg_vecfile)
+        trainfeatures_adult, devfeatures_adult, devresults_adult = setup(arg_modelname, 'adult', 'adult', arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, dataloc, arg_vecfile, crossval_num=arg_crossval_num)
+        trainfeatures_child, devfeatures_child, devresults_child = setup(arg_modelname, 'child', 'child', arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, dataloc, arg_vecfile, crossval_num=arg_crossval_num)
+        trainfeatures_neonate, devfeatures_neonate, devresults_neonate = setup(arg_modelname, 'neonate', 'neonate', arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, dataloc, arg_vecfile, crossval_num=arg_crossval_num)
         trainfeatures = [trainfeatures_adult, trainfeatures_child, trainfeatures_neonate]
         devfeatures = [devfeatures_adult, devfeatures_child, devfeatures_neonate]
         devresults = [devresults_adult, devresults_child, devresults_neonate]

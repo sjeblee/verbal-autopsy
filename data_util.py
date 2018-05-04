@@ -6,7 +6,9 @@
 from lxml import etree
 from lxml.etree import tostring
 from itertools import chain
+from sklearn import metrics
 import numpy
+import operator
 import subprocess
 
 def clean_file(filename):
@@ -207,6 +209,23 @@ def remove_no_narrs(infile, outfile):
 
     print "Removed " + str(count) + " missing or empty narratives"
     tree.write(outfile)
+
+def score_majority_class(true_labs):
+    pred_labs = []
+    majority_lab = None
+    count_map = {}
+    for lab in true_labs:
+        if lab not in count_map.keys():
+            count_map[lab] = 0
+        count_map[lab] = count_map[lab]+1
+    majority_lab = max(count_map.iteritems(), key=operator.itemgetter(1))[0]
+    for lab in true_labs:
+        pred_labs = majority_lab
+    # Score
+    precision = metrics.precision_score(true_labs, pred_labs, average="weighted")
+    recall = metrics.recall_score(true_labs, pred_labs, average="weighted")
+    f1 = metrics.f1_score(true_labs, pred_labs, average="weighted")
+    return precision, recall, f1
 
 ''' Scores vector labels with binary values
     returns: avg precision, recall, f1 of 1 labels (not 0s)
