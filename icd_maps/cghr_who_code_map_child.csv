@@ -1,0 +1,1995 @@
+icd_code,cghr_code,cghr_label
+A37,1,Pneumonia
+H65,1,Pneumonia
+H66,1,Pneumonia
+H67,1,Pneumonia
+H68,1,Pneumonia
+H70,1,Pneumonia
+H71,1,Pneumonia
+J00,1,Pneumonia
+J01,1,Pneumonia
+J02,1,Pneumonia
+J03,1,Pneumonia
+J04,1,Pneumonia
+J05,1,Pneumonia
+J06,1,Pneumonia
+J07,1,Pneumonia
+J08,1,Pneumonia
+J09,1,Pneumonia
+J10,1,Pneumonia
+J11,1,Pneumonia
+J12,1,Pneumonia
+J13,1,Pneumonia
+J14,1,Pneumonia
+J15,1,Pneumonia
+J16,1,Pneumonia
+J17,1,Pneumonia
+J18,1,Pneumonia
+J19,1,Pneumonia
+J20,1,Pneumonia
+J21,1,Pneumonia
+J22,1,Pneumonia
+J32,1,Pneumonia
+J36,1,Pneumonia
+J85,1,Pneumonia
+J86,1,Pneumonia
+P23,1,Pneumonia
+U04,1,Pneumonia
+A00,2,Diarrhoea
+A01,2,Diarrhoea
+A02,2,Diarrhoea
+A03,2,Diarrhoea
+A04,2,Diarrhoea
+A05,2,Diarrhoea
+A06,2,Diarrhoea
+A07,2,Diarrhoea
+A08,2,Diarrhoea
+A09,2,Diarrhoea
+S00,7,Injuries
+S01,7,Injuries
+S02,7,Injuries
+S03,7,Injuries
+S04,7,Injuries
+S05,7,Injuries
+S06,7,Injuries
+S07,7,Injuries
+S08,7,Injuries
+S09,7,Injuries
+S10,7,Injuries
+S11,7,Injuries
+S12,7,Injuries
+S13,7,Injuries
+S14,7,Injuries
+S15,7,Injuries
+S16,7,Injuries
+S17,7,Injuries
+S18,7,Injuries
+S19,7,Injuries
+S20,7,Injuries
+S21,7,Injuries
+S22,7,Injuries
+S23,7,Injuries
+S24,7,Injuries
+S25,7,Injuries
+S26,7,Injuries
+S27,7,Injuries
+S28,7,Injuries
+S29,7,Injuries
+S30,7,Injuries
+S31,7,Injuries
+S32,7,Injuries
+S33,7,Injuries
+S34,7,Injuries
+S35,7,Injuries
+S36,7,Injuries
+S37,7,Injuries
+S38,7,Injuries
+S39,7,Injuries
+S40,7,Injuries
+S41,7,Injuries
+S42,7,Injuries
+S43,7,Injuries
+S44,7,Injuries
+S45,7,Injuries
+S46,7,Injuries
+S47,7,Injuries
+S48,7,Injuries
+S49,7,Injuries
+S50,7,Injuries
+S51,7,Injuries
+S52,7,Injuries
+S53,7,Injuries
+S54,7,Injuries
+S55,7,Injuries
+S56,7,Injuries
+S57,7,Injuries
+S58,7,Injuries
+S59,7,Injuries
+S60,7,Injuries
+S61,7,Injuries
+S62,7,Injuries
+S63,7,Injuries
+S64,7,Injuries
+S65,7,Injuries
+S66,7,Injuries
+S67,7,Injuries
+S68,7,Injuries
+S69,7,Injuries
+S70,7,Injuries
+S71,7,Injuries
+S72,7,Injuries
+S73,7,Injuries
+S74,7,Injuries
+S75,7,Injuries
+S76,7,Injuries
+S77,7,Injuries
+S78,7,Injuries
+S79,7,Injuries
+S80,7,Injuries
+S81,7,Injuries
+S82,7,Injuries
+S83,7,Injuries
+S84,7,Injuries
+S85,7,Injuries
+S86,7,Injuries
+S87,7,Injuries
+S88,7,Injuries
+S89,7,Injuries
+S90,7,Injuries
+S91,7,Injuries
+S92,7,Injuries
+S93,7,Injuries
+S94,7,Injuries
+S95,7,Injuries
+S96,7,Injuries
+S97,7,Injuries
+S98,7,Injuries
+S99,7,Injuries
+T00,7,Injuries
+T01,7,Injuries
+T02,7,Injuries
+T03,7,Injuries
+T04,7,Injuries
+T05,7,Injuries
+T06,7,Injuries
+T07,7,Injuries
+T08,7,Injuries
+T09,7,Injuries
+T10,7,Injuries
+T11,7,Injuries
+T12,7,Injuries
+T13,7,Injuries
+T14,7,Injuries
+T15,7,Injuries
+T16,7,Injuries
+T17,7,Injuries
+T18,7,Injuries
+T19,7,Injuries
+T20,7,Injuries
+T21,7,Injuries
+T22,7,Injuries
+T23,7,Injuries
+T24,7,Injuries
+T25,7,Injuries
+T26,7,Injuries
+T27,7,Injuries
+T28,7,Injuries
+T29,7,Injuries
+T30,7,Injuries
+T31,7,Injuries
+T32,7,Injuries
+T33,7,Injuries
+T34,7,Injuries
+T35,7,Injuries
+T36,7,Injuries
+T37,7,Injuries
+T38,7,Injuries
+T39,7,Injuries
+T40,7,Injuries
+T41,7,Injuries
+T42,7,Injuries
+T43,7,Injuries
+T44,7,Injuries
+T45,7,Injuries
+T46,7,Injuries
+T47,7,Injuries
+T48,7,Injuries
+T49,7,Injuries
+T50,7,Injuries
+T51,7,Injuries
+T52,7,Injuries
+T53,7,Injuries
+T54,7,Injuries
+T55,7,Injuries
+T56,7,Injuries
+T57,7,Injuries
+T58,7,Injuries
+T59,7,Injuries
+T60,7,Injuries
+T61,7,Injuries
+T62,7,Injuries
+T63,7,Injuries
+T64,7,Injuries
+T65,7,Injuries
+T66,7,Injuries
+T67,7,Injuries
+T68,7,Injuries
+T69,7,Injuries
+T70,7,Injuries
+T71,7,Injuries
+T72,7,Injuries
+T73,7,Injuries
+T74,7,Injuries
+T75,7,Injuries
+T76,7,Injuries
+T77,7,Injuries
+T78,7,Injuries
+T79,7,Injuries
+T80,7,Injuries
+T81,7,Injuries
+T82,7,Injuries
+T83,7,Injuries
+T84,7,Injuries
+T85,7,Injuries
+T86,7,Injuries
+T87,7,Injuries
+T88,7,Injuries
+T89,7,Injuries
+T90,7,Injuries
+T91,7,Injuries
+T92,7,Injuries
+T93,7,Injuries
+T94,7,Injuries
+T95,7,Injuries
+T96,7,Injuries
+T97,7,Injuries
+T98,7,Injuries
+V01,7,Injuries
+V02,7,Injuries
+V03,7,Injuries
+V04,7,Injuries
+V05,7,Injuries
+V06,7,Injuries
+V07,7,Injuries
+V08,7,Injuries
+V09,7,Injuries
+V10,7,Injuries
+V11,7,Injuries
+V12,7,Injuries
+V13,7,Injuries
+V14,7,Injuries
+V15,7,Injuries
+V16,7,Injuries
+V17,7,Injuries
+V18,7,Injuries
+V19,7,Injuries
+V20,7,Injuries
+V21,7,Injuries
+V22,7,Injuries
+V23,7,Injuries
+V24,7,Injuries
+V25,7,Injuries
+V26,7,Injuries
+V27,7,Injuries
+V28,7,Injuries
+V29,7,Injuries
+V30,7,Injuries
+V31,7,Injuries
+V32,7,Injuries
+V33,7,Injuries
+V34,7,Injuries
+V35,7,Injuries
+V36,7,Injuries
+V37,7,Injuries
+V38,7,Injuries
+V39,7,Injuries
+V40,7,Injuries
+V41,7,Injuries
+V42,7,Injuries
+V43,7,Injuries
+V44,7,Injuries
+V45,7,Injuries
+V46,7,Injuries
+V47,7,Injuries
+V48,7,Injuries
+V49,7,Injuries
+V50,7,Injuries
+V51,7,Injuries
+V52,7,Injuries
+V53,7,Injuries
+V54,7,Injuries
+V55,7,Injuries
+V56,7,Injuries
+V57,7,Injuries
+V58,7,Injuries
+V59,7,Injuries
+V60,7,Injuries
+V61,7,Injuries
+V62,7,Injuries
+V63,7,Injuries
+V64,7,Injuries
+V65,7,Injuries
+V66,7,Injuries
+V67,7,Injuries
+V68,7,Injuries
+V69,7,Injuries
+V70,7,Injuries
+V71,7,Injuries
+V72,7,Injuries
+V73,7,Injuries
+V74,7,Injuries
+V75,7,Injuries
+V76,7,Injuries
+V77,7,Injuries
+V78,7,Injuries
+V79,7,Injuries
+V80,7,Injuries
+V81,7,Injuries
+V82,7,Injuries
+V83,7,Injuries
+V84,7,Injuries
+V85,7,Injuries
+V86,7,Injuries
+V87,7,Injuries
+V88,7,Injuries
+V89,7,Injuries
+V90,7,Injuries
+V91,7,Injuries
+V92,7,Injuries
+V93,7,Injuries
+V94,7,Injuries
+V95,7,Injuries
+V96,7,Injuries
+V97,7,Injuries
+V98,7,Injuries
+V99,7,Injuries
+W00,7,Injuries
+W01,7,Injuries
+W02,7,Injuries
+W03,7,Injuries
+W04,7,Injuries
+W05,7,Injuries
+W06,7,Injuries
+W07,7,Injuries
+W08,7,Injuries
+W09,7,Injuries
+W10,7,Injuries
+W11,7,Injuries
+W12,7,Injuries
+W13,7,Injuries
+W14,7,Injuries
+W15,7,Injuries
+W16,7,Injuries
+W17,7,Injuries
+W18,7,Injuries
+W19,7,Injuries
+W20,7,Injuries
+W21,7,Injuries
+W22,7,Injuries
+W23,7,Injuries
+W24,7,Injuries
+W25,7,Injuries
+W26,7,Injuries
+W27,7,Injuries
+W28,7,Injuries
+W29,7,Injuries
+W30,7,Injuries
+W31,7,Injuries
+W32,7,Injuries
+W33,7,Injuries
+W34,7,Injuries
+W35,7,Injuries
+W36,7,Injuries
+W37,7,Injuries
+W38,7,Injuries
+W39,7,Injuries
+W40,7,Injuries
+W41,7,Injuries
+W42,7,Injuries
+W43,7,Injuries
+W44,7,Injuries
+W45,7,Injuries
+W46,7,Injuries
+W47,7,Injuries
+W48,7,Injuries
+W49,7,Injuries
+W50,7,Injuries
+W51,7,Injuries
+W52,7,Injuries
+W53,7,Injuries
+W54,7,Injuries
+W55,7,Injuries
+W56,7,Injuries
+W57,7,Injuries
+W58,7,Injuries
+W59,7,Injuries
+W60,7,Injuries
+W61,7,Injuries
+W62,7,Injuries
+W63,7,Injuries
+W64,7,Injuries
+W65,7,Injuries
+W66,7,Injuries
+W67,7,Injuries
+W68,7,Injuries
+W69,7,Injuries
+W70,7,Injuries
+W71,7,Injuries
+W72,7,Injuries
+W73,7,Injuries
+W74,7,Injuries
+W75,7,Injuries
+W76,7,Injuries
+W77,7,Injuries
+W78,7,Injuries
+W79,7,Injuries
+W80,7,Injuries
+W81,7,Injuries
+W82,7,Injuries
+W83,7,Injuries
+W84,7,Injuries
+W85,7,Injuries
+W86,7,Injuries
+W87,7,Injuries
+W88,7,Injuries
+W89,7,Injuries
+W90,7,Injuries
+W91,7,Injuries
+W92,7,Injuries
+W93,7,Injuries
+W94,7,Injuries
+W95,7,Injuries
+W96,7,Injuries
+W97,7,Injuries
+W98,7,Injuries
+W99,7,Injuries
+X00,7,Injuries
+X01,7,Injuries
+X02,7,Injuries
+X03,7,Injuries
+X04,7,Injuries
+X05,7,Injuries
+X06,7,Injuries
+X07,7,Injuries
+X08,7,Injuries
+X09,7,Injuries
+X10,7,Injuries
+X11,7,Injuries
+X12,7,Injuries
+X13,7,Injuries
+X14,7,Injuries
+X15,7,Injuries
+X16,7,Injuries
+X17,7,Injuries
+X18,7,Injuries
+X19,7,Injuries
+X20,7,Injuries
+X21,7,Injuries
+X22,7,Injuries
+X23,7,Injuries
+X24,7,Injuries
+X25,7,Injuries
+X26,7,Injuries
+X27,7,Injuries
+X28,7,Injuries
+X29,7,Injuries
+X30,7,Injuries
+X31,7,Injuries
+X32,7,Injuries
+X33,7,Injuries
+X34,7,Injuries
+X35,7,Injuries
+X36,7,Injuries
+X37,7,Injuries
+X38,7,Injuries
+X39,7,Injuries
+X40,7,Injuries
+X41,7,Injuries
+X42,7,Injuries
+X43,7,Injuries
+X44,7,Injuries
+X45,7,Injuries
+X46,7,Injuries
+X47,7,Injuries
+X48,7,Injuries
+X49,7,Injuries
+X50,7,Injuries
+X51,7,Injuries
+X52,7,Injuries
+X57,7,Injuries
+X58,7,Injuries
+X59,7,Injuries
+X60,7,Injuries
+X61,7,Injuries
+X62,7,Injuries
+X63,7,Injuries
+X64,7,Injuries
+X65,7,Injuries
+X66,7,Injuries
+X67,7,Injuries
+X68,7,Injuries
+X69,7,Injuries
+X70,7,Injuries
+X71,7,Injuries
+X72,7,Injuries
+X73,7,Injuries
+X74,7,Injuries
+X75,7,Injuries
+X76,7,Injuries
+X77,7,Injuries
+X78,7,Injuries
+X79,7,Injuries
+X80,7,Injuries
+X81,7,Injuries
+X82,7,Injuries
+X83,7,Injuries
+X84,7,Injuries
+X85,7,Injuries
+X86,7,Injuries
+X87,7,Injuries
+X88,7,Injuries
+X89,7,Injuries
+X90,7,Injuries
+X91,7,Injuries
+X92,7,Injuries
+X93,7,Injuries
+X94,7,Injuries
+X95,7,Injuries
+X96,7,Injuries
+X97,7,Injuries
+X98,7,Injuries
+X99,7,Injuries
+Y00,7,Injuries
+Y01,7,Injuries
+Y02,7,Injuries
+Y03,7,Injuries
+Y04,7,Injuries
+Y05,7,Injuries
+Y06,7,Injuries
+Y07,7,Injuries
+Y08,7,Injuries
+Y09,7,Injuries
+Y10,7,Injuries
+Y11,7,Injuries
+Y12,7,Injuries
+Y13,7,Injuries
+Y14,7,Injuries
+Y15,7,Injuries
+Y16,7,Injuries
+Y17,7,Injuries
+Y18,7,Injuries
+Y19,7,Injuries
+Y20,7,Injuries
+Y21,7,Injuries
+Y22,7,Injuries
+Y23,7,Injuries
+Y24,7,Injuries
+Y25,7,Injuries
+Y26,7,Injuries
+Y27,7,Injuries
+Y28,7,Injuries
+Y29,7,Injuries
+Y30,7,Injuries
+Y31,7,Injuries
+Y32,7,Injuries
+Y33,7,Injuries
+Y34,7,Injuries
+Y35,7,Injuries
+Y36,7,Injuries
+Y37,7,Injuries
+Y38,7,Injuries
+Y39,7,Injuries
+Y40,7,Injuries
+Y41,7,Injuries
+Y42,7,Injuries
+Y43,7,Injuries
+Y44,7,Injuries
+Y45,7,Injuries
+Y46,7,Injuries
+Y47,7,Injuries
+Y48,7,Injuries
+Y49,7,Injuries
+Y50,7,Injuries
+Y51,7,Injuries
+Y52,7,Injuries
+Y53,7,Injuries
+Y54,7,Injuries
+Y55,7,Injuries
+Y56,7,Injuries
+Y57,7,Injuries
+Y58,7,Injuries
+Y59,7,Injuries
+Y60,7,Injuries
+Y61,7,Injuries
+Y62,7,Injuries
+Y63,7,Injuries
+Y64,7,Injuries
+Y65,7,Injuries
+Y66,7,Injuries
+Y67,7,Injuries
+Y68,7,Injuries
+Y69,7,Injuries
+Y70,7,Injuries
+Y71,7,Injuries
+Y72,7,Injuries
+Y73,7,Injuries
+Y74,7,Injuries
+Y75,7,Injuries
+Y76,7,Injuries
+Y77,7,Injuries
+Y78,7,Injuries
+Y79,7,Injuries
+Y80,7,Injuries
+Y81,7,Injuries
+Y82,7,Injuries
+Y83,7,Injuries
+Y84,7,Injuries
+Y85,7,Injuries
+Y86,7,Injuries
+Y87,7,Injuries
+Y88,7,Injuries
+Y89,7,Injuries
+Y90,7,Injuries
+Y91,7,Injuries
+Y97,7,Injuries
+Y98,7,Injuries
+P96,10,Ill-defined
+R02,10,Ill-defined
+R07,10,Ill-defined
+R09,10,Ill-defined
+R10,10,Ill-defined
+R25,10,Ill-defined
+R51,10,Ill-defined
+R52,10,Ill-defined
+R53,10,Ill-defined
+R54,10,Ill-defined
+R57,10,Ill-defined
+R58,10,Ill-defined
+R60,10,Ill-defined
+R61,10,Ill-defined
+R62,10,Ill-defined
+R64,10,Ill-defined
+R68,10,Ill-defined
+R69,10,Ill-defined
+R78,10,Ill-defined
+R79,10,Ill-defined
+R83,10,Ill-defined
+R89,10,Ill-defined
+R92,10,Ill-defined
+R93,10,Ill-defined
+R94,10,Ill-defined
+R95,10,Ill-defined
+R96,10,Ill-defined
+R97,10,Ill-defined
+R98,10,Ill-defined
+R99,10,Ill-defined
+B50,3,Malaria
+B51,3,Malaria
+B52,3,Malaria
+B53,3,Malaria
+B54,3,Malaria
+A20,4,Other Infections
+A21,4,Other Infections
+A22,4,Other Infections
+A23,4,Other Infections
+A24,4,Other Infections
+A25,4,Other Infections
+A26,4,Other Infections
+A27,4,Other Infections
+A28,4,Other Infections
+A32,4,Other Infections
+A38,4,Other Infections
+A40,4,Other Infections
+A41,4,Other Infections
+A42,4,Other Infections
+A43,4,Other Infections
+A44,4,Other Infections
+A46,4,Other Infections
+A48,4,Other Infections
+A49,4,Other Infections
+A68,4,Other Infections
+A69,4,Other Infections
+A70,4,Other Infections
+A74,4,Other Infections
+A75,4,Other Infections
+A77,4,Other Infections
+A78,4,Other Infections
+A79,4,Other Infections
+B95,4,Other Infections
+B96,4,Other Infections
+H10,4,Other Infections
+H60,4,Other Infections
+I30,4,Other Infections
+I32,4,Other Infections
+I33,4,Other Infections
+I39,4,Other Infections
+I40,4,Other Infections
+I41,4,Other Infections
+K65,4,Other Infections
+K67,4,Other Infections
+K81,4,Other Infections
+L00,4,Other Infections
+L01,4,Other Infections
+L02,4,Other Infections
+L03,4,Other Infections
+L04,4,Other Infections
+L08,4,Other Infections
+M00,4,Other Infections
+M01,4,Other Infections
+M60,4,Other Infections
+M86,4,Other Infections
+N10,4,Other Infections
+N30,4,Other Infections
+N34,4,Other Infections
+N41,4,Other Infections
+N49,4,Other Infections
+N61,4,Other Infections
+P36,4,Other Infections
+P38,4,Other Infections
+A39,4,Other Infections
+A81,4,Other Infections
+A82,4,Other Infections
+A83,4,Other Infections
+A84,4,Other Infections
+A85,4,Other Infections
+A86,4,Other Infections
+A87,4,Other Infections
+A88,4,Other Infections
+A89,4,Other Infections
+G00,4,Other Infections
+G01,4,Other Infections
+G02,4,Other Infections
+G03,4,Other Infections
+G04,4,Other Infections
+G05,4,Other Infections
+G06,4,Other Infections
+G07,4,Other Infections
+G08,4,Other Infections
+G09,4,Other Infections
+A15,4,Other Infections
+A16,4,Other Infections
+A17,4,Other Infections
+A18,4,Other Infections
+A19,4,Other Infections
+B90,4,Other Infections
+J65,4,Other Infections
+A33,4,Other Infections
+A34,4,Other Infections
+A35,4,Other Infections
+A80,4,Other Infections
+B91,4,Other Infections
+B01,4,Other Infections
+B05,4,Other Infections
+B20,4,Other Infections
+B21,4,Other Infections
+B22,4,Other Infections
+B23,4,Other Infections
+B24,4,Other Infections
+R75,4,Other Infections
+A30,4,Other Infections
+A31,4,Other Infections
+A36,4,Other Infections
+A50,4,Other Infections
+A51,4,Other Infections
+A52,4,Other Infections
+A53,4,Other Infections
+A54,4,Other Infections
+A55,4,Other Infections
+A56,4,Other Infections
+A57,4,Other Infections
+A58,4,Other Infections
+A59,4,Other Infections
+A60,4,Other Infections
+A61,4,Other Infections
+A62,4,Other Infections
+A63,4,Other Infections
+A64,4,Other Infections
+A65,4,Other Infections
+A66,4,Other Infections
+A67,4,Other Infections
+A71,4,Other Infections
+A90,4,Other Infections
+A91,4,Other Infections
+A92,4,Other Infections
+A93,4,Other Infections
+A94,4,Other Infections
+A95,4,Other Infections
+A96,4,Other Infections
+A97,4,Other Infections
+A98,4,Other Infections
+A99,4,Other Infections
+B00,4,Other Infections
+B02,4,Other Infections
+B03,4,Other Infections
+B04,4,Other Infections
+B06,4,Other Infections
+B07,4,Other Infections
+B08,4,Other Infections
+B09,4,Other Infections
+B15,4,Other Infections
+B16,4,Other Infections
+B17,4,Other Infections
+B18,4,Other Infections
+B19,4,Other Infections
+B25,4,Other Infections
+B26,4,Other Infections
+B27,4,Other Infections
+B30,4,Other Infections
+B33,4,Other Infections
+B34,4,Other Infections
+B35,4,Other Infections
+B36,4,Other Infections
+B37,4,Other Infections
+B38,4,Other Infections
+B39,4,Other Infections
+B40,4,Other Infections
+B41,4,Other Infections
+B42,4,Other Infections
+B43,4,Other Infections
+B44,4,Other Infections
+B45,4,Other Infections
+B46,4,Other Infections
+B47,4,Other Infections
+B48,4,Other Infections
+B49,4,Other Infections
+B55,4,Other Infections
+B56,4,Other Infections
+B57,4,Other Infections
+B58,4,Other Infections
+B59,4,Other Infections
+B60,4,Other Infections
+B64,4,Other Infections
+B65,4,Other Infections
+B66,4,Other Infections
+B67,4,Other Infections
+B68,4,Other Infections
+B69,4,Other Infections
+B70,4,Other Infections
+B71,4,Other Infections
+B72,4,Other Infections
+B73,4,Other Infections
+B74,4,Other Infections
+B75,4,Other Infections
+B76,4,Other Infections
+B77,4,Other Infections
+B78,4,Other Infections
+B79,4,Other Infections
+B80,4,Other Infections
+B81,4,Other Infections
+B82,4,Other Infections
+B83,4,Other Infections
+B85,4,Other Infections
+B86,4,Other Infections
+B87,4,Other Infections
+B88,4,Other Infections
+B89,4,Other Infections
+B92,4,Other Infections
+B94,4,Other Infections
+B97,4,Other Infections
+B99,4,Other Infections
+K02,4,Other Infections
+K04,4,Other Infections
+K05,4,Other Infections
+K61,4,Other Infections
+N70,4,Other Infections
+N71,4,Other Infections
+N72,4,Other Infections
+N73,4,Other Infections
+N74,4,Other Infections
+P35,4,Other Infections
+P37,4,Other Infections
+P39,4,Other Infections
+U00,4,Other Infections
+Y95,4,Other Infections
+R50,4,Other Infections
+F73,6,NCD
+Q00,5,Congenital anomalies
+Q01,5,Congenital anomalies
+Q02,5,Congenital anomalies
+Q03,5,Congenital anomalies
+Q04,5,Congenital anomalies
+Q05,5,Congenital anomalies
+Q06,5,Congenital anomalies
+Q07,5,Congenital anomalies
+Q08,5,Congenital anomalies
+Q09,5,Congenital anomalies
+Q10,5,Congenital anomalies
+Q11,5,Congenital anomalies
+Q12,5,Congenital anomalies
+Q13,5,Congenital anomalies
+Q14,5,Congenital anomalies
+Q15,5,Congenital anomalies
+Q16,5,Congenital anomalies
+Q17,5,Congenital anomalies
+Q18,5,Congenital anomalies
+Q19,5,Congenital anomalies
+Q20,5,Congenital anomalies
+Q21,5,Congenital anomalies
+Q22,5,Congenital anomalies
+Q23,5,Congenital anomalies
+Q24,5,Congenital anomalies
+Q25,5,Congenital anomalies
+Q26,5,Congenital anomalies
+Q27,5,Congenital anomalies
+Q28,5,Congenital anomalies
+Q29,5,Congenital anomalies
+Q30,5,Congenital anomalies
+Q31,5,Congenital anomalies
+Q32,5,Congenital anomalies
+Q33,5,Congenital anomalies
+Q34,5,Congenital anomalies
+Q35,5,Congenital anomalies
+Q36,5,Congenital anomalies
+Q37,5,Congenital anomalies
+Q38,5,Congenital anomalies
+Q39,5,Congenital anomalies
+Q40,5,Congenital anomalies
+Q41,5,Congenital anomalies
+Q42,5,Congenital anomalies
+Q43,5,Congenital anomalies
+Q44,5,Congenital anomalies
+Q45,5,Congenital anomalies
+Q46,5,Congenital anomalies
+Q47,5,Congenital anomalies
+Q48,5,Congenital anomalies
+Q49,5,Congenital anomalies
+Q50,5,Congenital anomalies
+Q51,5,Congenital anomalies
+Q52,5,Congenital anomalies
+Q53,5,Congenital anomalies
+Q54,5,Congenital anomalies
+Q55,5,Congenital anomalies
+Q56,5,Congenital anomalies
+Q57,5,Congenital anomalies
+Q58,5,Congenital anomalies
+Q59,5,Congenital anomalies
+Q60,5,Congenital anomalies
+Q61,5,Congenital anomalies
+Q62,5,Congenital anomalies
+Q63,5,Congenital anomalies
+Q64,5,Congenital anomalies
+Q65,5,Congenital anomalies
+Q66,5,Congenital anomalies
+Q67,5,Congenital anomalies
+Q68,5,Congenital anomalies
+Q69,5,Congenital anomalies
+Q70,5,Congenital anomalies
+Q71,5,Congenital anomalies
+Q72,5,Congenital anomalies
+Q73,5,Congenital anomalies
+Q74,5,Congenital anomalies
+Q75,5,Congenital anomalies
+Q76,5,Congenital anomalies
+Q77,5,Congenital anomalies
+Q78,5,Congenital anomalies
+Q79,5,Congenital anomalies
+Q80,5,Congenital anomalies
+Q81,5,Congenital anomalies
+Q82,5,Congenital anomalies
+Q83,5,Congenital anomalies
+Q84,5,Congenital anomalies
+Q85,5,Congenital anomalies
+Q86,5,Congenital anomalies
+Q87,5,Congenital anomalies
+Q88,5,Congenital anomalies
+Q89,5,Congenital anomalies
+Q90,5,Congenital anomalies
+Q91,5,Congenital anomalies
+Q92,5,Congenital anomalies
+Q93,5,Congenital anomalies
+Q94,5,Congenital anomalies
+Q95,5,Congenital anomalies
+Q96,5,Congenital anomalies
+Q97,5,Congenital anomalies
+Q98,5,Congenital anomalies
+Q99,5,Congenital anomalies
+C00,6,NCD
+C01,6,NCD
+C02,6,NCD
+C03,6,NCD
+C04,6,NCD
+C05,6,NCD
+C06,6,NCD
+C07,6,NCD
+C08,6,NCD
+C09,6,NCD
+C10,6,NCD
+C11,6,NCD
+C12,6,NCD
+C13,6,NCD
+C14,6,NCD
+C15,6,NCD
+C16,6,NCD
+C17,6,NCD
+C18,6,NCD
+C19,6,NCD
+C20,6,NCD
+C21,6,NCD
+C22,6,NCD
+C23,6,NCD
+C24,6,NCD
+C25,6,NCD
+C26,6,NCD
+C27,6,NCD
+C28,6,NCD
+C29,6,NCD
+C30,6,NCD
+C31,6,NCD
+C32,6,NCD
+C33,6,NCD
+C34,6,NCD
+C35,6,NCD
+C36,6,NCD
+C37,6,NCD
+C38,6,NCD
+C39,6,NCD
+C40,6,NCD
+C41,6,NCD
+C42,6,NCD
+C43,6,NCD
+C44,6,NCD
+C45,6,NCD
+C46,6,NCD
+C47,6,NCD
+C48,6,NCD
+C49,6,NCD
+C50,6,NCD
+C51,6,NCD
+C52,6,NCD
+C53,6,NCD
+C54,6,NCD
+C55,6,NCD
+C56,6,NCD
+C57,6,NCD
+C58,6,NCD
+C59,6,NCD
+C60,6,NCD
+C61,6,NCD
+C62,6,NCD
+C63,6,NCD
+C64,6,NCD
+C65,6,NCD
+C66,6,NCD
+C67,6,NCD
+C68,6,NCD
+C69,6,NCD
+C70,6,NCD
+C71,6,NCD
+C72,6,NCD
+C73,6,NCD
+C74,6,NCD
+C75,6,NCD
+C76,6,NCD
+C77,6,NCD
+C78,6,NCD
+C79,6,NCD
+C80,6,NCD
+C81,6,NCD
+C82,6,NCD
+C83,6,NCD
+C84,6,NCD
+C85,6,NCD
+C86,6,NCD
+C87,6,NCD
+C88,6,NCD
+C89,6,NCD
+C90,6,NCD
+C91,6,NCD
+C92,6,NCD
+C93,6,NCD
+C94,6,NCD
+C95,6,NCD
+C96,6,NCD
+C97,6,NCD
+D01,6,NCD
+D02,6,NCD
+D03,6,NCD
+D04,6,NCD
+D05,6,NCD
+D06,6,NCD
+D07,6,NCD
+D08,6,NCD
+D09,6,NCD
+D10,6,NCD
+D11,6,NCD
+D12,6,NCD
+D13,6,NCD
+D14,6,NCD
+D15,6,NCD
+D16,6,NCD
+D17,6,NCD
+D18,6,NCD
+D19,6,NCD
+D20,6,NCD
+D21,6,NCD
+D22,6,NCD
+D23,6,NCD
+D24,6,NCD
+D25,6,NCD
+D26,6,NCD
+D27,6,NCD
+D28,6,NCD
+D29,6,NCD
+D30,6,NCD
+D31,6,NCD
+D32,6,NCD
+D33,6,NCD
+D34,6,NCD
+D35,6,NCD
+D36,6,NCD
+D37,6,NCD
+D38,6,NCD
+D39,6,NCD
+D40,6,NCD
+D41,6,NCD
+D42,6,NCD
+D43,6,NCD
+D44,6,NCD
+D45,6,NCD
+D46,6,NCD
+D47,6,NCD
+D48,6,NCD
+D55,6,NCD
+D56,6,NCD
+D57,6,NCD
+D58,6,NCD
+D59,6,NCD
+D60,6,NCD
+D61,6,NCD
+D62,6,NCD
+D63,6,NCD
+D64,6,NCD
+D65,6,NCD
+D66,6,NCD
+D67,6,NCD
+D68,6,NCD
+D69,6,NCD
+D70,6,NCD
+D71,6,NCD
+D72,6,NCD
+D73,6,NCD
+D74,6,NCD
+D75,6,NCD
+D76,6,NCD
+D77,6,NCD
+D78,6,NCD
+D79,6,NCD
+D80,6,NCD
+D81,6,NCD
+D82,6,NCD
+D83,6,NCD
+D84,6,NCD
+D85,6,NCD
+D86,6,NCD
+D87,6,NCD
+D88,6,NCD
+D89,6,NCD
+E03,6,NCD
+E04,6,NCD
+E05,6,NCD
+E06,6,NCD
+E07,6,NCD
+E08,6,NCD
+E09,6,NCD
+E10,6,NCD
+E11,6,NCD
+E12,6,NCD
+E13,6,NCD
+E14,6,NCD
+E15,6,NCD
+E16,6,NCD
+E17,6,NCD
+E18,6,NCD
+E19,6,NCD
+E20,6,NCD
+E21,6,NCD
+E22,6,NCD
+E23,6,NCD
+E24,6,NCD
+E25,6,NCD
+E26,6,NCD
+E27,6,NCD
+E28,6,NCD
+E29,6,NCD
+E30,6,NCD
+E31,6,NCD
+E32,6,NCD
+E33,6,NCD
+E34,6,NCD
+E35,6,NCD
+E65,6,NCD
+E66,6,NCD
+E67,6,NCD
+E68,6,NCD
+E69,6,NCD
+E70,6,NCD
+E71,6,NCD
+E72,6,NCD
+E73,6,NCD
+E74,6,NCD
+E75,6,NCD
+E76,6,NCD
+E77,6,NCD
+E78,6,NCD
+E79,6,NCD
+E80,6,NCD
+E81,6,NCD
+E82,6,NCD
+E83,6,NCD
+E84,6,NCD
+E85,6,NCD
+E86,6,NCD
+E87,6,NCD
+E88,6,NCD
+E89,6,NCD
+E90,6,NCD
+F00,6,NCD
+F01,6,NCD
+F02,6,NCD
+G10,6,NCD
+G11,6,NCD
+G12,6,NCD
+G13,6,NCD
+G14,6,NCD
+G15,6,NCD
+G16,6,NCD
+G17,6,NCD
+G18,6,NCD
+G19,6,NCD
+G20,6,NCD
+G21,6,NCD
+G22,6,NCD
+G23,6,NCD
+G24,6,NCD
+G25,6,NCD
+G26,6,NCD
+G27,6,NCD
+G28,6,NCD
+G29,6,NCD
+G30,6,NCD
+G31,6,NCD
+G32,6,NCD
+G33,6,NCD
+G34,6,NCD
+G35,6,NCD
+G36,6,NCD
+G37,6,NCD
+G38,6,NCD
+G39,6,NCD
+G40,6,NCD
+G41,6,NCD
+G42,6,NCD
+G43,6,NCD
+G44,6,NCD
+G45,6,NCD
+G46,6,NCD
+G47,6,NCD
+G48,6,NCD
+G49,6,NCD
+G50,6,NCD
+G51,6,NCD
+G52,6,NCD
+G53,6,NCD
+G54,6,NCD
+G55,6,NCD
+G56,6,NCD
+G57,6,NCD
+G58,6,NCD
+G59,6,NCD
+G60,6,NCD
+G61,6,NCD
+G62,6,NCD
+G63,6,NCD
+G64,6,NCD
+G65,6,NCD
+G66,6,NCD
+G67,6,NCD
+G68,6,NCD
+G69,6,NCD
+G70,6,NCD
+G71,6,NCD
+G72,6,NCD
+G73,6,NCD
+G74,6,NCD
+G75,6,NCD
+G76,6,NCD
+G77,6,NCD
+G78,6,NCD
+G79,6,NCD
+G80,6,NCD
+G81,6,NCD
+G82,6,NCD
+G83,6,NCD
+G84,6,NCD
+G85,6,NCD
+G86,6,NCD
+G87,6,NCD
+G88,6,NCD
+G89,6,NCD
+G90,6,NCD
+G91,6,NCD
+G92,6,NCD
+G93,6,NCD
+G94,6,NCD
+G95,6,NCD
+G96,6,NCD
+G97,6,NCD
+G98,6,NCD
+G99,6,NCD
+H00,6,NCD
+H01,6,NCD
+H02,6,NCD
+H03,6,NCD
+H04,6,NCD
+H05,6,NCD
+H06,6,NCD
+H11,6,NCD
+H12,6,NCD
+H13,6,NCD
+H14,6,NCD
+H15,6,NCD
+H16,6,NCD
+H17,6,NCD
+H18,6,NCD
+H19,6,NCD
+H20,6,NCD
+H21,6,NCD
+H22,6,NCD
+H23,6,NCD
+H24,6,NCD
+H25,6,NCD
+H26,6,NCD
+H27,6,NCD
+H28,6,NCD
+H29,6,NCD
+H30,6,NCD
+H31,6,NCD
+H32,6,NCD
+H33,6,NCD
+H34,6,NCD
+H35,6,NCD
+H36,6,NCD
+H37,6,NCD
+H38,6,NCD
+H39,6,NCD
+H40,6,NCD
+H41,6,NCD
+H42,6,NCD
+H43,6,NCD
+H44,6,NCD
+H45,6,NCD
+H46,6,NCD
+H47,6,NCD
+H48,6,NCD
+H49,6,NCD
+H50,6,NCD
+H51,6,NCD
+H52,6,NCD
+H53,6,NCD
+H54,6,NCD
+H55,6,NCD
+H56,6,NCD
+H57,6,NCD
+H58,6,NCD
+H59,6,NCD
+H61,6,NCD
+H62,6,NCD
+H69,6,NCD
+H72,6,NCD
+H73,6,NCD
+H74,6,NCD
+H75,6,NCD
+H76,6,NCD
+H77,6,NCD
+H78,6,NCD
+H79,6,NCD
+H80,6,NCD
+H81,6,NCD
+H82,6,NCD
+H83,6,NCD
+H84,6,NCD
+H85,6,NCD
+H86,6,NCD
+H87,6,NCD
+H88,6,NCD
+H89,6,NCD
+H90,6,NCD
+H91,6,NCD
+H92,6,NCD
+H93,6,NCD
+H94,6,NCD
+H95,6,NCD
+I00,6,NCD
+I01,6,NCD
+I02,6,NCD
+I03,6,NCD
+I04,6,NCD
+I05,6,NCD
+I06,6,NCD
+I07,6,NCD
+I08,6,NCD
+I09,6,NCD
+I10,6,NCD
+I11,6,NCD
+I12,6,NCD
+I13,6,NCD
+I14,6,NCD
+I15,6,NCD
+I16,6,NCD
+I17,6,NCD
+I18,6,NCD
+I19,6,NCD
+I20,6,NCD
+I21,6,NCD
+I22,6,NCD
+I23,6,NCD
+I24,6,NCD
+I25,6,NCD
+I26,6,NCD
+I27,6,NCD
+I28,6,NCD
+I31,6,NCD
+I34,6,NCD
+I35,6,NCD
+I36,6,NCD
+I37,6,NCD
+I38,6,NCD
+I42,6,NCD
+I43,6,NCD
+I44,6,NCD
+I45,6,NCD
+I46,6,NCD
+I47,6,NCD
+I48,6,NCD
+I49,6,NCD
+I50,6,NCD
+I51,6,NCD
+I52,6,NCD
+I53,6,NCD
+I54,6,NCD
+I55,6,NCD
+I56,6,NCD
+I57,6,NCD
+I58,6,NCD
+I59,6,NCD
+I60,6,NCD
+I61,6,NCD
+I62,6,NCD
+I63,6,NCD
+I64,6,NCD
+I65,6,NCD
+I66,6,NCD
+I67,6,NCD
+I68,6,NCD
+I69,6,NCD
+I70,6,NCD
+I71,6,NCD
+I72,6,NCD
+I73,6,NCD
+I74,6,NCD
+I75,6,NCD
+I76,6,NCD
+I77,6,NCD
+I78,6,NCD
+I79,6,NCD
+I80,6,NCD
+I81,6,NCD
+I82,6,NCD
+I83,6,NCD
+I84,6,NCD
+I85,6,NCD
+I86,6,NCD
+I87,6,NCD
+I88,6,NCD
+I89,6,NCD
+I90,6,NCD
+I91,6,NCD
+I92,6,NCD
+I93,6,NCD
+I94,6,NCD
+I95,6,NCD
+I96,6,NCD
+I97,6,NCD
+I98,6,NCD
+I99,6,NCD
+J30,6,NCD
+J31,6,NCD
+J33,6,NCD
+J34,6,NCD
+J35,6,NCD
+J37,6,NCD
+J38,6,NCD
+J39,6,NCD
+J40,6,NCD
+J41,6,NCD
+J42,6,NCD
+J43,6,NCD
+J44,6,NCD
+J45,6,NCD
+J46,6,NCD
+J47,6,NCD
+J60,6,NCD
+J64,6,NCD
+J66,6,NCD
+J67,6,NCD
+J68,6,NCD
+J69,6,NCD
+J70,6,NCD
+J80,6,NCD
+J81,6,NCD
+J82,6,NCD
+J84,6,NCD
+J90,6,NCD
+J91,6,NCD
+J92,6,NCD
+J93,6,NCD
+J94,6,NCD
+J95,6,NCD
+J96,6,NCD
+J97,6,NCD
+J98,6,NCD
+J99,6,NCD
+K00,6,NCD
+K01,6,NCD
+K03,6,NCD
+K06,6,NCD
+K07,6,NCD
+K08,6,NCD
+K09,6,NCD
+K10,6,NCD
+K11,6,NCD
+K12,6,NCD
+K13,6,NCD
+K14,6,NCD
+K15,6,NCD
+K16,6,NCD
+K17,6,NCD
+K18,6,NCD
+K19,6,NCD
+K20,6,NCD
+K21,6,NCD
+K22,6,NCD
+K23,6,NCD
+K24,6,NCD
+K25,6,NCD
+K26,6,NCD
+K27,6,NCD
+K28,6,NCD
+K29,6,NCD
+K30,6,NCD
+K31,6,NCD
+K32,6,NCD
+K33,6,NCD
+K34,6,NCD
+K35,6,NCD
+K36,6,NCD
+K37,6,NCD
+K38,6,NCD
+K39,6,NCD
+K40,6,NCD
+K41,6,NCD
+K42,6,NCD
+K43,6,NCD
+K44,6,NCD
+K45,6,NCD
+K46,6,NCD
+K47,6,NCD
+K48,6,NCD
+K49,6,NCD
+K50,6,NCD
+K51,6,NCD
+K52,6,NCD
+K53,6,NCD
+K54,6,NCD
+K55,6,NCD
+K56,6,NCD
+K57,6,NCD
+K58,6,NCD
+K59,6,NCD
+K60,6,NCD
+K62,6,NCD
+K63,6,NCD
+K70,6,NCD
+K71,6,NCD
+K72,6,NCD
+K73,6,NCD
+K74,6,NCD
+K75,6,NCD
+K76,6,NCD
+K77,6,NCD
+K78,6,NCD
+K79,6,NCD
+K80,6,NCD
+K82,6,NCD
+K83,6,NCD
+K84,6,NCD
+K85,6,NCD
+K86,6,NCD
+K87,6,NCD
+K88,6,NCD
+K89,6,NCD
+K90,6,NCD
+K91,6,NCD
+K92,6,NCD
+K93,6,NCD
+L05,6,NCD
+L10,6,NCD
+L11,6,NCD
+L12,6,NCD
+L13,6,NCD
+L14,6,NCD
+L15,6,NCD
+L16,6,NCD
+L17,6,NCD
+L18,6,NCD
+L19,6,NCD
+L20,6,NCD
+L21,6,NCD
+L22,6,NCD
+L23,6,NCD
+L24,6,NCD
+L25,6,NCD
+L26,6,NCD
+L27,6,NCD
+L28,6,NCD
+L29,6,NCD
+L30,6,NCD
+L31,6,NCD
+L32,6,NCD
+L33,6,NCD
+L34,6,NCD
+L35,6,NCD
+L36,6,NCD
+L37,6,NCD
+L38,6,NCD
+L39,6,NCD
+L40,6,NCD
+L41,6,NCD
+L42,6,NCD
+L43,6,NCD
+L44,6,NCD
+L45,6,NCD
+L46,6,NCD
+L47,6,NCD
+L48,6,NCD
+L49,6,NCD
+L50,6,NCD
+L51,6,NCD
+L52,6,NCD
+L53,6,NCD
+L54,6,NCD
+L55,6,NCD
+L56,6,NCD
+L57,6,NCD
+L58,6,NCD
+L59,6,NCD
+L60,6,NCD
+L61,6,NCD
+L62,6,NCD
+L63,6,NCD
+L64,6,NCD
+L65,6,NCD
+L66,6,NCD
+L67,6,NCD
+L68,6,NCD
+L69,6,NCD
+L70,6,NCD
+L71,6,NCD
+L72,6,NCD
+L73,6,NCD
+L74,6,NCD
+L75,6,NCD
+L76,6,NCD
+L77,6,NCD
+L78,6,NCD
+L79,6,NCD
+L80,6,NCD
+L81,6,NCD
+L82,6,NCD
+L83,6,NCD
+L84,6,NCD
+L85,6,NCD
+L86,6,NCD
+L87,6,NCD
+L88,6,NCD
+L89,6,NCD
+L90,6,NCD
+L91,6,NCD
+L92,6,NCD
+L93,6,NCD
+L94,6,NCD
+L95,6,NCD
+L96,6,NCD
+L97,6,NCD
+L98,6,NCD
+L99,6,NCD
+M02,6,NCD
+M03,6,NCD
+M04,6,NCD
+M05,6,NCD
+M06,6,NCD
+M07,6,NCD
+M08,6,NCD
+M09,6,NCD
+M10,6,NCD
+M11,6,NCD
+M12,6,NCD
+M13,6,NCD
+M14,6,NCD
+M15,6,NCD
+M16,6,NCD
+M17,6,NCD
+M18,6,NCD
+M19,6,NCD
+M20,6,NCD
+M21,6,NCD
+M22,6,NCD
+M23,6,NCD
+M24,6,NCD
+M25,6,NCD
+M26,6,NCD
+M27,6,NCD
+M28,6,NCD
+M29,6,NCD
+M30,6,NCD
+M31,6,NCD
+M32,6,NCD
+M33,6,NCD
+M34,6,NCD
+M35,6,NCD
+M36,6,NCD
+M37,6,NCD
+M38,6,NCD
+M39,6,NCD
+M40,6,NCD
+M41,6,NCD
+M42,6,NCD
+M43,6,NCD
+M44,6,NCD
+M45,6,NCD
+M46,6,NCD
+M47,6,NCD
+M48,6,NCD
+M49,6,NCD
+M50,6,NCD
+M51,6,NCD
+M52,6,NCD
+M53,6,NCD
+M54,6,NCD
+M61,6,NCD
+M62,6,NCD
+M63,6,NCD
+M64,6,NCD
+M65,6,NCD
+M66,6,NCD
+M67,6,NCD
+M68,6,NCD
+M69,6,NCD
+M70,6,NCD
+M71,6,NCD
+M72,6,NCD
+M73,6,NCD
+M74,6,NCD
+M75,6,NCD
+M76,6,NCD
+M77,6,NCD
+M78,6,NCD
+M79,6,NCD
+M80,6,NCD
+M81,6,NCD
+M82,6,NCD
+M83,6,NCD
+M84,6,NCD
+M85,6,NCD
+M87,6,NCD
+M88,6,NCD
+M89,6,NCD
+M90,6,NCD
+M91,6,NCD
+M92,6,NCD
+M93,6,NCD
+M94,6,NCD
+M95,6,NCD
+M96,6,NCD
+M97,6,NCD
+M98,6,NCD
+M99,6,NCD
+N00,6,NCD
+N01,6,NCD
+N02,6,NCD
+N03,6,NCD
+N04,6,NCD
+N05,6,NCD
+N06,6,NCD
+N07,6,NCD
+N08,6,NCD
+N11,6,NCD
+N12,6,NCD
+N13,6,NCD
+N14,6,NCD
+N15,6,NCD
+N16,6,NCD
+N17,6,NCD
+N18,6,NCD
+N19,6,NCD
+N20,6,NCD
+N21,6,NCD
+N22,6,NCD
+N23,6,NCD
+N24,6,NCD
+N25,6,NCD
+N26,6,NCD
+N27,6,NCD
+N28,6,NCD
+N29,6,NCD
+N31,6,NCD
+N32,6,NCD
+N33,6,NCD
+N35,6,NCD
+N36,6,NCD
+N37,6,NCD
+N38,6,NCD
+N39,6,NCD
+N40,6,NCD
+N42,6,NCD
+N43,6,NCD
+N44,6,NCD
+N45,6,NCD
+N46,6,NCD
+N47,6,NCD
+N48,6,NCD
+N50,6,NCD
+N51,6,NCD
+N60,6,NCD
+N62,6,NCD
+N63,6,NCD
+N64,6,NCD
+N75,6,NCD
+N76,6,NCD
+N77,6,NCD
+N78,6,NCD
+N79,6,NCD
+N80,6,NCD
+N81,6,NCD
+N82,6,NCD
+N83,6,NCD
+N84,6,NCD
+N85,6,NCD
+N86,6,NCD
+N87,6,NCD
+N88,6,NCD
+N89,6,NCD
+N90,6,NCD
+N91,6,NCD
+N92,6,NCD
+N93,6,NCD
+N94,6,NCD
+N95,6,NCD
+N96,6,NCD
+N97,6,NCD
+N98,6,NCD
+N99,6,NCD
+P04,6,NCD
+P08,6,NCD
+P51,6,NCD
+P53,6,NCD
+P54,6,NCD
+P55,6,NCD
+P56,6,NCD
+P57,6,NCD
+P58,6,NCD
+P59,6,NCD
+P60,6,NCD
+P70,6,NCD
+P71,6,NCD
+P72,6,NCD
+P74,6,NCD
+P75,6,NCD
+P76,6,NCD
+P78,6,NCD
+P80,6,NCD
+P81,6,NCD
+P82,6,NCD
+P83,6,NCD
+P92,6,NCD
+P93,6,NCD
+P94,6,NCD
+R00,6,NCD
+R01,6,NCD
+R03,6,NCD
+R04,6,NCD
+R05,6,NCD
+R06,6,NCD
+R11,6,NCD
+R12,6,NCD
+R13,6,NCD
+R14,6,NCD
+R15,6,NCD
+R16,6,NCD
+R17,6,NCD
+R18,6,NCD
+R19,6,NCD
+R20,6,NCD
+R21,6,NCD
+R22,6,NCD
+R23,6,NCD
+R26,6,NCD
+R27,6,NCD
+R29,6,NCD
+R30,6,NCD
+R31,6,NCD
+R32,6,NCD
+R33,6,NCD
+R34,6,NCD
+R35,6,NCD
+R36,6,NCD
+R37,6,NCD
+R38,6,NCD
+R39,6,NCD
+R40,6,NCD
+R41,6,NCD
+R42,6,NCD
+R43,6,NCD
+R44,6,NCD
+R45,6,NCD
+R46,6,NCD
+R47,6,NCD
+R48,6,NCD
+R49,6,NCD
+R55,6,NCD
+R56,6,NCD
+R59,6,NCD
+R63,6,NCD
+R70,6,NCD
+R71,6,NCD
+R72,6,NCD
+R73,6,NCD
+R74,6,NCD
+R76,6,NCD
+R77,6,NCD
+R80,6,NCD
+R81,6,NCD
+R82,6,NCD
+R84,6,NCD
+R85,6,NCD
+R86,6,NCD
+R87,6,NCD
+R90,6,NCD
+R91,6,NCD
+D50,8,Nutritional
+D51,8,Nutritional
+D52,8,Nutritional
+D53,8,Nutritional
+E00,8,Nutritional
+E01,8,Nutritional
+E02,8,Nutritional
+E40,8,Nutritional
+E41,8,Nutritional
+E42,8,Nutritional
+E43,8,Nutritional
+E44,8,Nutritional
+E45,8,Nutritional
+E46,8,Nutritional
+E50,8,Nutritional
+E51,8,Nutritional
+E52,8,Nutritional
+E53,8,Nutritional
+E54,8,Nutritional
+E55,8,Nutritional
+E56,8,Nutritional
+E59,8,Nutritional
+E60,8,Nutritional
+E61,8,Nutritional
+E63,8,Nutritional
+E64,8,Nutritional
+X53,8,Nutritional
+X54,8,Nutritional
+ZZ11,4,Other Infections
+ZZ12,6,NCD
+ZZ13,6,NCD
+ZZ15,6,NCD
+P07,5,Congenital anomalies
+P01,5,Congenital anomalies
+P05,5,Congenital anomalies
+P21,5,Congenital anomalies
+P27,6,NCD

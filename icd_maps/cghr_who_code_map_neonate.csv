@@ -1,0 +1,307 @@
+icd_code,cghr_code,cghr_label
+P00,3,Birth asphyxia & birth trauma
+P02,3,Birth asphyxia & birth trauma
+P03,3,Birth asphyxia & birth trauma
+P10,3,Birth asphyxia & birth trauma
+P11,3,Birth asphyxia & birth trauma
+P12,3,Birth asphyxia & birth trauma
+P13,3,Birth asphyxia & birth trauma
+P14,3,Birth asphyxia & birth trauma
+P15,3,Birth asphyxia & birth trauma
+P20,3,Birth asphyxia & birth trauma
+P21,3,Birth asphyxia & birth trauma
+P24,3,Birth asphyxia & birth trauma
+P29,3,Birth asphyxia & birth trauma
+P50,3,Birth asphyxia & birth trauma
+P90,3,Birth asphyxia & birth trauma
+P91,3,Birth asphyxia & birth trauma
+P01,1,Prematurity & low birthweight
+P05,1,Prematurity & low birthweight
+P07,1,Prematurity & low birthweight
+P22,1,Prematurity & low birthweight
+P25,1,Prematurity & low birthweight
+P26,1,Prematurity & low birthweight
+P27,1,Prematurity & low birthweight
+P28,1,Prematurity & low birthweight
+P52,1,Prematurity & low birthweight
+P61,1,Prematurity & low birthweight
+P77,1,Prematurity & low birthweight
+R04,1,Prematurity & low birthweight
+A37,2,Neonatal Infections
+H65,2,Neonatal Infections
+H66,2,Neonatal Infections
+H67,2,Neonatal Infections
+H68,2,Neonatal Infections
+H70,2,Neonatal Infections
+H71,2,Neonatal Infections
+J00,2,Neonatal Infections
+J01,2,Neonatal Infections
+J02,2,Neonatal Infections
+J03,2,Neonatal Infections
+J04,2,Neonatal Infections
+J05,2,Neonatal Infections
+J06,2,Neonatal Infections
+J07,2,Neonatal Infections
+J08,2,Neonatal Infections
+J09,2,Neonatal Infections
+J10,2,Neonatal Infections
+J11,2,Neonatal Infections
+J12,2,Neonatal Infections
+J13,2,Neonatal Infections
+J14,2,Neonatal Infections
+J15,2,Neonatal Infections
+J16,2,Neonatal Infections
+J17,2,Neonatal Infections
+J18,2,Neonatal Infections
+J19,2,Neonatal Infections
+J20,2,Neonatal Infections
+J21,2,Neonatal Infections
+J22,2,Neonatal Infections
+J32,2,Neonatal Infections
+J36,2,Neonatal Infections
+J85,2,Neonatal Infections
+J86,2,Neonatal Infections
+P23,2,Neonatal Infections
+U04,2,Neonatal Infections
+A20,2,Neonatal Infections
+A21,2,Neonatal Infections
+A22,2,Neonatal Infections
+A23,2,Neonatal Infections
+A24,2,Neonatal Infections
+A25,2,Neonatal Infections
+A26,2,Neonatal Infections
+A27,2,Neonatal Infections
+A28,2,Neonatal Infections
+A32,2,Neonatal Infections
+A38,2,Neonatal Infections
+A40,2,Neonatal Infections
+A41,2,Neonatal Infections
+A42,2,Neonatal Infections
+A43,2,Neonatal Infections
+A44,2,Neonatal Infections
+A46,2,Neonatal Infections
+A48,2,Neonatal Infections
+A49,2,Neonatal Infections
+A68,2,Neonatal Infections
+A69,2,Neonatal Infections
+A70,2,Neonatal Infections
+A74,2,Neonatal Infections
+A75,2,Neonatal Infections
+A77,2,Neonatal Infections
+A78,2,Neonatal Infections
+A79,2,Neonatal Infections
+B95,2,Neonatal Infections
+B96,2,Neonatal Infections
+H10,2,Neonatal Infections
+H60,2,Neonatal Infections
+I30,2,Neonatal Infections
+I32,2,Neonatal Infections
+I33,2,Neonatal Infections
+I39,2,Neonatal Infections
+I40,2,Neonatal Infections
+I41,2,Neonatal Infections
+K65,2,Neonatal Infections
+K67,2,Neonatal Infections
+K81,2,Neonatal Infections
+L00,2,Neonatal Infections
+L01,2,Neonatal Infections
+L02,2,Neonatal Infections
+L03,2,Neonatal Infections
+L04,2,Neonatal Infections
+L08,2,Neonatal Infections
+M00,2,Neonatal Infections
+M01,2,Neonatal Infections
+M60,2,Neonatal Infections
+M86,2,Neonatal Infections
+N10,2,Neonatal Infections
+N30,2,Neonatal Infections
+N34,2,Neonatal Infections
+N41,2,Neonatal Infections
+N49,2,Neonatal Infections
+N61,2,Neonatal Infections
+P35,2,Neonatal Infections
+P36,2,Neonatal Infections
+P37,2,Neonatal Infections
+P38,2,Neonatal Infections
+P39,2,Neonatal Infections
+A39,2,Neonatal Infections
+A81,2,Neonatal Infections
+A82,2,Neonatal Infections
+A83,2,Neonatal Infections
+A84,2,Neonatal Infections
+A85,2,Neonatal Infections
+A86,2,Neonatal Infections
+A87,2,Neonatal Infections
+A88,2,Neonatal Infections
+A89,2,Neonatal Infections
+G00,2,Neonatal Infections
+G01,2,Neonatal Infections
+G02,2,Neonatal Infections
+G03,2,Neonatal Infections
+G04,2,Neonatal Infections
+G05,2,Neonatal Infections
+G06,2,Neonatal Infections
+G07,2,Neonatal Infections
+G08,2,Neonatal Infections
+G09,2,Neonatal Infections
+P96,6,Ill-defined
+R02,6,Ill-defined
+R07,6,Ill-defined
+R09,6,Ill-defined
+R10,6,Ill-defined
+R25,6,Ill-defined
+R51,6,Ill-defined
+R52,6,Ill-defined
+R53,6,Ill-defined
+R54,6,Ill-defined
+R57,6,Ill-defined
+R58,6,Ill-defined
+R60,6,Ill-defined
+R61,6,Ill-defined
+R62,6,Ill-defined
+R64,6,Ill-defined
+R68,6,Ill-defined
+R69,6,Ill-defined
+R78,6,Ill-defined
+R79,6,Ill-defined
+R83,6,Ill-defined
+R89,6,Ill-defined
+R92,6,Ill-defined
+R93,6,Ill-defined
+R94,6,Ill-defined
+R95,6,Ill-defined
+R96,6,Ill-defined
+R97,6,Ill-defined
+R98,6,Ill-defined
+R99,6,Ill-defined
+P58,2,Neonatal Infections
+P59,2,Neonatal Infections
+D64,1,Prematurity & low birthweight
+P80,1,Prematurity & low birthweight
+P51,3,Birth asphyxia & birth trauma
+G40,3,Birth asphyxia & birth trauma
+Q00,4,Congenital anomalies
+Q01,4,Congenital anomalies
+Q02,4,Congenital anomalies
+Q03,4,Congenital anomalies
+Q04,4,Congenital anomalies
+Q05,4,Congenital anomalies
+Q06,4,Congenital anomalies
+Q07,4,Congenital anomalies
+Q08,4,Congenital anomalies
+Q09,4,Congenital anomalies
+Q10,4,Congenital anomalies
+Q11,4,Congenital anomalies
+Q12,4,Congenital anomalies
+Q13,4,Congenital anomalies
+Q14,4,Congenital anomalies
+Q15,4,Congenital anomalies
+Q16,4,Congenital anomalies
+Q17,4,Congenital anomalies
+Q18,4,Congenital anomalies
+Q19,4,Congenital anomalies
+Q20,4,Congenital anomalies
+Q21,4,Congenital anomalies
+Q22,4,Congenital anomalies
+Q23,4,Congenital anomalies
+Q24,4,Congenital anomalies
+Q25,4,Congenital anomalies
+Q26,4,Congenital anomalies
+Q27,4,Congenital anomalies
+Q28,4,Congenital anomalies
+Q29,4,Congenital anomalies
+Q30,4,Congenital anomalies
+Q31,4,Congenital anomalies
+Q32,4,Congenital anomalies
+Q33,4,Congenital anomalies
+Q34,4,Congenital anomalies
+Q35,4,Congenital anomalies
+Q36,4,Congenital anomalies
+Q37,4,Congenital anomalies
+Q38,4,Congenital anomalies
+Q39,4,Congenital anomalies
+Q40,4,Congenital anomalies
+Q41,4,Congenital anomalies
+Q42,4,Congenital anomalies
+Q43,4,Congenital anomalies
+Q44,4,Congenital anomalies
+Q45,4,Congenital anomalies
+Q46,4,Congenital anomalies
+Q47,4,Congenital anomalies
+Q48,4,Congenital anomalies
+Q49,4,Congenital anomalies
+Q50,4,Congenital anomalies
+Q51,4,Congenital anomalies
+Q52,4,Congenital anomalies
+Q53,4,Congenital anomalies
+Q54,4,Congenital anomalies
+Q55,4,Congenital anomalies
+Q56,4,Congenital anomalies
+Q57,4,Congenital anomalies
+Q58,4,Congenital anomalies
+Q59,4,Congenital anomalies
+Q60,4,Congenital anomalies
+Q61,4,Congenital anomalies
+Q62,4,Congenital anomalies
+Q63,4,Congenital anomalies
+Q64,4,Congenital anomalies
+Q65,4,Congenital anomalies
+Q66,4,Congenital anomalies
+Q67,4,Congenital anomalies
+Q68,4,Congenital anomalies
+Q69,4,Congenital anomalies
+Q70,4,Congenital anomalies
+Q71,4,Congenital anomalies
+Q72,4,Congenital anomalies
+Q73,4,Congenital anomalies
+Q74,4,Congenital anomalies
+Q75,4,Congenital anomalies
+Q76,4,Congenital anomalies
+Q77,4,Congenital anomalies
+Q78,4,Congenital anomalies
+Q79,4,Congenital anomalies
+Q80,4,Congenital anomalies
+Q81,4,Congenital anomalies
+Q82,4,Congenital anomalies
+Q83,4,Congenital anomalies
+Q84,4,Congenital anomalies
+Q85,4,Congenital anomalies
+Q86,4,Congenital anomalies
+Q87,4,Congenital anomalies
+Q88,4,Congenital anomalies
+Q89,4,Congenital anomalies
+Q90,4,Congenital anomalies
+Q91,4,Congenital anomalies
+Q92,4,Congenital anomalies
+Q93,4,Congenital anomalies
+Q94,4,Congenital anomalies
+Q95,4,Congenital anomalies
+Q96,4,Congenital anomalies
+Q97,4,Congenital anomalies
+Q98,4,Congenital anomalies
+Q99,4,Congenital anomalies
+P92,1,Prematurity & low birthweight
+R06,3,Birth asphyxia & birth trauma
+W79,3,Birth asphyxia & birth trauma
+C76,4,Congenital anomalies
+A00,2,Neonatal Infections
+A01,2,Neonatal Infections
+A02,2,Neonatal Infections
+A03,2,Neonatal Infections
+A04,2,Neonatal Infections
+A05,2,Neonatal Infections
+A06,2,Neonatal Infections
+A07,2,Neonatal Infections
+A08,2,Neonatal Infections
+A09,2,Neonatal Infections
+A33,2,Neonatal Infections
+A34,2,Neonatal Infections
+A35,2,Neonatal Infections
+O601,1,Prematurity & low birthweight
+Z37,3,Birth asphyxia & birth trauma
+P351,2,Neonatal Infections
+P353,2,Neonatal Infections
+A90,2,Neonatal Infections
+P57,5,Other
+B54,2,Neonatal Infections
+O85,2,Neonatal Infections
