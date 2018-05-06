@@ -29,10 +29,6 @@ def main():
 
 def run(infile, vec_size, outfile, stem=False):
 
-    bin_dir = "/u/sjeblee/tools/word2vec/word2vec/bin"
-
-    if not os.path.exists(bin_dir):
-        print "Warning: word2vec bin dir does not exist!"
     if not os.path.exists(infile):
         print "Warning: infile does not exist!"
 
@@ -47,7 +43,7 @@ def run(infile, vec_size, outfile, stem=False):
     num_threads = 12
 
     print "-- Training vectors..."
-    vec_model = Word2Vec(sentences, size=int(vec_size), window=window_size, min_count=1, workers=num_threads, negative=0, sg=1)
+    vec_model = Word2Vec(sentences, size=int(vec_size), window=window_size, min_count=2, workers=num_threads, negative=5, sg=0)
     #vec_model = FastText(sentences, size=int(vec_size), window=window_size, min_count=1, word_ngrams=1, min_n=2, max_n=6, workers=num_threads, negative=0)
     vec_data = outfile + ".model"
     vec_model.save(vec_data)
@@ -58,12 +54,10 @@ def run(infile, vec_size, outfile, stem=False):
 
 def get(word, model):
     dim = model.vector_size
-    if word in model: #.wv.vocab:
+    if word in model:
         return list(model[word])
     else:
         return data_util.zero_vec(dim)
-    #return model[word]
-    #return model.get_vector(word)
 
 def load(filename):
     if '.bin' in filename:
