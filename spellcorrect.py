@@ -114,14 +114,15 @@ def run(infile, outfile, arg_lm=False, fix_keywords=True):
         # Fix keyword spelling
         if fix_keywords:
             keywords = extract_features.get_keywords(child).replace(';',',')
+            keywords = keywords.replace('|', ',')
             keywords_fixed = []
             for kw_phrase in keywords.strip().split(','):
                 kw_fixed = ""
                 prevwords = []
                 prevn = 4
                 for word in kw_phrase.split(' '):
+                    word = word.strip().lower().translate(None, string.punctuation)
                     if len(word) > 0:
-                        word = word.lower()
                         # Hand-crafted mappings
                         if word in mapping.keys():
                             kw_fixed = kw_fixed + " " + mapping[word]
@@ -144,7 +145,9 @@ def run(infile, outfile, arg_lm=False, fix_keywords=True):
                             prevwords.append(bestw)
                         if len(prevwords) > prevn:
                             del prevwords[0]
-                keywords_fixed.append(kw_fixed.strip())
+                kw_final = kw_fixed.strip()
+                if kw_final != "" and kw_final not in keywords_fixed:
+                    keywords_fixed.append(kw_final)
         node = etree.SubElement(child, "keywords_spell")
         node.text = ','.join(keywords_fixed)
 
