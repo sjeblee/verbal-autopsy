@@ -30,12 +30,12 @@ from sklearn.feature_selection import SelectKBest, f_classif, chi2
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.pipeline import make_pipeline
 
-import attention_utils
+#import attention_utils
 import cluster_keywords
 import data_util
 import model_library
 import rebalance
-from layers import Attention
+#from layers import Attention
 
 global anova_filter
 labelencoder = None
@@ -1139,18 +1139,19 @@ def attention(inputs, time_steps, input_dim):
     output_attention_mul = merge([inputs, a_probs], name='attention_mul', mode='mul')
     return output_attention_mul
 
-def get_attention_vector(model, test_input):
+#def get_attention_vector(model, test_input):
     #attention_vectors = []
     #for i in range(300):
     #testing_inputs_1, testing_outputs = get_data_recurrent(1, TIME_STEPS, INPUT_DIM)
-    attention_vector = numpy.mean(attention_utils.get_activations(model, test_input,
-                                                   print_shape_only=True,
-                                                   layer_name='attention_vec')[0], axis=2).squeeze()
+    #attention_vector = numpy.mean(attention_utils.get_activations(model, test_input,
+    #                                               print_shape_only=True,
+    #                                               layer_name='attention_vec')[0], axis=2).squeeze()
         #print('attention =', attention_vector)
     #assert (numpy.sum(attention_vector) - 1.0) < 1e-5
     #attention_vectors.append(attention_vector)
     #attention_vector_final = np.mean(np.array(attention_vectors), axis=0)
-    return attention_vector
+
+    #return attention_vector
 
 def create_anova_filter(X, Y, function, num_feats):
     global anova_filter
