@@ -3,6 +3,17 @@
 Verbal Autopsy pipeline
 Developed by Serena Jeblee (sjeblee@cs.toronto.edu) at University of Toronto
 
+Run the pipeline:
+./pipeline.sh
+
+pipeline.py: main pipeline script
+spellcorrect.py: spelling correction for narratives and keywords
+extract_features.py: feature extraction
+model.py: passes the data to the model and set parameters
+model_library.py: the actual model functions (Keras w/ Theano backend)
+model_library_torch.py: model functions in PyTorch
+results_stats.py: calculates metrics from predicted labels
+
 Requires:
 
 Python 2.7 and the following Python modules:
@@ -11,6 +22,10 @@ nltk
 numpy
 scikit-learn
 theano
+
+For PyTorch models (model_library_torch), you will need python 3 and:
+pytorch
+numpy
 
 Other module-specific requirements:
 
