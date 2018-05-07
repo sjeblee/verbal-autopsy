@@ -42,6 +42,8 @@ def main():
     argparser.add_argument('-z', '--featurename', action="store", dest="featurename")
     argparser.add_argument('-b', '--rebalance', action="store", dest="rebalance")
     argparser.add_argument('-v', '--vectors', action="store", dest="vecfile")
+    argparser.add_argument('-i', '--prefix', action="store", dest="prefix")
+    argparser.add_argument('-a', '--dataloc', action="store", dest="dataloc")
     args = argparser.parse_args()
 
     if not (args.train and args.name):
@@ -132,11 +134,11 @@ def main():
     #nodes = 600
 
     if experiment == "traintest":
-        run(args.model, modelname, args.train, testset, args.features, fn, args.name, pre, labels, arg_dev=dev, arg_hyperopt=False, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes, arg_dataset=dataset, arg_rebalance=rebal, arg_vecfile=args.vecfile)
+        run(args.model, modelname, args.train, testset, args.features, fn, args.name, pre, labels, arg_dev=dev, arg_hyperopt=False, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes, arg_dataset=dataset, arg_rebalance=rebal, arg_vecfile=args.vecfile, arg_dataloc=args.dataloc)
     elif experiment == "hyperopt":
         run(args.model, modelname, args.train, testset, args.features, fn, args.name, pre, labels, arg_dev=dev, arg_hyperopt=True, arg_dataset=dataset)
     elif experiment == "crossval":
-        crossval(models, args.train, args.features, fn, args.name, pre, labels, args.data, arg_vecfile=args.vecfile)
+        crossval(models, args.train, args.features, fn, args.name, pre, labels, args.data, arg_vecfile=args.vecfile, arg_dataloc=args.dataloc)
 
     end_time = time.time()
     total_time = end_time - start_time
@@ -145,10 +147,10 @@ def main():
     else:
         print "Total time: " + str(total_time/60) + " mins"
 
-def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dataset="mds+rct", arg_vecfile=""):
+def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dataset="mds+rct", arg_vecfile="", arg_dataloc="/u/sjeblee/research/va/data/datasets"):
     print "10-fold cross-validation"
     models = arg_models.split(',')
-    dataloc = "/u/sjeblee/research/va/data/datasets"
+    dataloc = arg_dataloc
     vecfile = None
     joint_training = False
     if arg_train == 'all':
@@ -367,7 +369,7 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
             
             run(m, modelname, trainname, trainname, arg_features, arg_featurename, name, arg_preprocess, arg_labels, arg_dev=False, arg_hyperopt=False, arg_dataset=dset, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes, dataloc=datadir, arg_vecfile=vecfile, arg_crossval_num=z)
 
-def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, arg_dataloc, arg_vecfile, crossval_num=None):
+def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, arg_dataloc, arg_vecfile, crossval_num=None, arg_prefix="/u/sjeblee/research/va/data"):
     if crossval_num is not None:
         trainname = arg_train + "_" + str(crossval_num)
         devname = arg_test + "_" + str(crossval_num)
@@ -386,11 +388,9 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
 
     # Location of data files
     dataloc = arg_dataloc
-    resultsloc="/u/sjeblee/research/va/data/" + arg_name
+    resultsloc = arg_prefix + "/" + arg_name
     heideldir="/u/sjeblee/tools/heideltime/heideltime-standalone"
     #scriptdir="/u/sjeblee/research/va/git/verbal-autopsy"
-    if crossval_num is not None:
-        resultsloc = "/nbb/sjeblee/va/data/" + arg_name
 
     # Setup
     if not os.path.exists(resultsloc):
@@ -544,12 +544,12 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
             extract_features.run(trainset, trainfeatures, devset, devfeatures, features, labels, stem, lemma, element)
     return trainfeatures, devfeatures, devresults
 
-def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev=True, arg_hyperopt=False, arg_dataset="mds", arg_n_feats=398, arg_anova="f_classif", arg_nodes=297, dataloc="/u/sjeblee/research/va/data/datasets", arg_rebalance="", arg_vecfile=None, arg_crossval_num=None):
+def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev=True, arg_hyperopt=False, arg_dataset="mds", arg_n_feats=398, arg_anova="f_classif", arg_nodes=297, arg_dataloc="/u/sjeblee/research/va/data/datasets", arg_rebalance="", arg_vecfile=None, arg_crossval_num=None, arg_prefix="/u/sjeblee/research/va/data"):
 
-    dataloc = dataloc + "/" + arg_dataset
-    resultsloc="/u/sjeblee/research/va/data/" + arg_name
-    if arg_crossval_num is not None:
-        resultsloc = "/nbb/sjeblee/va/data/" + arg_name
+    dataloc = arg_dataloc + "/" + arg_dataset
+    resultsloc = arg_prefix + "/" + arg_name
+
+    # Joint training
     joint = False
     if arg_train == 'all' and arg_test == 'all':
         joint = True

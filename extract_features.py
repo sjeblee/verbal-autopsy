@@ -1,7 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 # Extract features from the xml data
-# Feature names: keyword_bow, keyword_tfidf, narr_bow, narr_tfidf
 
 from lxml import etree
 from sklearn.decomposition import LatentDirichletAllocation
@@ -47,6 +46,9 @@ def main():
     else:
         run(args.trainfile, args.trainoutfile, args.testfile, args.testoutfile, args.featurenames, arg_vecfile=vecfile)
 
+''' Run feature extraction for the training and testing files
+    This is the function that is called from pipeline.py
+'''
 def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames="narr_count", arg_labelname="Final_Code", stem=False, lemma=False, arg_element="narrative", arg_vecfile=""):
     print "extract_features from " + arg_train_in + " and " + arg_test_in + " : " + arg_element
 
@@ -61,6 +63,7 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
     labelname = arg_labelname
     print "vecfile: " + vecfile
 
+    # Feature types
     global featurenames, rec_type, checklist, dem, kw_words, kw_bow, kw_tfidf, narr_bow, kw_count, kw_vec, kw_clusters, narr_count, narr_tfidf, narr_vec, narr_seq, narr_dem, event_vec, event_seq, lda, symp_train, symp_count
     rec_type = "type"
     checklist = "checklist"
@@ -105,6 +108,7 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
     print "narr_features: " + str(narr_features)
     stopwords = []
 
+    # Remove a small set of stopwords from the narrative
     if kw_features or narr_features:
         with open("stopwords_small.txt", "r") as f:
             for line in f:
@@ -113,6 +117,7 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
     global tfidfVectorizer
     global lda_model
 
+    # Extract the features
     keys = extract(arg_train_in, arg_train_out, None, stem, lemma, arg_element, arg_vecfile=vecfile)
     print "dict_keys: " + str(keys)
     extract(arg_test_in, arg_test_out, keys, stem, lemma, arg_element, arg_vecfile=vecfile)
@@ -121,6 +126,8 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
     totaltime = endtime - starttime
     print "feature extraction took " + str(totaltime/60) + " mins"
 
+''' Extract features from an xml file
+'''
 def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrative", arg_rebalance="", arg_vecfile=""):
     print "arg_vecfile: " + arg_vecfile
     train = False
@@ -226,6 +233,7 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
                     tags = ['EVENT', 'TIMEX3']
                     narr_string = data_util.text_from_tags(narr_string, tags)
 
+                # Add demographic information to the narrative text before generating narr_vec features
                 if narr_dem in featurenames:
                     age = features["CL_DeathAge"]
                     # Convert ageunit and gender to words
@@ -527,6 +535,10 @@ def rebalance_data(matrix, dict_keys, rebal_name):
         new_matrix.append(new_entry)
     return new_matrix
 
+'''
+   Get the physician-generated keyword from a record
+   elem: the xml element representing the record
+'''
 def get_keywords(elem, name=None):
     keyword_string = ""
     if name is None:
@@ -562,6 +574,9 @@ def add_keywords(keywords, keyword_string, translate_table, stopwords):
                 if w2 not in stopwords:
                     keywords.add(w2)
 
+'''
+Get the narratives from an xml file
+'''
 def get_narrs(filename, element="narrative"):
     narratives = []
     # Get the xml from file
@@ -580,25 +595,5 @@ def get_narrs(filename, element="narrative"):
             #print narr_string.strip().lower()
             narratives.append(narr_string.strip().lower())
     return narratives
-
-#def load_word2vec(vecfile):
-#    # Create word2vec mapping
-#    word2vec = {}
-#    dim = 0
-#    with open(vecfile, "r") as f:
-#        firstline = True
-#        for line in f:
-#            # Ignore the first line of the file
-#            if firstline:
-#                firstline = False
-#            else:
-#                tokens = line.strip().split(' ')
-#                vec = []
-#                word = tokens[0]
-#                for token in tokens[1:]:
-#                    vec.append(float(token))
-#                word2vec[word] = vec
-#                dim = len(vec)
-#    return word2vec, dim
 
 if __name__ == "__main__":main()
