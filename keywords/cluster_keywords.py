@@ -19,7 +19,7 @@ import os
 import textrank
 import time
 
-import extract_features_temp as extract_features
+import extract_features
 import word2vec
 
 numpy.set_printoptions(threshold=numpy.nan)
