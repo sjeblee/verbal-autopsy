@@ -24,7 +24,7 @@ from keras.utils import plot_model
 import cluster_keywords
 import data_util
 import rebalance
-from layers import Attention
+#from layers import Attention
 
 vec_types = ["narr_vec", "narr_seq", "event_vec", "event_seq"]
 numpy.set_printoptions(threshold=numpy.inf)
