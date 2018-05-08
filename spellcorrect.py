@@ -29,7 +29,7 @@ def main():
         run(args.infile, args.outfile)
 
 def run(infile, outfile, arg_lm=False, fix_keywords=True):
-    d = enchant.DictWithPWL("en_CA", "/u/sjeblee/research/va/git/verbal-autopsy/dictionary.txt")
+    d = enchant.DictWithPWL("en_CA", "dictionary.txt")
     mapping = {'labor':'labour', 'laborer':'labourer', 'color':'colour', 'yeras':'years', 'elergies':'allergies', 'around12':'around 12', 'learnt':'learned', 'rigor':'rigour', 'couldn':'couldn\'t', 'didnt':'didn\'t', 'didn':'didn\'t', 'neighbor':'neighbour', 'enjury':'injury', 'h/o':'h/o'}
 
     # Language model
