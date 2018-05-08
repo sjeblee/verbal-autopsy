@@ -370,6 +370,7 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
             run(m, modelname, trainname, trainname, arg_features, arg_featurename, name, arg_preprocess, arg_labels, arg_dev=False, arg_hyperopt=False, arg_dataset=dset, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes, dataloc=datadir, arg_vecfile=vecfile, arg_crossval_num=z)
 
 def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, arg_dataloc, arg_vecfile, crossval_num=None, arg_prefix="/u/sjeblee/research/va/data"):
+    print "setup prefix: " + arg_prefix
     if crossval_num is not None:
         trainname = arg_train + "_" + str(crossval_num)
         devname = arg_test + "_" + str(crossval_num)
@@ -546,6 +547,7 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
 
 def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev=True, arg_hyperopt=False, arg_dataset="mds", arg_n_feats=398, arg_anova="f_classif", arg_nodes=297, arg_dataloc="/u/sjeblee/research/va/data/datasets", arg_rebalance="", arg_vecfile=None, arg_crossval_num=None, arg_prefix="/u/sjeblee/research/va/data"):
 
+    print "run prefix: " + arg_prefix
     dataloc = arg_dataloc + "/" + arg_dataset
     resultsloc = arg_prefix + "/" + arg_name
 
@@ -555,14 +557,14 @@ def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_feature
         joint = True
 
     if joint:
-        trainfeatures_adult, devfeatures_adult, devresults_adult = setup(arg_modelname, 'adult', 'adult', arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, dataloc, arg_vecfile, crossval_num=arg_crossval_num)
-        trainfeatures_child, devfeatures_child, devresults_child = setup(arg_modelname, 'child', 'child', arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, dataloc, arg_vecfile, crossval_num=arg_crossval_num)
-        trainfeatures_neonate, devfeatures_neonate, devresults_neonate = setup(arg_modelname, 'neonate', 'neonate', arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, dataloc, arg_vecfile, crossval_num=arg_crossval_num)
+        trainfeatures_adult, devfeatures_adult, devresults_adult = setup(arg_modelname, 'adult', 'adult', arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, dataloc, arg_vecfile, crossval_num=arg_crossval_num, arg_prefix=arg_prefix)
+        trainfeatures_child, devfeatures_child, devresults_child = setup(arg_modelname, 'child', 'child', arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, dataloc, arg_vecfile, crossval_num=arg_crossval_num, arg_prefix=arg_prefix)
+        trainfeatures_neonate, devfeatures_neonate, devresults_neonate = setup(arg_modelname, 'neonate', 'neonate', arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, dataloc, arg_vecfile, crossval_num=arg_crossval_num, arg_prefix=arg_prefix)
         trainfeatures = [trainfeatures_adult, trainfeatures_child, trainfeatures_neonate]
         devfeatures = [devfeatures_adult, devfeatures_child, devfeatures_neonate]
         devresults = [devresults_adult, devresults_child, devresults_neonate]
     else:
-        trainfeatures, devfeatures, devresults = setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, dataloc, arg_vecfile)
+        trainfeatures, devfeatures, devresults = setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, dataloc, arg_vecfile, arg_prefix=arg_prefix)
 
     labels = arg_labels
     modeltype = arg_model # svm, knn, nn, lstm, nb, rf
