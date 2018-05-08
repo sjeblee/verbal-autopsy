@@ -10,7 +10,7 @@ import kenlm
 import re
 import string
 
-import extract_features_temp as extract_features
+import extract_features
 
 def main():
     argparser = argparse.ArgumentParser()
