@@ -134,7 +134,7 @@ def main():
     #nodes = 600
 
     if experiment == "traintest":
-        run(args.model, modelname, args.train, testset, args.features, fn, args.name, pre, labels, arg_dev=dev, arg_hyperopt=False, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes, arg_dataset=dataset, arg_rebalance=rebal, arg_vecfile=args.vecfile, arg_dataloc=args.dataloc)
+        run(args.model, modelname, args.train, testset, args.features, fn, args.name, pre, labels, arg_dev=dev, arg_hyperopt=False, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes, arg_dataset=dataset, arg_rebalance=rebal, arg_vecfile=args.vecfile, arg_dataloc=args.dataloc, arg_prefix=args.prefix)
     elif experiment == "hyperopt":
         run(args.model, modelname, args.train, testset, args.features, fn, args.name, pre, labels, arg_dev=dev, arg_hyperopt=True, arg_dataset=dataset)
     elif experiment == "crossval":
