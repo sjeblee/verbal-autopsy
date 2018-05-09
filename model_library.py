@@ -35,7 +35,8 @@ numpy.set_printoptions(threshold=numpy.inf)
     returns: the model and the modified X and Y arrays
 '''
 def nn_model(X, Y, num_nodes, act, num_epochs=10):
-    #X = numpy.asarray(X)
+    if type(X) is list:
+        X = numpy.asarray(X)
     #Y = to_categorical(Y)
     print "X.shape: " + str(X.shape)
     print "Y.shape: " + str(Y.shape)
