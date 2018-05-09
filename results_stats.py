@@ -91,8 +91,11 @@ def run(arg_infile, arg_outfile, arg_rank=1):
     # Calculate precision, recall, F1, and PCCC
     precision = metrics.precision_score(correct, predicted, average="weighted")
     recall = metrics.recall_score(correct, predicted, average="weighted")
-    total_recall = tp / (tp + fn)
+    #total_recall = tp / (tp + fn)
     f1 = metrics.f1_score(correct, predicted, average="weighted")
+    p_scores = metrics.precision_score(correct, predicted, average=None)
+    r_scores = metrics.recall_score(correct, predicted, average=None)
+    f1_scores = metrics.f1_score(correct, predicted, average=None)
 
     # PCCC
     pccc = ((tp/n) - (k/num_classes)) / (1 - (k/num_classes))
@@ -115,6 +118,11 @@ def run(arg_infile, arg_outfile, arg_rank=1):
         confusion_percent.append(row_percent)
 
     # Print metrics to terminal
+    print "Per class metrics:"
+    print "P, R, F1"
+    for x in range(len(p_scores)):
+        print str(p_scores[x]) + "," + str(r_scores[x]) + "," + str(f1_scores[x]) + "\n"
+
     print "Metrics:\n"
     print "p: " + str(precision) + "\n"
     print "r: " + str(recall) + "\n"
