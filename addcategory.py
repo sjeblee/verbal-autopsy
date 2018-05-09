@@ -41,7 +41,10 @@ def main():
         icd = "R99"
         # Skip if record already has an ICD cat
         cat_node = child.find(label)
-        if cat_node is None:
+        overwrite = True
+        if (cat_node is None) or overwrite:
+            if cat_node is not None:
+                child.remove(cat_node)
             node = child.find("Final_code")
             icd = None
             if node != None and node.text != None:
