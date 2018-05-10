@@ -36,7 +36,7 @@ def run(infile, outfile, arg_lm=False, fix_keywords=True):
     #lmfile = None
     #lm = None
     #if arg_lm:
-    lmfile = "/u/sjeblee/research/data/ICE-India/ice-lm-5.binary"
+    lmfile = "resources/ice-lm-5.binary"
     lm = kenlm.Model(lmfile)
 
     # Get the xml from file
