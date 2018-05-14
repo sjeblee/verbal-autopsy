@@ -34,13 +34,15 @@ def run(symptomfile, infile, outfile):
     tree.write(outfile)
 
 def narr_tag_symptoms(symptomfile, tree):
-
+   
+    starttag = '<SYMPTOM>'.encode('utf-8')
+    endtag = '</SYMPTOM>'.encode('utf-8')
     # Open csv file
     # csvfile_path = "/Users/yoona96/Desktop/nserc/SYMP.csv"
     csvfile_path = symptomfile
     mycsv = csv.reader(open(csvfile_path))
 
-    dir_path = os.path.dirname(csvfile_path)
+    dirpath = os.path.dirname(csvfile_path)
     narr_temp = dirpath + "temp.txt"
 
     symptoms = []
@@ -54,31 +56,32 @@ def narr_tag_symptoms(symptomfile, tree):
 
     root = tree.getroot()
 
-    for child in rood:
+    for child in root:
         node = child.find("narrative")
         narr = ""
         if node != None:
-            narr = node.text.encode('utf-8')
-        
-        ngrams = get_substrings(narr)
-        new_narr = narr
+            narr = node.text.encode('utf-8').strip()
+	
+       	    ngrams = get_substrings_with_limit(narr, max_word_count)
+            new_narr = narr.encode('utf-8').strip()
 
-        for substring in ngrams:
-            if (substring in symptoms):
-                startindex = new_narr.find(substring)
-                endindex = startindex + len(substring)
-                new_narr = new_narr[0:startindex] + "<symptom> " + substring + " </symptom>" + new_narr[endindex:]
-            node.text = new_narr
+            for substring in ngrams:
+                if (substring in symptoms):
+                    startindex = new_narr.find(substring)
+                    endindex = startindex + len(substring)
+                    new_narr = new_narr[0:startindex].encode('utf-8') + starttag + substring.encode('utf-8') + endtag + new_narr[endindex:].encode('utf-8')
+            print(new_narr)
+	    node.text = new_narr.strip()
 
 
-        '''if len(new_narr) > 0:
-            temp = open(narr_temp, "w")
-            temp.write("<TEXT>")
-            print "narr: " + new_narr
-            temp.write(new_narr)
-            temp.write("</TEXT>\n")
-            temp.close()
-        '''
+            '''if len(new_narr) > 0:
+                temp = open(narr_temp, "w")
+                temp.write("<TEXT>")
+                print "narr: " + new_narr
+                temp.write(new_narr)
+                temp.write("</TEXT>\n")
+                temp.close()
+            '''
 
     return tree
 
@@ -91,8 +94,8 @@ def count_max_len_symptoms(symptoms):
     max_word_count = 0
     for symptom in symptoms:
         curr_count = len(symptom.split(' '))
-        if curr > max_word_count:
-            max_word_count = curr
+        if curr_count > max_word_count:
+            max_word_count = curr_count
 
     return max_word_count
 
