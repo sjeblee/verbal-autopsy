@@ -35,8 +35,8 @@ def run(symptomfile, infile, outfile):
 
 def narr_tag_symptoms(symptomfile, tree):
    
-    starttag = '<SYMPTOM>'.encode('utf-8')
-    endtag = '</SYMPTOM>'.encode('utf-8')
+    starttag = '<SYMPTOM>'
+    endtag = '</SYMPTOM>'
     # Open csv file
     # csvfile_path = "/Users/yoona96/Desktop/nserc/SYMP.csv"
     csvfile_path = symptomfile
@@ -60,30 +60,69 @@ def narr_tag_symptoms(symptomfile, tree):
         node = child.find("narrative")
         narr = ""
         if node != None:
-            narr = node.text.encode('utf-8').strip()
-	
+            narr = node.text.encode('utf-8')
        	    ngrams = get_substrings_with_limit(narr, max_word_count)
-            new_narr = narr.encode('utf-8').strip()
 
-            for substring in ngrams:
-                if (substring in symptoms):
-                    startindex = new_narr.find(substring)
-                    endindex = startindex + len(substring)
-                    new_narr = new_narr[0:startindex].encode('utf-8') + starttag + substring.encode('utf-8') + endtag + new_narr[endindex:].encode('utf-8')
-            print(new_narr)
-	    node.text = new_narr.strip()
+            # Find all phrases that contains words in the list of symptoms. 
+            possible_phrases = find_possible_phrases(ngrams)
 
+            # Remove duplicates in possible phrases
+            clean_possible_phrases = remove_duplicates(possible_phrases)
 
-            '''if len(new_narr) > 0:
-                temp = open(narr_temp, "w")
-                temp.write("<TEXT>")
-                print "narr: " + new_narr
-                temp.write(new_narr)
-                temp.write("</TEXT>\n")
-                temp.close()
-            '''
+            # Sort possible phrases by start index
+            sorted_phrases = sorted(clean_possible_phrases, key=lambda tup: tup[1])
+            
+            lastindex = 0
+            to_be_tagged_phrases = []
+            i = 0
+            while i < len(sorted_phrases):
+                phrase = sorted_phrases[i]
+                start = phrase[1]
+                end = phrase[2]
+                if i == 0:
+                    to_be_tagged_phrases.append(phrase)
+                    lastindex = end
+                else:
+                    if end > lastindex:
+                        to_be_tagged_phrases.append(phrase)
+                        lastindex = end
+                i = i + 1
+
+            lastindex = 0
+            narr_symp = ""
+            narr_fixed = ""
+
+            for phrase in to_be_tagged_phrases:
+                phr = phrase[0]
+                start = phrase[1]
+                end = phrase[2]
+                if start > lastindex:
+                    narr_fixed = narr_fixed + narr[lastindex:start]
+                narr_fixed = narr_fixed + starttag + " " + narr[start:end] + " " + endtag
+                narr_symp = narr_symp + narr[start:end] + " "
+                lastindex = end
+
+            if lastindex < len(narr):
+                narr_fixed = narr_fixed + narr[lastindex:]
+
+            if node == None:
+            node = etree.SubElement(child, "narrative")
+            node.text = narr_fixed.encode('utf-8').strip()
+            node = etree.SubElement(child, "narr_symp")
+            node.text = narr_symp.encode('utf-8').strip()
+
+        '''if len(new_narr) > 0:
+            temp = open(narr_temp, "w")
+            temp.write("<TEXT>")
+            print "narr: " + new_narr
+            temp.write(new_narr)
+            temp.write("</TEXT>\n")
+            temp.close()
+        '''
 
     return tree
+
+
 
 ''' Find the symptom with the maximum word count. 
     It is to limit the length of the substring generated from narratives. 
@@ -99,6 +138,7 @@ def count_max_len_symptoms(symptoms):
 
     return max_word_count
 
+
 ''' Generate substrings from input string
     The maximum word count of each substring generated from input string is
     no larger than max_word_count. 
@@ -111,6 +151,58 @@ def get_substrings_with_limit(input_string, max_word_count):
     for sub in subs:
         substrings.append(' '.join(sub))
     return substrings
+
+
+''' Find all the phrases that contain words describing symptoms. 
+'''
+def find_possible_phrases(ngrams):
+
+    possible_phrases = []
+    for substring in ngrams:
+        # if the substring ends with punctuation.
+        if is_end_index_punc(substring):
+            temp_substring = substring[0:len(substring) - 1]
+            if (temp_substring in symptoms):
+                startindex = narr.find(substring)
+                while startindex != -1:
+                    endindex = startindex + len(substring)
+                    match = [substring, startindex, endindex]
+                    possible_phrases.append(match)
+                    startindex = narr.find(substring, endindex)
+        
+        # if the substring does not end with punctuation. 
+        else:
+            if (substring in symptoms):
+                startindex = narr.find(substring)
+                while startindex != -1:
+                    endindex = startindex + len(substring)
+                    match = [substring, startindex, endindex]
+                    possible_phrases.append(match)
+                    startindex = narr.find(substring, endindex)
+
+
+    return possible_phrases
+
+
+''' Remove duplicates in possible phrases
+'''
+def remove_duplicates(phrases):
+
+    clean_possible_phrases = []
+
+    for phrase in phrases:
+        if phrase not in clean_possible_phrases:
+            clean_possible_phrases.append(phrase)
+
+    return clean_possible_phrases
+
+''' Check whether the input string ends with punctuation. 
+'''
+def is_end_index_punc(input_string):
+    punc = ' :;,./?'
+    if input_string[len(input_string)-1] not in punc
+        return False
+    return True
 
 
 if __name__ == "__main__":main()
