@@ -28,12 +28,12 @@ def main():
         if node != None:
             narr = node.text.encode('utf-8')
         if len(narr) > 0:
-            tempname = "/u/sjeblee/research/va/data/temp.txt"
+            tempname = "../mds+rct/narrative/temp.txt"
             temp = open(tempname, "w")
             temp.write(narr)
             temp.close()
             # Run Stanford parser on narr
-            process = subprocess.Popen(["java", "-cp", "/p/spoclab/tools/Stanford/stanford-corenlp-full-2015-04-20/stanford-corenlp-3.5.2.jar:/p/spoclab/tools/Stanford/stanford-corenlp-full-2015-04-20/stanford-corenlp-3.5.2-models.jar", "edu.stanford.nlp.parser.nndep.DependencyParser", "-model", "/u/sjeblee/research/va/res/stanford/english_SD.gz", "-textFile", tempname, "-outFile", "-"], stdout=subprocess.PIPE)
+            process = subprocess.Popen(["java", "-cp", "../stanford-corenlp-full-2018-02-27/stanford-corenlp-3.9.1.jar:../stanford-corenlp-full-2018-02-27/stanford-corenlp-3.9.1-models.jar", "edu.stanford.nlp.parser.nndep.DependencyParser", "-model", "../edu/stanford/nlp/models/parser/nndep/english_SD.gz", "-textFile", tempname, "-outFile", "-"], stdout=subprocess.PIPE)
             output, err = process.communicate()
             newnode = etree.Element("narr_depparse")
             newnode.text = output.decode('utf-8')

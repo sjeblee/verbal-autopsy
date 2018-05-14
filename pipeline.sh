@@ -2,8 +2,8 @@
 # Script to run all the steps of the Verbal Autopsy pipeline
 
 # Directories for data input and output: SET THESE
-prefix="../../data"   # File output prefix
-dataloc="../../data/datasets"  # Location of data files (i.e. parent of mds+rct folder
+prefix="/Users/yoona96/Desktop/nserc/data"   # File output prefix
+dataloc="/Users/yoona96/Desktop/nserc/"  # Location of data files (i.e. parent of mds+rct folder
 
 name="va_nn_counts"   # Give the output folder a name, will be created in $prefix
 modelname="nn"        # Model type: one of: nn cnn svm rnn gru
@@ -14,7 +14,7 @@ labels="cghr_cat"     # ICD categories to use (leave this as cghr_cat)
 dataset="mds+rct"     # Dataset to use (leave this as mds+rct)
 trainset="adult"      # Training data to use: all adult child neonate
 devset="adult"        # Testing data to use: all adult child neonate
-vecfile="/u/sjeblee/research/va/data/datasets/mds+rct/narr+ice+medhelp.vectors.100" # Vectors for narr_vec features
+vecfile="/Users/yoona96/Desktop/nserc/mds+rct/narr+ice+medhelp.vectors.100" # Vectors for narr_vec features
 
 # Create the output directory
 mkdir -p $prefix/$name
