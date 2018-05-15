@@ -497,6 +497,7 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
         devset = devsp
         devname = devname + "_" + sympname
         trainname = trainname + "_" + sympname
+        element = "narr_symp"
 
     if "kwc" in pre:
         numc = "100"
