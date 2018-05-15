@@ -43,7 +43,7 @@ def narr_tag_symptoms(symptomfile, tree):
     mycsv = csv.reader(open(csvfile_path))
 
     dirpath = os.path.dirname(csvfile_path)
-    narr_temp = dirpath + "temp.txt"
+    narr_temp = dirpath + "/temp.txt"
 
     symptoms = []
 
@@ -62,9 +62,9 @@ def narr_tag_symptoms(symptomfile, tree):
         if node != None:
             narr = node.text.encode('utf-8')
        	    ngrams = get_substrings_with_limit(narr, max_word_count)
-
+	    ngrams = filter(None, ngrams)
             # Find all phrases that contains words in the list of symptoms. 
-            possible_phrases = find_possible_phrases(ngrams)
+            possible_phrases = find_possible_phrases(ngrams, symptoms, narr)
 
             # Remove duplicates in possible phrases
             clean_possible_phrases = remove_duplicates(possible_phrases)
@@ -106,19 +106,18 @@ def narr_tag_symptoms(symptomfile, tree):
                 narr_fixed = narr_fixed + narr[lastindex:]
 
             if node == None:
-            node = etree.SubElement(child, "narrative")
-            node.text = narr_fixed.encode('utf-8').strip()
+            	node = etree.SubElement(child, "narrative")
+            node.text = narr_fixed.decode('utf-8').strip()
             node = etree.SubElement(child, "narr_symp")
-            node.text = narr_symp.encode('utf-8').strip()
+            node.text = narr_symp.decode('utf-8').strip()
 
-        '''if len(new_narr) > 0:
+    
             temp = open(narr_temp, "w")
             temp.write("<TEXT>")
-            print "narr: " + new_narr
-            temp.write(new_narr)
+            print "narr: " + narr_fixed
+            temp.write(narr_fixed)
             temp.write("</TEXT>\n")
             temp.close()
-        '''
 
     return tree
 
@@ -146,7 +145,7 @@ def count_max_len_symptoms(symptoms):
 def get_substrings_with_limit(input_string, max_word_count):
     words = input_string.split(' ')
     length = len(words)
-    subs = [words[i:j+1] for i in xrange(length) for j in xrange(i,i + max_word_count)]
+    subs = [words[i:j+1] for i in xrange(length) for j in xrange(i,min(length,i + max_word_count))]
     substrings = []
     for sub in subs:
         substrings.append(' '.join(sub))
@@ -155,7 +154,7 @@ def get_substrings_with_limit(input_string, max_word_count):
 
 ''' Find all the phrases that contain words describing symptoms. 
 '''
-def find_possible_phrases(ngrams):
+def find_possible_phrases(ngrams, symptoms, narr):
 
     possible_phrases = []
     for substring in ngrams:
@@ -200,9 +199,8 @@ def remove_duplicates(phrases):
 '''
 def is_end_index_punc(input_string):
     punc = ' :;,./?'
-    if input_string[len(input_string)-1] not in punc
+    if input_string[len(input_string)-1] not in punc:
         return False
     return True
-
 
 if __name__ == "__main__":main()
