@@ -161,7 +161,7 @@ def find_possible_phrases(ngrams, symptoms, narr):
         # if the substring ends with punctuation.
         if is_end_index_punc(substring):
             temp_substring = substring[0:len(substring) - 1]
-            if (temp_substring in symptoms):
+            if (temp_substring.lower() in symptoms):
                 startindex = narr.find(substring)
                 while startindex != -1:
                     endindex = startindex + len(substring)
@@ -171,7 +171,7 @@ def find_possible_phrases(ngrams, symptoms, narr):
         
         # if the substring does not end with punctuation. 
         else:
-            if (substring in symptoms):
+            if (substring.lower() in symptoms):
                 startindex = narr.find(substring)
                 while startindex != -1:
                     endindex = startindex + len(substring)
