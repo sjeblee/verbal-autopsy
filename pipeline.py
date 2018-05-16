@@ -476,8 +476,8 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
 
     if "symp" in pre:
         print "Tagging symptoms..."
-        sympname = "medttk"
-        tagger_name = "medttk"
+        sympname = "symp"
+        tagger_name = "tag_symptoms"
         trainsp = dataloc + "/train_" + trainname + "_" + sympname + ".xml"
         devsp = ""
         if arg_dev:
