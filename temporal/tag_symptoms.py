@@ -3,7 +3,8 @@
 # Identify and label symptom phrases in narrative
 
 import sys
-sys.path.append('/u/sjeblee/research/va/git/verbal-autopsy')
+#sys.path.append('/u/sjeblee/research/va/git/verbal-autopsy')
+sys.path.append('/u/yoona/ypark_branch/verbal-autopsy')
 
 from lxml import etree
 import argparse
@@ -14,6 +15,8 @@ import subprocess
 import data_util
 import extract_features
 import model_seq
+
+import csv
 
 global symp_narr_tag
 symp_narr_tag = "narr_symp"
@@ -39,7 +42,7 @@ def main():
         exit()
 
 
-    run(args.infile, args.outfile, args.tagger, args.symptomfile)
+    run(args.infile, args.outfile, args.tagger)
 
 def run(infile, outfile, tagger="keyword_match"):
     if tagger == "crf":
@@ -52,7 +55,7 @@ def run(infile, outfile, tagger="keyword_match"):
             tree = medttk(tree)
         elif tagger == seq2seq:
             tree = seq2seq(tree)
-        eilf tagger == "tag_symptoms":
+        elif tagger == "tag_symptoms":
             tree = tag_symptoms(tree)
         tree.write(outfile)
         data_util.fix_escaped_chars(outfile)
@@ -225,10 +228,10 @@ def medttk(tree):
             print "med_narr: " + med_narr
     return tree
 
-def tag_symptoms(symptomfile, tree):
+def tag_symptoms(tree):
    
-    #starttag = '<SYMPTOM>'
-    #endtag = '</SYMPTOM>'
+    starttag = '<SYMPTOM>'
+    endtag = '</SYMPTOM>'
     
 
     # Open csv file
@@ -256,7 +259,7 @@ def tag_symptoms(symptomfile, tree):
         if node != None:
             narr = node.text.encode('utf-8')
             ngrams = get_substrings_with_limit(narr, max_word_count)
-        ngrams = filter(None, ngrams)
+	    ngrams = filter(None, ngrams)
             # Find all phrases that contains words in the list of symptoms. 
             possible_phrases = find_possible_phrases(ngrams, symptoms, narr)
 

@@ -107,18 +107,18 @@ def narr_tag_symptoms(symptomfile, tree):
 
             if node == None:
             	node = etree.SubElement(child, "narrative")
-            node.text = narr_fixed.decode('utf-8').strip()
+          # node.text = narr_fixed.decode('utf-8').strip()
             node = etree.SubElement(child, "narr_symp")
             node.text = narr_symp.decode('utf-8').strip()
 
-    
+   	'''
             temp = open(narr_temp, "w")
             temp.write("<TEXT>")
             print "narr: " + narr_fixed
             temp.write(narr_fixed)
             temp.write("</TEXT>\n")
             temp.close()
-
+	'''
     return tree
 
 
