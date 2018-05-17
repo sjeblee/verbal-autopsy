@@ -247,7 +247,7 @@ def tag_symptoms(tree):
 
     # Open tsv file. Comment this if you don't want to add symptoms listed in chv file. 
     chv_tsvfile_path = "/u/yoona/symptom_files/CHV_concepts_terms_flatfile_20110204.tsv" # hard-coded. To be updated
-    chv = csv.reader(chv_tsvfile_path, delimiter = '\t')
+    chv = csv.reader(open(chv_tsvfile_path), delimiter = '\t')
 
     symptoms = []
 
