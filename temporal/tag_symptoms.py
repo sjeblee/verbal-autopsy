@@ -17,6 +17,8 @@ import extract_features
 import model_seq
 
 import csv
+import pandas as pd
+import numpy as np
 
 global symp_narr_tag
 symp_narr_tag = "narr_symp"
@@ -234,18 +236,29 @@ def tag_symptoms(tree):
     endtag = '</SYMPTOM>'
     
 
-    # Open csv file
+    # Open SYMP.csv file
     #csvfile_path = symptomfile
-    csvfile_path = "/u/yoona/SYMP.csv" # hard-coded. To be updated. 
+    csvfile_path = "/u/yoona/symptom_files/SYMP.csv" # hard-coded. To be updated. 
     mycsv = csv.reader(open(csvfile_path))
 
+    # Uncomment this to create temp file which contain only the narrative of each data
     #dirpath = os.path.dirname(csvfile_path)
     #narr_temp = dirpath + "/temp.txt"
 
+    # Open tsv file. Comment this if you don't want to add symptoms listed in chv file. 
+    chv_tsvfile_path = "/u/yoona/symptom_files/CHV_concepts_terms_flatfile_20110204.tsv" # hard-coded. To be updated
+    chv = csv.reader(chv_tsvfile_path, delimiter = '\t')
+
     symptoms = []
 
-    # Loop through the rows in csv file and get the list of symptoms
+    # Loop over the rows in SYMP.csv file and get the list of symptoms
     for row in mycsv:
+        symptoms.append(row[1])
+        print(row[1])
+
+    # Loop over the rows in CHV file and get the list of symptoms. 
+    # Comment this if you don't want to add symptoms listed in chv file. 
+    for row in chv:
         symptoms.append(row[1])
         print(row[1])
 
