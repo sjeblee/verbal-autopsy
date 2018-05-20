@@ -19,7 +19,8 @@ import data_util3
 
 numpy.set_printoptions(threshold=numpy.inf)
 use_cuda = torch.cuda.is_available()
-torch.cuda.set_device(2)
+if use_cuda:
+    torch.cuda.set_device(2)
 
 # Neural Network Model (1 hidden layer)
 class Net(nn.Module):
