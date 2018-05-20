@@ -7,6 +7,7 @@ sys.path.append('/u/sjeblee/research/va/git/verbal-autopsy')
 #import data_util
 import model_library_torch
 import extract_temporal_features
+import temporal_util as tutil
 
 from keras.utils.np_utils import to_categorical
 from lxml import etree
@@ -124,6 +125,6 @@ def run(model, pairtype, trainfile, vecfile, testfile, outfile, relation_set='ex
         # TODO: use the TempEval3 evaluation script
 
         # TODO: write output to file
-    print("total time: ", print_time(time.time()-st))
+    print("total time: ", tutil.print_time(time.time()-st))
 
 if __name__ == "__main__":main()

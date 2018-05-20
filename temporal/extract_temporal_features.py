@@ -10,8 +10,9 @@ from gensim.models import KeyedVectors
 from lxml import etree
 from sklearn.feature_selection import f_classif
 from sklearn.metrics import classification_report, precision_score, recall_score, f1_score
-from sklearn.preprocessing import LabelEncoder, scale
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 from sklearn.svm import SVC
+from xml.sax.saxutils import unescape
 import argparse
 import math
 import numpy
@@ -21,12 +22,15 @@ import torch
 # Local imports
 import temporal_util as tutil
 
+# Parameters
+undersample = 1.0
+
 # Global variables
 unk = "UNK"
 none_label = "NONE"
 labelenc_map = {}
 relationencoder = None
-undersample = 0.9
+sclaer = None
 
 def main():
     argparser = argparse.ArgumentParser()
@@ -60,6 +64,7 @@ def extract_features(filename, relation_set='exact', pairtype='ee', vecfile=None
     labels = []
     ids = []
     vec_model = None
+    dropped = 0
 
     if vecfile is not None:
         print("Loading vectors: ", vecfile)
@@ -69,6 +74,12 @@ def extract_features(filename, relation_set='exact', pairtype='ee', vecfile=None
         id_node = child.find("record_id")
         rec_id = id_node.text
         node = child.find("narr_timeml_simple")
+        try:
+            node = etree.fromstring('<narr_timeml_simple>' + data_util3.stringify_children(node) + '</narr_timeml_simple>')
+        except etree.XMLSyntaxError as e:
+            dropped += 1
+            position = e.position[1]
+            #print("XMLSyntaxError at ", e.position, str(e), data_util3.stringify_children(node)[position-5:position+5])
         if node != None:
             pairs, pair_labels = extract_pairs(node, relation_set, pairtype)
             for x in range(len(pair_labels)):
@@ -80,6 +91,8 @@ def extract_features(filename, relation_set='exact', pairtype='ee', vecfile=None
                     vec_features.append(vec_feats)
 
     # Print the first few feature vectors as a sanity check
+    print("examples:", str(len(features)))
+    print("dropped:", str(dropped))
     for x in range(2):
         print("features[", str(x), "]: ", str(features[x]))
         print("vec_features[", str(x), "]: len ", str(len(vec_features[x])))
@@ -87,7 +100,7 @@ def extract_features(filename, relation_set='exact', pairtype='ee', vecfile=None
 
     # Normalize features
     num_feats = len(features[0])
-    for y in range(num_feats):
+    for y in range(1,num_feats):
         column = []
         for feat in features:
             column.append(feat[y])
@@ -102,7 +115,11 @@ def extract_features(filename, relation_set='exact', pairtype='ee', vecfile=None
         for x in range(len(norm_column)):
             features[x][y] = norm_column[x]
     # Scale the features
-    features_scaled = scale(features)
+    global scaler
+    if train:
+        scaler = MinMaxScaler()
+        scaler.fit(features)
+    features_scaled = scaler.transform(features)
     print("features_scaled[0]: ", str(features_scaled[0]))
 
     # Merge the two feature sets
@@ -238,23 +255,13 @@ def pair_features(pair, pairtype, vec_model=None):
 def event_features(event, vec_model=None):
     second_feats = None
     event_class = unk
-    if 'class' in event.attrib:
-        event_class = event.attrib['class']
-    event_tense = unk
-    if 'tense' in event.attrib:
-        event_tense = event.attrib['tense']
-    event_polarity = unk
-    if 'polarity' in event.attrib:
-        event_polarity = event.attrib['polarity']
-    event_pos = unk
-    if 'pos' in event.attrib:
-        event_pos = event.attrib['pos']
-    feats = [event_class, event_tense, event_polarity, event_pos] 
-
-    # Word embeddings
-    #if vec_model is not None:
-    #    second_feats = word_vector_features(event, vec_model)
-    #    feats = feats + event_emb
+    feats = []
+    featurenames = ['class','tense','pos','polarity','contextualmodality','contextualaspect','type']
+    for fname in featurenames:
+        if fname in event.attrib:
+            feats.append(event.attrib[fname])
+        else:
+            feats.append(unk)
 
     return feats
 
