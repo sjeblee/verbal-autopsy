@@ -286,8 +286,8 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
     # Construct the feature matrix
 
     # Concatenate narratives and symptoms. Put more weight on symptoms
-    for i in range(len(symptoms)):
-	narratives[i] = narratives[i] + symptoms[i] * 20
+    #for i in range(len(symptoms)):
+    #narratives[i] = narratives[i] + symptoms[i] * 30
 
     # COUNT or TFIDF features
     if narr_count in featurenames or kw_count in featurenames or narr_tfidf in featurenames or kw_tfidf in featurenames or lda in featurenames or symp_train in featurenames or symp_count in featurenames:
