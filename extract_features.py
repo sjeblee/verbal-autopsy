@@ -285,9 +285,24 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
 
     # Construct the feature matrix
 
-    # Concatenate narratives and symptoms. Put more weight on symptoms
+    # Concatenate narratives and symptoms. Put more weight on symptoms (Yoona)
     #for i in range(len(symptoms)):
-    #narratives[i] = narratives[i] + symptoms[i] * 30
+	#narratives[i] = narratives[i] + symptoms[i] * 20
+
+    # Insert "symptoms" key and count matrix of symptoms as value into matrix (Yoona) 
+    if narr_symp in element:
+        global symp_count_vectorizer
+        if train:
+            symp_count_vectorizer =  sklearn.feature_extraction.text.CountVectorizer(ngram_range=(min_ngram,max_ngram),stop_words=stopwords)
+            symp_count_vectorizer.fit(symptoms)
+            dict_keys = dict_keys.append("symptoms")
+        symp_count_matrix = symp_count_vectorizer.transform(symptoms)
+
+        for x in range(len(matrix)):
+            feat = matrix[x]
+            val = symp_count_matrix[x]
+            feat["symptoms"] = val
+>>>>>>> d66a79084760694d34afab90379ee16c1503d494
 
     # COUNT or TFIDF features
     if narr_count in featurenames or kw_count in featurenames or narr_tfidf in featurenames or kw_tfidf in featurenames or lda in featurenames or symp_train in featurenames or symp_count in featurenames:
