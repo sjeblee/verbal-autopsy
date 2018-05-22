@@ -302,7 +302,6 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
             feat = matrix[x]
             val = symp_count_matrix[x]
             feat["symptoms"] = val
->>>>>>> d66a79084760694d34afab90379ee16c1503d494
 
     # COUNT or TFIDF features
     if narr_count in featurenames or kw_count in featurenames or narr_tfidf in featurenames or kw_tfidf in featurenames or lda in featurenames or symp_train in featurenames or symp_count in featurenames:
