@@ -271,12 +271,13 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
             print "Adding symp_narr: " + narr_string.lower()
         '''
         #SYMPTOM features (Edit by Yoona)
-        symp_string = ""
-        item = child.find(narr_symp) # Hard-coded. To be fixed 
-        if item != None:
-            item_text = item.text
-            symp_string = " " + item_text + " "
-        symptoms.append(symp_string.lower())
+        if narr_symp in element:
+            symp_string = ""
+            item = child.find(narr_symp) # Hard-coded. To be fixed 
+            if item != None:
+                item_text = item.text
+                symp_string = " " + str(item_text) + " "
+            symptoms.append(symp_string.lower())
         
 
         # Save features
