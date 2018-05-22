@@ -271,25 +271,22 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
             print "Adding symp_narr: " + narr_string.lower()
         '''
         #SYMPTOM features (Edit by Yoona)
+        symp_string = ""
+        item = child.find(narr_symp) # Hard-coded. To be fixed 
+        if item != None:
+            item_text = item.text
+            symp_string = " " + item_text + " "
+        symptoms.append(symp_string.lower())
         
-        symptoms = []
-        if narr_symp in element:
-            symp_string = ""
-            item = child.find(narr_symp) # Hard-coded. To be fixed 
-            if item != None:
-                item_text = item_text
-                if item_text != None and len(item_text) > 0:
-                    symp_string = " " + item_text.encode('utf-8') + " "
-            symptoms.append(symp_string.lower())
-        
-        # Concatenate narratives and symptoms. Put more weight on symptoms
-        for i in range(len(symptoms)):
-            narratives[i] = narratives[i] + symptoms[i] * 5
 
         # Save features
         matrix.append(features)
 
     # Construct the feature matrix
+
+    # Concatenate narratives and symptoms. Put more weight on symptoms
+    for i in range(len(symptoms)):
+	narratives[i] = narratives[i] + symptoms[i] * 20
 
     # COUNT or TFIDF features
     if narr_count in featurenames or kw_count in featurenames or narr_tfidf in featurenames or kw_tfidf in featurenames or lda in featurenames or symp_train in featurenames or symp_count in featurenames:
