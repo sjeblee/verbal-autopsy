@@ -411,6 +411,10 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
     trainfeatures = dataloc + "/train_" + trainname + ".features." + featureset
     element = "narrative"
 
+    # Edit by Yoona
+    element = []
+    element.append("narrative")
+
     # Preprocessing
     spname = "spell"
     print "Preprocessing..."
@@ -497,7 +501,8 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
         devset = devsp
         devname = devname + "_" + sympname
         trainname = trainname + "_" + sympname
-        element = "narr_symp"
+        #element = "narr_symp"
+        element.append("narr_symp")
 
     if "kwc" in pre:
         numc = "100"

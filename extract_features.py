@@ -65,6 +65,11 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
 
     # Feature types
     global featurenames, rec_type, checklist, dem, kw_words, kw_bow, kw_tfidf, narr_bow, kw_count, kw_vec, kw_clusters, narr_count, narr_tfidf, narr_vec, narr_seq, narr_dem, event_vec, event_seq, lda, symp_train, symp_count
+
+    #Edit by Yoona
+    global narr_symp
+    narr_symp = "narr_symp"
+
     rec_type = "type"
     checklist = "checklist"
     dem = "dem"
@@ -86,6 +91,8 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
     lda = "lda"
     symp_train = "symp_train"
     symp_count = "symp_count"
+
+    # Add by yoona for training using "symp_narr"
     featurenames = arg_featurenames.split(',')
     print "Features: " + str(featurenames)
 
@@ -133,6 +140,10 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
     train = False
     narratives = []
     keywords = []
+
+    # Edit by Yoona
+    symptoms = []
+    mult_features = []
 
     if event_vec in featurenames or event_seq in featurenames or symp_count in featurenames:
         element = "narr_symp"
@@ -215,7 +226,8 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
         # NARRATIVE features
         if narr_features or ((not train) and (symp_train in featurenames)):
             narr_string = ""
-            item = child.find(element)
+            #item = child.find(element)
+            item = child.find("narrative")
             if item != None:
                 narr_string = data_util.stringify_children(item).encode('utf-8')
                 
@@ -246,6 +258,7 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
             #print "Adding narr: " + narr_string.lower()
 
         # SYMPTOM features
+        '''
         elif train and (symp_train in featurenames):
             narr_string = ""
             item = child.find("narrative_symptoms")
@@ -256,6 +269,22 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
                     #narr_words = [w.strip() for w in narr_string.lower().translate(string.maketrans("",""), string.punctuation).split(' ')]
             narratives.append(narr_string.lower())
             print "Adding symp_narr: " + narr_string.lower()
+        '''
+        #SYMPTOM features (Edit by Yoona)
+        
+        symptoms = []
+        if narr_symp in element:
+            symp_string = ""
+            item = child.find(narr_symp) # Hard-coded. To be fixed 
+            if item != None:
+                item_text = item_text
+                if item_text != None and len(item_text) > 0:
+                    symp_string = " " + item_text.encode('utf-8') + " "
+            symptoms.append(symp_string.lower())
+        
+        # Concatenate narratives and symptoms. Put more weight on symptoms
+        for i in range(len(symptoms)):
+            narratives[i] = narratives[i] + symptoms[i] * 5
 
         # Save features
         matrix.append(features)
