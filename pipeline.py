@@ -523,7 +523,8 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
         devset = devkw
         devname = devname + "_" + kwname
         trainname = trainname + "_" + kwname
-
+    print("Elements: ")
+    print(element)
     # Feature Extraction
     if arg_dev:
         devset = dataloc + "/dev_" + devname + ".xml"
