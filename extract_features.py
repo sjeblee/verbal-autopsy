@@ -171,12 +171,9 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
         elif kw_clusters in featurenames:
             dict_keys.append("keyword_clusters")
         print "dict_keys: " + str(dict_keys)
-	print(type(dict_keys))
         #keywords = set([])
         #narrwords = set([])
-    print("dict_keys none?")
-    print(type(dict_keys))
-    print(str(dict_keys))
+
     print "train: " + str(train)
     print "stem: " + str(stem)
     print "lemma: " + str(lemma)
@@ -285,7 +282,7 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
 
         # Save features
         matrix.append(features)
-    print "Second test for dict_keys" + str(dict_keys)
+
     # Construct the feature matrix
 
     # Concatenate narratives and symptoms. Put more weight on symptoms (Yoona)
@@ -298,20 +295,20 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
         if train:
             symp_count_vectorizer =  sklearn.feature_extraction.text.CountVectorizer(ngram_range=(min_ngram,max_ngram),stop_words=stopwords)
             symp_count_vectorizer.fit(symptoms)
-            dict_keys = dict_keys + ["symptoms"]
+            dict_keys = dict_keys + ["narr_symptoms"]
 	    print "Test dict_keys after narr_symp: " + str(dict_keys)
         symp_count_matrix = symp_count_vectorizer.transform(symptoms)
 
         for x in range(len(matrix)):
             feat = matrix[x]
             val = symp_count_matrix[x]
-            feat["symptoms"] = val
+            feat["narr_symptoms"] = val
 	print("Add symptoms into dictionary as a key")
 
 	out_matrix = open(infile + ".symp_countmatrix", "w")
 	out_matrix.write(str(symp_count_matrix))
 	out_matrix.close()
-    print("Two half test for dict_keys: ") + str(dict_keys)
+
     # COUNT or TFIDF features
     if narr_count in featurenames or kw_count in featurenames or narr_tfidf in featurenames or kw_tfidf in featurenames or lda in featurenames or symp_train in featurenames or symp_count in featurenames:
         print "count features"
@@ -325,17 +322,13 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
         count_feats = False
         if narr_count in featurenames or narr_tfidf in featurenames or kw_count in featurenames:
             count_feats = True
-	print "Third test for dict_keys : " + str(dict_keys)
+
         # Create count matrix
         global count_vectorizer
         if train:
             print "training count_vectorizer"
             count_vectorizer = sklearn.feature_extraction.text.CountVectorizer(ngram_range=(min_ngram,max_ngram),stop_words=stopwords)
             count_vectorizer.fit(documents)
-	    print(dict_keys)
-	    print("The types of dict_keys and words")
-	    print(type(dict_keys))
-	    print(type(count_vectorizer.get_feature_names()))
 	    
             if count_feats:
                 dict_keys = dict_keys + count_vectorizer.get_feature_names()
