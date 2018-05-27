@@ -1023,10 +1023,23 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
     Y_arrays = []
     labels2 = []
     extra_labels = False
+
+    # Edit by Yoona for narrative symptoms
+    symptoms_keys = []
+    symptoms_keys_fixed = False
+
     with open(filename, 'r') as f:
         for line in f:
             vector = eval(line)
             features = []
+
+            # Edit by Yoona. Fix keys in narrative symptoms vector. 
+            if not symptoms_keys_fixed:
+                if "narr_symptoms" in keys:
+                    symptoms_vec = vector["narr_symptoms"]
+                    symptoms_keys = symptoms_vec.keys()
+                    symptoms_keys_fixed = True
+
             for key in keys:
                 if key == 'MG_ID':
                     ids.append(vector[key])
@@ -1060,6 +1073,15 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
                             features.append(vector[key])
                         else:
                             features.append('0')
+
+                    # Edit by Yoona for appending narrative symptoms
+                    elif key == "narr_symptoms":
+                        symp_vector = vector[key]
+                        for symp_key in symptoms_keys:
+                            if symp_vector.has_key(symp_key):
+                                features.append(symp_vector[symp_key])
+                            else:
+                                features.append('0')
             x.append(features)
 
     # Convert type features to numerical features
