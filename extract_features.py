@@ -295,15 +295,24 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
         if train:
             symp_count_vectorizer =  sklearn.feature_extraction.text.CountVectorizer(ngram_range=(min_ngram,max_ngram),stop_words=stopwords)
             symp_count_vectorizer.fit(symptoms)
-            dict_keys = dict_keys + ["narr_symptoms"]
-	    print "Test dict_keys after narr_symp: " + str(dict_keys)
+            #dict_keys = dict_keys + ["narr_symptoms"]
+
+            temp_keys = symp_count_vectorizer.get_feature_names()
+            symptom_keys = []
+            for key in temp_keys:
+                symptom_keys.append("symp_" + key)
+            print("Change symptoms key with appropriate name")
+
+            dict_keys = dict_keys + symptom_keys
         symp_count_matrix = symp_count_vectorizer.transform(symptoms)
-	print "Checking of addition of symptom key: " + str(dict_keys)
 
         for x in range(len(matrix)):
             feat = matrix[x]
-            val = symp_count_matrix[x]
-            feat["narr_symptoms"] = val
+            for i in range(len(symptom_keys)):
+                key = symptom_keys[i]
+                val = symp_count_matrix[x, i]
+                feat[key] = val
+                
 	print("Add symptoms into dictionary as a key")
 
 	out_matrix = open(infile + ".symp_countmatrix", "w")
