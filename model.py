@@ -1161,7 +1161,7 @@ def map_back(results):
     return output
 
 def split_feats(keys, labelname):
-    ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4"]
+    ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4", "symp_vec"]
     vec_keys = [] # vector/matrix features for CNN and RNN models
     point_keys = [] # traditional features for other models
     for key in keys:
