@@ -299,7 +299,6 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
 	    print "Test dict_keys after narr_symp: " + str(dict_keys)
         symp_count_matrix = symp_count_vectorizer.transform(symptoms)
 	print "Checking of addition of symptom key: " + str(dict_keys)
-	exit()
 
         for x in range(len(matrix)):
             feat = matrix[x]

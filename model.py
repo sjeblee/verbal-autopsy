@@ -1074,14 +1074,14 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
                         else:
                             features.append('0')
 
-                    # Edit by Yoona for appending narrative symptoms
-                    elif key == "narr_symptoms":
-                        symp_vector = vector[key]
-                        for symp_key in symptoms_keys:
-                            if symp_vector.has_key(symp_key):
-                                features.append(symp_vector[symp_key])
-                            else:
-                                features.append('0')
+                # Edit by Yoona for appending narrative symptoms
+                elif key == "narr_symptoms":
+                    symp_vector = vector[key]
+                    for symp_key in symptoms_keys:
+                        if symp_vector.has_key(symp_key):
+                            features.append(symp_vector[symp_key])
+                        else:
+                            features.append('0')
             x.append(features)
 
     # Convert type features to numerical features
