@@ -443,13 +443,15 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
             feat_name = symp_vec
             text = symptoms
             matrix, dict_keys = vector_features(feat_name, text, matrix, dict_keys, arg_vecfile)
-
+	    print "Testing for dict_keys of vector: " + str(dict_keys)
+	    print(type(matrix[0][symp_vec]))
+	    print(type(matrix[0][narr_vec]))
             # Concatenate narrative vectors and narrative_symptom vectors. 
-            for x in range(len(matrix))
+            for x in range(len(matrix)):
                 feat = matrix[x]
                 symptom_vec = feat[symp_vec]
                 narrative_vec = feat[narr_vec]
-                concatenated_vec = feat[narr_vec] + feat[symptom_vec]
+                concatenated_vec = narrative_vec + symptom_vec
                 feat[narr_vec] = concatenated_vec
 
 
