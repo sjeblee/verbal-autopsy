@@ -67,8 +67,9 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
     global featurenames, rec_type, checklist, dem, kw_words, kw_bow, kw_tfidf, narr_bow, kw_count, kw_vec, kw_clusters, narr_count, narr_tfidf, narr_vec, narr_seq, narr_dem, event_vec, event_seq, lda, symp_train, symp_count
 
     #Edit by Yoona
-    global narr_symp
+    global narr_symp, symp_vec
     narr_symp = "narr_symp"
+    symp_vec = "symp_vec"
 
     rec_type = "type"
     checklist = "checklist"
@@ -289,35 +290,6 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
     #for i in range(len(symptoms)):
 	#narratives[i] = narratives[i] + symptoms[i] * 20
 
-    # Insert "symptoms" key and count matrix of symptoms as value into matrix (Yoona) 
-    if narr_symp in element:
-        global symp_count_vectorizer
-        if train:
-            symp_count_vectorizer =  sklearn.feature_extraction.text.CountVectorizer(ngram_range=(min_ngram,max_ngram),stop_words=stopwords)
-            symp_count_vectorizer.fit(symptoms)
-            #dict_keys = dict_keys + ["narr_symptoms"]
-
-            temp_keys = symp_count_vectorizer.get_feature_names()
-            symptom_keys = []
-            for key in temp_keys:
-                symptom_keys.append("symp_" + key)
-            print("Change symptoms key with appropriate name")
-
-            dict_keys = dict_keys + symptom_keys
-        symp_count_matrix = symp_count_vectorizer.transform(symptoms)
-
-        for x in range(len(matrix)):
-            feat = matrix[x]
-            for i in range(len(symptom_keys)):
-                key = symptom_keys[i]
-                val = symp_count_matrix[x, i]
-                feat[key] = val
-                
-	print("Add symptoms into dictionary as a key")
-
-	out_matrix = open(infile + ".symp_countmatrix", "w")
-	out_matrix.write(str(symp_count_matrix))
-	out_matrix.close()
 
     # COUNT or TFIDF features
     if narr_count in featurenames or kw_count in featurenames or narr_tfidf in featurenames or kw_tfidf in featurenames or lda in featurenames or symp_train in featurenames or symp_count in featurenames:
@@ -332,6 +304,37 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
         count_feats = False
         if narr_count in featurenames or narr_tfidf in featurenames or kw_count in featurenames:
             count_feats = True
+
+        # Insert "symptoms" key and count matrix of symptoms as value into matrix (Yoona) 
+        if narr_symp in element:
+            global symp_count_vectorizer
+            if train:
+                symp_count_vectorizer =  sklearn.feature_extraction.text.CountVectorizer(ngram_range=(min_ngram,max_ngram),stop_words=stopwords)
+                symp_count_vectorizer.fit(symptoms)
+                #dict_keys = dict_keys + ["narr_symptoms"]
+
+                temp_keys = symp_count_vectorizer.get_feature_names()
+                symptom_keys = []
+                for key in temp_keys:
+                    symptom_keys.append("symp_" + key)
+                print("Change symptoms key with appropriate name")
+
+                if count_feats:
+                    dict_keys = dict_keys + symptom_keys
+            symp_count_matrix = symp_count_vectorizer.transform(symptoms)
+
+            if count_feats:
+                for x in range(len(matrix)):
+                    feat = matrix[x]
+                    for i in range(len(symptom_keys)):
+                        key = symptom_keys[i]
+                        val = symp_count_matrix[x, i]
+                        feat[key] = val   
+                print("Add symptoms into dictionary as a key")
+
+        out_matrix = open(infile + ".symp_countmatrix", "w")
+        out_matrix.write(str(symp_count_matrix))
+        out_matrix.close()
 
         # Create count matrix
         global count_vectorizer
@@ -435,6 +438,21 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
 
         matrix, dict_keys = vector_features(feat_name, text, matrix, dict_keys, arg_vecfile)
 
+        # WORD2VEC for narrative symptoms
+        if narr_symp in element:
+            feat_name = symp_vec
+            text = symptoms
+            matrix, dict_keys = vector_features(feat_name, text, matrix, dict_keys, arg_vecfile)
+
+            # Concatenate narrative vectors and narrative_symptom vectors. 
+            for x in range(len(matrix))
+                feat = matrix[x]
+                symptom_vec = feat[symp_vec]
+                narrative_vec = feat[narr_vec]
+                concatenated_vec = feat[narr_vec] + feat[symptom_vec]
+                feat[narr_vec] = concatenated_vec
+
+
     # narr_seq for RNN
     if narr_seq in featurenames:
         global vocab_size, max_seq_len
@@ -490,6 +508,10 @@ def vector_features(feat_name, narratives, matrix, dict_keys, vecfile):
     # Convert words to vectors and add to matrix
     if feat_name == narr_vec:
         max_seq_len = 200
+
+    # Edit by Yoona. Deal with narrative symptoms
+    if feat_name == symp_vec:
+        max_seq_len = 100
     #if train:
     #max_seq_len = 0
     print "feat_name: " + feat_name
@@ -503,7 +525,7 @@ def vector_features(feat_name, narratives, matrix, dict_keys, vecfile):
         vectors = []
         tags = ['EVENT', 'TIMEX3']
 
-        if feat_name == event_vec or feat_name == narr_vec or feat_name == kw_vec:
+        if feat_name == event_vec or feat_name == narr_vec or feat_name == kw_vec or feat_name == symp_vec:
             if feat_name == event_vec:
                 narr = data_util.text_from_tags(narr, tags)
                 print "narr_filtered: " + narr
