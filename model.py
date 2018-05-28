@@ -354,6 +354,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
         Y = preprocess(arg_train_feats, trainids, trainlabels, X, Y, vec_keys, trainlabels=True)
         preprocess(arg_train_feats, [], [], X2, [], point_keys, trainlabels=True)
     else:
+	print("Keys tested")
         Y = preprocess(arg_train_feats, trainids, trainlabels, X, Y, keys, trainlabels=True, Y2_labels='keyword_clusters')
     print "X: " + str(len(X)) + " Y: " + str(len(Y))
     print "X2: " + str(len(X2))
@@ -1170,6 +1171,7 @@ def split_feats(keys, labelname):
             point_keys.append(key)
     print "vec_keys: " + str(vec_keys)
     print "point_keys: " + str(point_keys)
+    print("Keys printed")
     return vec_keys, point_keys
 
 if __name__ == "__main__":main() 
