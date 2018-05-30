@@ -1041,7 +1041,8 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
             #        symptoms_keys = symptoms_vec.keys()
             #        symptoms_keys_fixed = True
 
-            for key in keys:
+            #for key in keys:
+            for key in feats:
                 if key == 'MG_ID':
                     ids.append(vector[key])
                     #print "ID: " + vector[key]
@@ -1161,14 +1162,22 @@ def map_back(results):
     return output
 
 def split_feats(keys, labelname):
-    ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4", "symp_vec"]
+    ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4", "symp_vec"] # symp_vec added by Yoona
     vec_keys = [] # vector/matrix features for CNN and RNN models
     point_keys = [] # traditional features for other models
     for key in keys:
         if key in vec_types:
             vec_keys.append(key)
-        elif key == labelname or key not in ignore_feats:
+
+        #elif key == labelname or key not in ignore_feats:
+        #    point_keys.append(key)
+        # Edit by Yoona for hybrid of checklist and narrative and narrative symptoms
+        elif key == "MG_IG" or key == labelname:
+            vec_keys.append(key)
             point_keys.append(key)
+        elif key not in ignore_feats:
+            point_keys.append(key)
+
     print "vec_keys: " + str(vec_keys)
     print "point_keys: " + str(point_keys)
     print("Keys printed")
