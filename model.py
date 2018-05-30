@@ -1172,7 +1172,7 @@ def split_feats(keys, labelname):
         #elif key == labelname or key not in ignore_feats:
         #    point_keys.append(key)
         # Edit by Yoona for hybrid of checklist and narrative and narrative symptoms
-        elif key == "MG_IG" or key == labelname:
+        elif key == "MG_ID" or key == labelname:
             vec_keys.append(key)
             point_keys.append(key)
         elif key not in ignore_feats:

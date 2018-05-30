@@ -192,13 +192,15 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
             if key[0:3] == "CL_":
                 key = key[3:]
             item = child.find(key)
-            value = "0"
+            #value = "0"
+            value = 0
             if item != None:
                 value = item.text
             if key == "AlcoholD" or key == "ApplytobaccoD":
                 if value == 'N':
                     value = 9
-            features[orig_key] = value
+            #features[orig_key] = value
+            features[orig_key] = int(value)
             #if key == "MG_ID":
             #    print "extracting features from: " + value
             #print "-- key: " + orig_key + " value: " + value
