@@ -166,9 +166,10 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
         if rec_type in featurenames:
             dict_keys.append("CL_" + rec_type)
         if checklist in featurenames:
-            dict_keys = dict_keys + ["CL_DeathAge", "CL_ageunit", "CL_DeceasedSex", "CL_Occupation", "CL_Marital", "CL_Hypertension", "CL_Heart", "CL_Stroke", "CL_Diabetes", "CL_TB", "CL_HIV", "CL_Cancer", "CL_Asthma","CL_InjuryHistory", "CL_SmokeD", "CL_AlcoholD", "CL_ApplytobaccoD"]
+            dict_keys = dict_keys + ["CL_DeathAge", "CL_Occupation", "CL_Marital", "CL_Hypertension", "CL_Heart", "CL_Stroke", "CL_Diabetes", "CL_TB", "CL_HIV", "CL_Cancer", "CL_Asthma","CL_InjuryHistory", "CL_SmokeD", "CL_AlcoholD", "CL_ApplytobaccoD"]
         elif dem in featurenames or narr_dem in featurenames:
-            dict_keys = dict_keys + ["CL_DeathAge", "CL_ageunit", "CL_DeceasedSex"]
+            #dict_keys = dict_keys + ["CL_DeathAge", "CL_ageunit", "CL_DeceasedSex"]
+	    dict_keys = dict_keys + ["CL_DeathAge", "CL_DeceasedSex"]
         elif kw_clusters in featurenames:
             dict_keys.append("keyword_clusters")
         print "dict_keys: " + str(dict_keys)
@@ -199,8 +200,11 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
             if key == "AlcoholD" or key == "ApplytobaccoD":
                 if value == 'N':
                     value = 9
-            #features[orig_key] = value
-            features[orig_key] = int(value)
+		# Edit by Yoona
+	    if value == 'NULL' or value == "Other":
+		value = 0
+            features[orig_key] = value
+            #features[orig_key] = int(value)
             #if key == "MG_ID":
             #    print "extracting features from: " + value
             #print "-- key: " + orig_key + " value: " + value

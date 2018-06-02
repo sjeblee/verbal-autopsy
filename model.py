@@ -336,7 +336,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     # If a mix of traditional and vector features is requested, use a hybrid nn model
     vec_keys, point_keys = split_feats(keys, arg_labelname)
     hybrid = False
-    if len(vec_keys) > 0 and len(point_keys) > 2:
+    if len(vec_keys) > 2 and len(point_keys) > 2:
         hybrid = True
         print "hybrid features"
 
@@ -1072,6 +1072,7 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
                         #print "narr_vec shape: " + str(features.shape)
                     elif not vec_feats:
                         if vector.has_key(key):
+			    print "This is: " + str(key) + "and value is : " + str(vector[key])
                             features.append(vector[key])
                         else:
                             features.append('0')
@@ -1143,7 +1144,7 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
 
     # Normalize features to 0 to 1 (if not word vectors)
     if not vec_feats:
-        preprocessing.minmax_scale(x, copy=False)
+	preprocessing.minmax_scale(x, copy=False)
     endtime = time.time()
     mins = float(endtime-starttime)/60
     print "preprocessing took " + str(mins) + " mins"
