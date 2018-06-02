@@ -8,6 +8,8 @@ import numpy
 from sklearn import metrics
 import string
 
+from scipy import stats
+
 def main():
     argparser = argparse.ArgumentParser()
     argparser.add_argument('--in', action="store", dest="infile")
@@ -88,6 +90,24 @@ def run(arg_infile, arg_outfile, arg_rank=1):
 
     csmf_accuracy = 1 - (csmf_sum / (2 * (1 - csmf_corr_min)))
 
+    # Edit by Yoona
+    # Calculate KL Divergence (forward and reverse)
+    dist_pred = []
+    dist_corr = []
+    keys = labels_correct.keys()
+
+    print "Probability Distribution: "
+    for key in keys:
+        pred_prob = labels_pred[key] / n
+        corr_prob = labels_correct[key] / n
+        dist_pred.append(pred_prob)
+        dist_corr.append(corr_prob)
+        print "Correct probabilty for class " + str(key) + " is" + str(corr_prob)
+        print "Predicted probabilty for class " + str(key) + " is" + str(pred_prob)
+
+    kl_divergence_f = stats.entropy(dist_corr, dist_pred)
+    kl_divergence_r = stats.entropy(dist_pred, dist_corr)
+
     # Calculate precision, recall, F1, and PCCC
     precision = metrics.precision_score(correct, predicted, average="weighted")
     recall = metrics.recall_score(correct, predicted, average="weighted")
@@ -130,6 +150,9 @@ def run(arg_infile, arg_outfile, arg_rank=1):
     print "f1: " + str(f1) + "\n"
     print "pccc: " + str(pccc) + "\n"
     print "csmf accuracy: " + str(csmf_accuracy) + "\n"
+
+    print "KL divergence forward: " + str(kl_divergence_f) + "\n"
+    print "KL divergence reverse: " + str(kl_divergence_r) + "\n"
         
     # write the stats to file
     output = open(arg_outfile, "w")
