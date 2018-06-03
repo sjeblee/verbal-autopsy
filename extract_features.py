@@ -457,7 +457,7 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
                 feat = matrix[x]
                 symptom_vec = feat[symp_vec]
                 narrative_vec = feat[narr_vec]
-                concatenated_vec = narrative_vec + symptom_vec
+                concatenated_vec = narrative_vec + symptom_vec + symptom_vec
                 feat[narr_vec] = concatenated_vec
 
 

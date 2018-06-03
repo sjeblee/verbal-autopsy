@@ -336,7 +336,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     # If a mix of traditional and vector features is requested, use a hybrid nn model
     vec_keys, point_keys = split_feats(keys, arg_labelname)
     hybrid = False
-    if len(vec_keys) > 2 and len(point_keys) > 2:
+    if len(vec_keys) > 0 and len(point_keys) > 2:
         hybrid = True
         print "hybrid features"
 
@@ -1013,7 +1013,7 @@ def create_anova_filter(X, Y, function, num_feats):
 '''
 def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=False, Y2_labels=None):
     global labelencoder, labelencoder_adult, labelencoder_child, labelencoder_neonate
-    ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4"]
+    ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4","symp_vec"]
 
     # Read in the feature vectors
     starttime = time.time()
@@ -1041,8 +1041,8 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
             #        symptoms_keys = symptoms_vec.keys()
             #        symptoms_keys_fixed = True
 
-            #for key in keys:
-            for key in feats:
+            for key in keys:
+            #for key in feats:
                 if key == 'MG_ID':
                     ids.append(vector[key])
                     #print "ID: " + vector[key]
@@ -1169,15 +1169,14 @@ def split_feats(keys, labelname):
     for key in keys:
         if key in vec_types:
             vec_keys.append(key)
-
-        #elif key == labelname or key not in ignore_feats:
-        #    point_keys.append(key)
+        elif key == labelname or key not in ignore_feats:
+            point_keys.append(key)
         # Edit by Yoona for hybrid of checklist and narrative and narrative symptoms
-        elif key == "MG_ID" or key == labelname:
-            vec_keys.append(key)
-            point_keys.append(key)
-        elif key not in ignore_feats:
-            point_keys.append(key)
+        #elif key == "MG_ID" or key == labelname:
+        #    vec_keys.append(key)
+        #    point_keys.append(key)
+        #elif key not in ignore_feats:
+        #    point_keys.append(key)
 
     print "vec_keys: " + str(vec_keys)
     print "point_keys: " + str(point_keys)
