@@ -42,7 +42,7 @@ labelencoder = None
 labelencoder_adult = None
 labelencoder_child = None
 labelencoder_neonate = None
-vec_types = ["narr_vec", "narr_seq", "event_vec", "event_seq"]
+vec_types = ["narr_vec", "narr_seq", "event_vec", "event_seq", "symp_vec"]
 numpy.set_printoptions(threshold=numpy.inf)
 
 def main():
@@ -1013,7 +1013,8 @@ def create_anova_filter(X, Y, function, num_feats):
 '''
 def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=False, Y2_labels=None):
     global labelencoder, labelencoder_adult, labelencoder_child, labelencoder_neonate
-    ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4","symp_vec"]
+    #ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4","symp_vec"]
+    ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4"]
 
     # Read in the feature vectors
     starttime = time.time()
@@ -1060,7 +1061,8 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
                         kw_clusters.append(kw_list)
                     elif key in vec_types:
                         # The feature matrix for word2vec can't have other features
-                        features = vector[key]
+                        #features = vector[key]
+                        feature = vector[key]
                         vec_feats = True
                         if key == "narr_seq":
                             global vocab_size
@@ -1068,7 +1070,9 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
                         global max_seq_len
                         max_seq_len = vector['max_seq_len']
                         #print "max_seq_len: " + str(max_seq_len)
-                        features = numpy.asarray(features)#.reshape(max_seq_len, 1)
+                        #features = numpy.asarray(features)#.reshape(max_seq_len, 1)
+                        feature = numpy.asarray(feature)
+                        features.append(feature)
                         #print "narr_vec shape: " + str(features.shape)
                     elif not vec_feats:
                         if vector.has_key(key):
@@ -1163,7 +1167,7 @@ def map_back(results):
     return output
 
 def split_feats(keys, labelname):
-    ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4", "symp_vec"] # symp_vec added by Yoona
+    ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4"] # symp_vec added by Yoona
     vec_keys = [] # vector/matrix features for CNN and RNN models
     point_keys = [] # traditional features for other models
     for key in keys:
