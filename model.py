@@ -42,7 +42,7 @@ labelencoder = None
 labelencoder_adult = None
 labelencoder_child = None
 labelencoder_neonate = None
-vec_types = ["narr_vec", "narr_seq", "event_vec", "event_seq", "symp_vec"]
+vec_types = ["narr_vec", "narr_seq", "event_vec", "event_seq", "symp_vec", "kw_vec"]
 numpy.set_printoptions(threshold=numpy.inf)
 
 def main():

@@ -339,9 +339,9 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
                         feat[key] = val   
                 print("Add symptoms into dictionary as a key")
 
-        out_matrix = open(infile + ".symp_countmatrix", "w")
-        out_matrix.write(str(symp_count_matrix))
-        out_matrix.close()
+            out_matrix = open(infile + ".symp_countmatrix", "w")
+            out_matrix.write(str(symp_count_matrix))
+            out_matrix.close()
 
         # Create count matrix
         global count_vectorizer
