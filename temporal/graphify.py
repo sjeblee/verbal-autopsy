@@ -24,8 +24,8 @@ before_types = ['BEFORE']
 overlap_types = ['OVERLAP', 'CONTAINS']
 
 class Event:
-    start = None
-    end = None
+    start = 'UNK'
+    end = 'UNK'
     
     def __init__(self, eid, element):
         self.eid = eid
@@ -72,7 +72,7 @@ def get_graphs(filename, relation_set='exact'):
             position = e.position[1]
             print("XMLSyntaxError at ", e.position, str(e), data_util3.stringify_children(node)[position-5:position+5])
         if node is not None:
-            graph = create_digraph(node, relation_set)
+            graph = create_graph(node, relation_set)
             ids.append(rec_id)
             graphs.append(graph)
             records += 1
@@ -81,7 +81,7 @@ def get_graphs(filename, relation_set='exact'):
             pdot_graph = nx.drawing.nx_pydot.to_pydot(graph)
             #for edge in pdot_graph.get_edges():
             #    print("edge:", edge.to_string())
-            pdot_graph.write_png(filename + ".digraph.png")
+            pdot_graph.write_png(filename + ".graph.png")
 
     # Print the first few feature vectors as a sanity check
     print("records:", str(records))
@@ -126,39 +126,49 @@ def create_graph(xml_node, relation_set='exact', return_event_map=False):
             event2_id = tlink.attrib['relatedToEventID']
             rel_type = tlink.attrib['relType']
             rel_type = tutil.map_rel_type(rel_type, relation_set)
-            # TODO: why weren't these events here before???
-            if event_id not in event_map:
-                print("adding event from tlink:", event_id)
-                event_map[event_id] = Event(event_id, None)
-            if event2_id not in event_map:
-                print("adding event from tlink:", event2_id)
-                event_map[event2_id] = Event(event2_id, None)
+            if event_id not in event_map or event2_id not in event_map:
+                print("WARNING: missing event:", event_id)
+                #event_map[event_id] = Event(event_id, None)
+            #if event2_id not in event_map:
+            #    print("adding event from tlink:", event2_id)
+            #    event_map[event2_id] = Event(event2_id, None)
             # Flip after relations when adding to the graph
-            if rel_type == 'AFTER':
-                graph.add_edge(event2_id, event_id, label='BEFORE')
-            else:
-                graph.add_edge(event_id, event2_id, label=rel_type)
+            id1, id2, rel_type = tutil.flip_relations(event_id, event2_id, rel_type)
+            graph.add_edge(id1, id2, label=rel_type)
 
     # Add time information to events, and add transitive event relations
     for tlink in tlinks:
+        rel_type = tlink.attrib['relType']
+        # event-time
         if 'relatedToTime' in tlink.attrib and 'eventID' in tlink.attrib:
             event_id = tlink.attrib['eventID']
             time_id = tlink.attrib['relatedToTime']
-            rel_type = tlink.attrib['relType']
-            if rel_type == 'AFTER':
-                graph.add_edge(time_id, event_id, label='BEFORE')
-            else:
-                graph.add_edge(event_id, time_id, label=rel_type)
-            # Add time value to the event
-            #e = event_map[event_id]
-            #tval = timex_map[time_id].attrib['value']
-            #if rel_type == 'BEGINS-ON':
-            #    e.start = tval
-            #elif rel_type == 'ENDS-ON':
-            #    e.end = tval
-            #elif rel_type == 'CONTAINS':
-            #    e.start = tval
-            #    e.end = tval
+            # Flip relations if necessary
+            id1, id2, rel_type = tutil.flip_relations(event_id, time_id, rel_type)
+        # time-event
+        elif 'timeID' in tlink.attrib and 'relatedToEventID' in tlink.attrib:
+            event_id = tlink.attrib['relatedToEventID']
+            time_id = tlink.attrib['timeID']
+            id1, id2, rel_type = tutil.flip_relations(time_id, event_id, rel_type)
+        else:
+            continue
+        #elif 'timeID' in tlink.attrib and 'relatedToTimeID' in tlink.attrib:
+        #    time_id = tlink.attrib['timeID']
+        #    time2_id = tlink.attrib['relatedToTimeID']
+        #    id1, id2, rel_type = tutil.flip_relations(time_id, event_id, rel_type)
+        graph.add_edge(id1, id2, label=rel_type)
+        
+        # Add time value to the event
+        e = event_map[event_id]
+        tval = timex_map[time_id].text # TODO: convert this to an actual value
+        if rel_type == 'BEGINS-ON':
+            e.start = tval
+        elif rel_type in 'ENDS-ON':
+            e.end = tval
+        elif rel_type == 'CONTAINS':
+            e.start = tval
+            e.end = tval
+
     # Add transitive event relations (BEFORE only)
     for tlink in tlinks:
         if 'relatedToTime' in tlink.attrib and 'eventID' in tlink.attrib:
@@ -170,6 +180,8 @@ def create_graph(xml_node, relation_set='exact', return_event_map=False):
                     second_rel = graph.get_edge_data(time_id, other_event)
                     if not graph.has_edge(event_id, other_event) and second_rel in before_types:
                         graph.add_edge(event_id, other_event, label='BEFORE')
+        #elif 'eventID' in tlink.attrib and 'relatedToEventID' in tlink.attrib:
+            # TODO: handle transitive ends-on etc. relations
     # MAYBE: add event relations based on start and end times
 
     if return_event_map:
@@ -261,7 +273,7 @@ def create_digraph(xml_node, relation_set='exact', return_elements=False):
             node_to_event[nid] = []
             for eid in node_to_ids[nid]:
                 #print("- eid:", eid)
-                node_to_event[nid].append(event_map[eid].element)
+                node_to_event[nid].append(event_map[eid])
         return digraph, node_to_event
     else:
         return digraph
@@ -301,6 +313,7 @@ def update_node(digraph, eid, node_num):
     # Add the eid to the correct node
     id_to_node[eid] = node_num
     node_to_ids[node_num].append(eid)
+
 
 
 if __name__ == "__main__":main()
