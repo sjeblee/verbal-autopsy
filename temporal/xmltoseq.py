@@ -8,8 +8,27 @@ import data_util
 
 from lxml import etree
 import argparse
+import re
 
-symp_narr_tag = "narr_symp"
+id_name = "record_id"
+symp_narr_tag = "narr_timeml_gru"
+#symp_narr_tag = "narr_symp"
+BE = 'BE'
+IE = 'IE'
+BT = 'BT'
+IT = 'IT'
+O = 'O'
+
+class Element:
+    element = None
+    start = 0
+    end = 0
+    def __init__(self, element):
+        self.element = element
+        span_text = element.attrib['span']
+        span = span_text.split(',')
+        self.start = int(span[0])
+        self.end = int(span[1])
 
 def main():
     argparser = argparse.ArgumentParser()
@@ -46,14 +65,82 @@ def run(infile, outfile):
     output.write(str(seqs))
     output.close()
 
+'''
+Get sequence tags from separate xml tags and text
+narr: the text-only narrative
+ann: just the xml tags 
+split_sents: NOT IMPLEMENTED YET
+'''
+def ann_to_seq(narr, ann, split_sents):
+    ann_element = etree.fromstring("<root>" + ann + "</root>")
+    narr_ref = narr.replace('\n', ' ') # Replace newlines with spaces so words get separated
+    tags = []
+    seqs = [] # a list of tuples (word, label)
+    for child in ann_element:
+        if child.tag in ['EVENT', 'TIMEX3']:
+            tags.append(Element(child))
+            #print "element: " + etree.tostring(child).decode('utf8')
+    #print "tags: " + str(len(tags))
+    # Sort tags by span start
+    tags.sort(key=lambda x:x.start)
+    index = 0
+    for tag in tags:
+        if tag.start > index:
+            text = narr_ref[index:tag.start]
+            index = tag.start
+            get_seqs(text, O, seqs)
+        if tag.element.tag == 'EVENT':
+            label = BE
+        elif tag.element.tag == 'TIMEX3':
+            label = BT
+        for word in split_words(tag.element.text):
+            seqs.append((word, label))
+            if label == BE:
+                label = IE
+            elif label == BT:
+                label = IT
+        index = tag.end
+    # Add the tail of the narrative
+    if index < len(narr):
+        text = narr_ref[index:]
+        get_seqs(text, O, seqs)
+
+    # Split sentences
+    if split_sents:
+        narr = re.sub("\.  ", ". \n", narr) # Add line breaks after sentence breaks
+        narr_splits = narr.splitlines()
+        #print "split_sents: " + str(len(narr_splits))
+        split_seqs = []
+        sent_seqs = []
+        index = 0
+        for chunk in narr_splits:
+            chunk = chunk.strip()
+            if len(chunk) > 0:
+                #print "chunk: " + chunk
+                num_words = len(split_words(chunk))
+                #print "num_words: " + str(num_words)
+                index2 = index+num_words
+                sent_seqs = seqs[index:index2]
+                #print "seq: " + str(sent_seqs)
+                split_seqs.append(sent_seqs)
+                index += num_words
+        seqs = split_seqs
+
+    return seqs
+
+def get_seqs(text, label, seqs):
+    for word in split_words(text):
+        seqs.append((word, O))
+
+def split_words(text):
+    return re.findall(r"[\w']+|[.,!?;=/\-\[\]]", text.strip())
+
+'''
+Convert inline xml-tagged text to sequences
+'''
 def xml_to_seq(text):
     seq = [] # List of tuples
     #print "text: " + text
-    BE = 'BE'
-    IE = 'IE'
-    BT = 'BT'
-    IT = 'IT'
-    O = 'O'
     event_start = "<EVENT"
     time_start = ["<TIMEX3", "<SECTIME"]
     event_end = "</EVENT>"
@@ -146,7 +233,7 @@ def seq_to_xml(seqs, filename="", tag="Adult_Anonymous"):
         root = tree.getroot()
         usefile = True
         for child in root:
-            rec_id = child.find("MG_ID").text
+            rec_id = child.find(id_name).text
             seq = ""
             if rec_id in seqs:
                 seq = seqs[rec_id]
@@ -164,17 +251,12 @@ def seq_to_xml(seqs, filename="", tag="Adult_Anonymous"):
     return tree
 
 def to_xml(seq):
-    BE = 'BE'
-    IE = 'IE'
-    BT = 'BT'
-    IT = 'IT'
-    O = 'O'
     t_labels = [BT, IT]
     e_labels = [BE, IE]
     event_start = "<EVENT"
     time_start = ["<TIMEX3", "<SECTIME"]
     event_end = "</EVENT>"
-                                
+
     text = ""
     tid = 0
     eid = 0

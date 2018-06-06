@@ -5,6 +5,8 @@
 import sys
 sys.path.append('/u/sjeblee/research/va/git/verbal-autopsy')
 import data_util
+import models_pytorch
+import word2vec
 import xmltoseq
 
 from keras.models import Model
@@ -16,8 +18,15 @@ from sklearn_crfsuite import CRF, metrics
 import argparse
 import numpy
 import subprocess
+import warnings
+
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 global labelencoder, onehotencoder, label_set, max_seq_len, num_labels
+id_name = "record_id"
+max_seq_len = 100
+#vecfile = "/u/sjeblee/research/va/data/datasets/mds+rct/narr+ice+medhelp.vectors.100"
+vecfile = "/u/sjeblee/research/vectors/GoogleNews-vectors-negative300.bin"
 
 def main():
     argparser = argparse.ArgumentParser()
@@ -28,7 +37,7 @@ def main():
     args = argparser.parse_args()
 
     if not (args.trainfile and args.testfile):
-        print "usage: ./model_seq.py --train [file.xml] --test [file.xml] (--out [file.xml])"
+        print "usage: ./model_seq.py --train [file.xml] --test [file.xml] (--out [file.xml] --model [crf/gru])"
         exit()
         
 
@@ -40,8 +49,8 @@ def main():
         run(args.trainfile, args.testfile)
 
 def run(trainfile, testfile, outfile="", modelname="crf"):
-    train_ids, train_seqs = get_seqs(trainfile, split_sents=True)
-    test_ids, test_seqs = get_seqs(testfile, split_sents=True)
+    train_ids, train_seqs = get_seqs(trainfile, split_sents=True, inline=False)
+    test_ids, test_seqs = get_seqs(testfile, split_sents=True, inline=False)
 
     if modelname == "crf":
         trainx = [sent2features(s) for s in train_seqs]
@@ -53,13 +62,18 @@ def run(trainfile, testfile, outfile="", modelname="crf"):
         train_seqs = extra_seqs + train_seqs
         trainx, trainy = get_feats(train_seqs, True)
         testx, testy = get_feats(test_seqs)
+    elif modelname == 'gru':
+        trainx, trainy = get_feats(train_seqs, True)
+        testx, testy = get_feats(test_seqs)
 
     print "train: " + str(len(trainx)) + " " + str(len(trainy))
     print "test: " + str(len(testx)) + " " + str(len(testy))
 
     # Split labels into time and event only
-    trainy_time, trainy_event = split_labels(trainy)
-    testy_time, testy_event = split_labels(testy)
+    split = False
+    if split:
+        trainy_time, trainy_event = split_labels(trainy)
+        testy_time, testy_event = split_labels(testy)
 
     # Train model
     model = None
@@ -75,8 +89,15 @@ def run(trainfile, testfile, outfile="", modelname="crf"):
         y_pred = model.predict(testx)
         #y_pred_time = crf_time.predict(testx)
         #y_pred_event = crf_event.predict(testx)
+    elif modelname == 'gru':
+        nodes = 100
+        epochs = 5
+        model = models_pytorch.rnn_model(trainx, trainy, num_nodes=nodes, loss_function='mse', num_epochs=epochs)
+        y_pred = models_pytorch.test_rnn(model, testx)
+        y_pred_labels = decode_all_labels(y_pred)
+        testy_labels = decode_all_labels(testy)
 
-    elif modelname == "nn":
+    elif modelname == "ende":
         model, encoder_model, decoder_model, dim = train_seq2seq(trainx, trainy)
         y_pred = predict_seqs(encoder_model, decoder_model, testx, dim)
         testy_labels = []
@@ -100,10 +121,10 @@ def run(trainfile, testfile, outfile="", modelname="crf"):
         #testy_event = testy_labels_event
 
     # Print metrics
-    print "testy: " + str(testy[0])
-    print "y_pred: " + str(y_pred[0])
+    #print "testy: " + str(testy[0])
+    #print "y_pred: " + str(y_pred[0])
     #print "labels: " + str(labels[0])
-    f1_score = score(testy, y_pred, model, modelname)
+    f1_score = score(testy_labels, y_pred_labels, model, modelname)
     #f1_score_time = score(testy_time, y_pred_time, time_model, modelname)
     #f1_score_event = score(testy_event, y_pred_event, event_model, modelname)
 
@@ -119,8 +140,11 @@ def run(trainfile, testfile, outfile="", modelname="crf"):
     test_dict = {}
     for x in range(len(test_ids)):
         rec_id = test_ids[x]
-        rec_seq = zip((item[0] for item in test_seqs[x]), y_pred[x])
-        test_dict[rec_id] = rec_seq
+        rec_seq = zip((item[0] for item in test_seqs[x]), y_pred_labels[x])
+        # Concatenate all the sequences for each record
+        if rec_id not in test_dict:
+            test_dict[rec_id] = []
+        test_dict[rec_id] = test_dict[rec_id] + rec_seq # TODO: add line breaks???
     xml_tree = xmltoseq.seq_to_xml(test_dict, testfile)
 
     # write the xml to file
@@ -142,7 +166,7 @@ def train_crf(trainx, trainy):
     crf.fit(trainx, trainy)
     return crf
 
-def train_seq2seq(trainx, trainy, vec_labels=False):
+def train_seq2seq(trainx, trainy, num_nodes=100, vec_labels=False, loss_function="cosine_proximity", num_epochs=10):
     trainx = numpy.array(trainx)
     print "trainx shape: " + str(trainx.shape)
     trainy = numpy.array(trainy)
@@ -157,18 +181,18 @@ def train_seq2seq(trainx, trainy, vec_labels=False):
     zero_lab = data_util.zero_vec(output_dim)
     if not vec_labels:
         zero_lab = encode_labels([['O']])[0][0]
-    #print "zero_lab shape: " + str(numpy.array(zero_lab))
+    print "zero_lab shape: " + str(numpy.asarray(zero_lab))
     for i in range(trainy.shape[0]):
         row = trainy[i].tolist()
         new_row = row[1:]
         new_row.append(zero_lab)
         trainy_target.append(new_row)
-    trainy_target = numpy.array(trainy_target)
+    trainy_target = numpy.asarray(trainy_target)
 
     print "trainy_target shape: " + str(trainy_target.shape)
         
     # Set up the encoder
-    latent_dim = 100
+    latent_dim = num_nodes
     dropout = 0.1
     encoder_inputs = Input(shape=(None, input_dim)) #seq_len
     encoder = LSTM(latent_dim, return_state=True)
@@ -187,8 +211,8 @@ def train_seq2seq(trainx, trainy, vec_labels=False):
     # Define the model that will turn
     # `encoder_input_data` & `decoder_input_data` into `decoder_target_data`
     model = Model([encoder_inputs, decoder_inputs], decoder_outputs)
-    model.compile(optimizer='rmsprop', loss='categorical_crossentropy')
-    model.fit([trainx, trainy], trainy_target, epochs=10)
+    model.compile(optimizer='rmsprop', loss=loss_function)
+    model.fit([trainx, trainy], trainy_target, epochs=num_epochs)
 
     # Normal RNN
     #rnn_out = GRU(latent_dim, return_sequences=False)(encoder_inputs)
@@ -251,7 +275,7 @@ def decode_sequence(encoder_model, decoder_model, input_seq, output_seq_len, out
             encoded_label[ind] = 1
             #print "encoded_label: " + str(encoded_label)
             sampled_lab = decode_labels([encoded_label])[0]
-            #print "sampled_lab: " + str(sampled_lab)
+            print "sampled_lab: " + str(sampled_lab)
             decoded_sentence.append(sampled_lab)
 
         # Exit condition: either hit max length or find stop character.
@@ -294,7 +318,7 @@ def score(testy, y_pred, model, modelname):
     # Ignore O tags for evaluation
     if modelname == "crf":
         labels = list(model.classes_)
-    elif modelname == "nn":
+    elif modelname == "nn" or modelname == 'gru':
         labels = list(label_set)
     labels.remove('O')
     f1_score = metrics.flat_f1_score(testy, y_pred, average='weighted', labels=labels)
@@ -332,8 +356,7 @@ def split_labels(y):
 '''
 def get_feats(seqs, train=False):
     print "get_feats"
-    vecfile = "/u/sjeblee/research/va/data/datasets/mds+rct/narr+ice+medhelp.vectors.100"
-    word2vec, dim = data_util.load_word2vec(vecfile)
+    vec_model, dim = word2vec.load(vecfile)
     zero_vec = data_util.zero_vec(dim)
     feats = []
     labels = []
@@ -344,9 +367,7 @@ def get_feats(seqs, train=False):
         s_labels = []
         for pair in s:
             word = pair[0]
-            vector = zero_vec
-            if word in word2vec:
-                vector = word2vec[word]
+            vector = word2vec.get(word, vec_model)
             s_feats.append(vector)
             s_labels.append(pair[1])
             label_set.add(pair[1])
@@ -356,8 +377,8 @@ def get_feats(seqs, train=False):
         num_labels = len(list(label_set))
         create_labelencoder(list(label_set), num_labels)
         global max_seq_len
-        max_seq_len = max([len(txt) for txt in feats])
-        print "max_seq_len: " + str(max_seq_len)
+        #max_seq_len = max([len(txt) for txt in feats])
+    print "max_seq_len: " + str(max_seq_len)
 
     # Pad sequences
     #feats = pad_sequences(numpy.array(feats), maxlen=max_seq_len, dtype='float32', padding="pre")
@@ -366,39 +387,49 @@ def get_feats(seqs, train=False):
     padded_feats = []
     padded_labels = []
     for feat in feats:
-        pad_size = max_seq_len - len(feat)
-        new_feat = []
-        new_feat.append(zero_vec)
-        for w in feat:
-            new_feat.append(w)
-        for k in range(pad_size):
-            new_feat.append(zero_vec)
+        #print "seq len: " + str(len(feat))
+        while len(feat) > max_seq_len:
+            feat_part = feat[0:max_seq_len]
+            padded_feats.append(pad_feat(feat_part, max_seq_len, zero_vec))
+            feat = feat[max_seq_len:]
+        new_feat = pad_feat(feat, max_seq_len, zero_vec)
         padded_feats.append(new_feat)
     for labs in labels:
-        pad_size = max_seq_len - len(labs)
-        new_labs = []
-        new_labs.append('O')
-        for w in labs:
-            new_labs.append(w)
-        for k in range(pad_size):
-            new_labs.append('O')
-        padded_labels.append(new_labs)
+        while len(labs) > max_seq_len:
+            labs_part = labs[0:max_seq_len]
+            padded_labels.append(pad_feat(labs_part, max_seq_len, 'O'))
+            labs = labs[max_seq_len:]
+        padded_labels.append(pad_feat(labs, max_seq_len, 'O'))
     feats = padded_feats
     labels = padded_labels
     
     # Encode labels
-    encoded_labels = encode_labels(labels)
+    encoded_labels = encode_labels(labels, max_len=max_seq_len)
+    print "labels[0]: " + str(encoded_labels[0])
     #for row in labels:
     #    encoded_row = encode_labels(row)
     #    encoded_labels.append(encoded_row)
     print "feats: " + str(len(feats)) + " labels: " + str(len(encoded_labels))
     return feats, encoded_labels
+
+def pad_feat(feat, max_seq_len, pad_item):
+    pad_size = max_seq_len - len(feat)
+    assert(pad_size >= 0)
+    new_feat = []
+    #new_feat.append(pad_item) # Start symbol for encoder-decoder
+    for w in feat:
+        new_feat.append(w)
+    for k in range(pad_size):
+        new_feat.append(pad_item)
+    return new_feat
                           
-def get_seqs(filename, split_sents=False):
+def get_seqs(filename, split_sents=False, inline=True):
     print "get_seqs " + filename
     ids = []
     narrs = []
+    anns = []
     seqs = []
+    seq_ids = []
     
     # Get the xml from file
     tree = etree.parse(filename)
@@ -406,42 +437,62 @@ def get_seqs(filename, split_sents=False):
     
     for child in root:
         narr = ""
-
+        rec_id = child.find(id_name).text
+        ids.append(rec_id)
         # Get the narrative text
         node = child.find("narr_timeml_simple")
-        if node == None:
-            narr_node = child.find("narrative")
-            if narr_node == None:
-                print "no narrative: " + data_util.stringify_children(child)
+        if inline:
+            if node == None:
+                narr_node = child.find("narrative")
+                if narr_node == None:
+                    print "no narrative: " + data_util.stringify_children(child)
+                else:
+                    narr = narr_node.text
+                    #print "narr: " + narr
+                    narrs.append(narr)
             else:
-                rec_id = child.find("MG_ID").text
+                rec_id = child.find(id_name).text
                 #print "rec_id: " + rec_id
-                ids.append(rec_id)
-                narr = narr_node.text
+                narr = data_util.stringify_children(node).encode('utf-8')
                 #print "narr: " + narr
+                ids.append(rec_id)
                 narrs.append(narr)
-        else:
-            rec_id = child.find("MG_ID").text
-            #print "rec_id: " + rec_id
-            narr = data_util.stringify_children(node).encode('utf-8')
-            #print "narr: " + narr
-            ids.append(rec_id)
-            narrs.append(narr)
+        else: # NOT inline
+            anns.append(data_util.stringify_children(node).encode('utf8'))
+            narr_node = child.find("narrative")
+            narrs.append(narr_node.text)
 
-    for narr in narrs:
-        if split_sents:
-            sents = narr.split('.')
-            for sent in sents:
-                sent_seq = xmltoseq.xml_to_seq(sent.strip())
-                seqs.append(sent_seq)
-        else:
-            narr_seq = xmltoseq.xml_to_seq(narr)
-            seqs.append(narr_seq)
+    if inline:
+        for x in range(len(narrs)):
+            narr = narrs[x]
+            rec_id = ids[x]
+            if split_sents:
+                sents = narr.split('.')
+                for sent in sents:
+                    sent_seq = xmltoseq.xml_to_seq(sent.strip())
+                    seqs.append(sent_seq)
+                    seq_ids.append(rec_id)
+            else:
+                narr_seq = xmltoseq.xml_to_seq(narr)
+                seqs.append(narr_seq)
+                seq_ids.append(rec_id)
+    else:
+        for x in range(len(narrs)):
+            narr = narrs[x]
+            ann = anns[x]
+            rec_id = ids[x]
+            print "split_sents: " + str(split_sents)
+            ann_seqs = xmltoseq.ann_to_seq(narr, ann, split_sents)
+            print "seqs: " + str(len(ann_seqs))
+            for s in ann_seqs:
+                seqs.append(s)
+                seq_ids.append(rec_id)
 
-    return ids, seqs
+    return seq_ids, seqs
 
 def create_labelencoder(data, num=0):
     global labelencoder, onehotencoder, num_labels
+    print "create_labelencoder: data[0]: " + str(data[0])
     labelencoder = LabelEncoder()
     labelencoder.fit(data)
     num_labels = len(labelencoder.classes_)
@@ -454,7 +505,7 @@ def create_labelencoder(data, num=0):
     data: a 1D array of labels
     num_labels: the number of label classes
 '''
-def encode_labels(data, labenc=None):
+def encode_labels(data, labenc=None, max_len=50):
     if labenc == None:
         labenc = labelencoder
     if labenc == None: # or onehotencoder == None:
@@ -462,36 +513,53 @@ def encode_labels(data, labenc=None):
         return None
     #return onehotencoder.transform(labelencoder.transform(data))
     data2 = []
+
     num_labels = len(labenc.classes_)
+    zero_vec = data_util.zero_vec(num_labels)
     print "data: " + str(len(data))
     for item in data:
-        #print "item: " + str(len(item))
-        item2 = labenc.transform(item)
+        #print "item len: " + str(len(item))
         new_item = []
-        for lab in item2:
-            onehot = []
-            for x in range(num_labels):
-                onehot.append(0)
-            onehot[lab] = 1
-            new_item.append(onehot)
+        if len(item) > 0:
+            item2 = labenc.transform(item)
+            for lab in item2:
+                onehot = []
+                for x in range(num_labels):
+                    onehot.append(0)
+                onehot[lab] = 1
+                new_item.append(onehot)
+        # Pad vectors
+        if len(new_item) > max_len:
+            new_item = new_item[0:max_len]
+        while len(new_item) < max_len:
+            new_item.append(zero_vec)
         data2.append(new_item)
+        #else:
+        #    data2.append([])
     return data2
 
 ''' Decodes one sequence of labels
 '''
 def decode_labels(data, labenc=None):
-    print "decode_labels"
+    #print "decode_labels"
     if labenc is None:
         labenc = labelencoder
     data2 = []
     for row in data:
         #print "- row: " + str(row)
-        lab = row.index(1)
+        lab = numpy.argmax(numpy.asarray(row))
         #print "- lab: " + str(lab)
         data2.append(lab)
     #print "- data2: " + str(data2)
     return labenc.inverse_transform(data2)
     #return labelencoder.inverse_transform(onehotencoder.reverse_transform(data))
+
+def decode_all_labels(data, labenc=None):
+    decoded_labels = []
+    for sequence in data:
+        labs = decode_labels(sequence, labenc)
+        decoded_labels.append(labs)
+    return decoded_labels
 
 def word2features(sent, i):
     word = sent[i][0]
