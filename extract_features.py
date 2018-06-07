@@ -211,7 +211,8 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
 
         # KEYWORD features
         if kw_features:
-            keyword_string = get_keywords(child, 'keywords_spell')
+	    keyword_string = get_keywords(child, 'keyword_clusters_text')
+            #keyword_string = get_keywords(child, 'keywords_spell')
             # Remove punctuation and trailing spaces from keywords
             words = [s.strip().translate(string.maketrans("",""), string.punctuation) for s in keyword_string.split(',')]
             # Split keyword phrases into individual words
@@ -439,9 +440,9 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
             feat_name = event_vec
         elif event_seq in featurenames:
             feat_name = event_seq
-        elif kw_vec in featurenames:
-            feat_name = kw_vec
-            text = keywords
+        #elif kw_vec in featurenames:
+        #    feat_name = kw_vec
+        #    text = keywords
 
         matrix, dict_keys = vector_features(feat_name, text, matrix, dict_keys, arg_vecfile)
 
@@ -452,6 +453,10 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
             matrix, dict_keys = vector_features(feat_name, text, matrix, dict_keys, arg_vecfile)
 	    print "Testing for dict_keys of vector: " + str(dict_keys)
 
+	if kw_vec in featurenames:
+	    feat_name = kw_vec
+	    text = keywords
+	    matrix, dict_keys = vector_features(feat_name, text, matrix, dict_keys, arg_vecfile)
             # Concatenate narrative vectors and narrative_symptom vectors. 
             #for x in range(len(matrix)):
             #    feat = matrix[x]
