@@ -20,6 +20,8 @@ import csv
 import pandas as pd
 import numpy as np
 
+import string
+
 global symp_narr_tag
 symp_narr_tag = "narr_symp"
 symp_tagger_tag = "symp_tagger"
@@ -250,18 +252,24 @@ def tag_symptoms(tree):
     chv = csv.reader(open(chv_tsvfile_path), delimiter = '\t')
 
     symptoms = []
+    dict_symp = {}
+
 
     # Loop over the rows in SYMP.csv file and get the list of symptoms
     for row in mycsv:
-        symptoms.append(row[1])
-        print(row[1])
+        if row[1] not in symptoms:
+            symptoms.append(row[1])
+            print(row[1])
 
     # Loop over the rows in CHV file and get the list of symptoms. 
     # Comment this if you don't want to add symptoms listed in chv file. 
     for row in chv:
-        symptoms.append(row[1])
-        print(row[1])
+        if row[1] not in symptoms:
+            symptoms.append(row[1])
+            dict_symp[row[1]] = row[2]
+            print(row[1])
 
+    # Loop over 
     max_word_count = count_max_len_symptoms(symptoms)
 
     root = tree.getroot()
@@ -271,6 +279,10 @@ def tag_symptoms(tree):
         narr = ""
         if node != None:
             narr = node.text.encode('utf-8')
+
+            # Remove punctuation
+            narr_words = [w.strip() for w in narr.lower().translate(string.maketrans("",""), string.punctuation).split(' ')]
+            narr = " ".join(narr_words)
             ngrams = get_substrings_with_limit(narr, max_word_count)
 	    ngrams = filter(None, ngrams)
             # Find all phrases that contains words in the list of symptoms. 
@@ -279,6 +291,14 @@ def tag_symptoms(tree):
             # Remove duplicates in possible phrases
             clean_possible_phrases = remove_duplicates(possible_phrases)
 
+            narr_symp = ""
+            for phrase in clean_possible_phrases:
+                keys = dict_symp.keys()
+                if phrase in keys:
+                    phrase = dict_symp[phrase]
+                    narr_symp = narr_symp + " " + phrase
+
+            '''
             # Sort possible phrases by start index
             sorted_phrases = sorted(clean_possible_phrases, key=lambda tup: tup[1])
             
@@ -314,7 +334,7 @@ def tag_symptoms(tree):
 
             if lastindex < len(narr):
                 narr_fixed = narr_fixed + narr[lastindex:]
-
+            '''
             if node == None:
                 node = etree.SubElement(child, "narrative")
             #node.text = narr_fixed.decode('utf-8').strip()
