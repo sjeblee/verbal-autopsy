@@ -256,10 +256,11 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
                 if narr_dem in featurenames:
                     age = features["CL_DeathAge"]
                     # Convert ageunit and gender to words
-                    ageunit = data_util.decode_ageunit(features["CL_ageunit"])
+                    #ageunit = data_util.decode_ageunit(features["CL_ageunit"])
                     gender = data_util.decode_gender(features["CL_DeceasedSex"])
-                    dem_prefix = " age " + str(age) + " " + ageunit + " " + str(gender) + " "
-                    print "narr_dem: " + dem_prefix
+                    #dem_prefix = " age " + str(age) + " " + ageunit + " " + str(gender) + " "
+                    dem_prefix = " age " + str(age) + " " + str(gender) + " "
+		    print "narr_dem: " + dem_prefix
                     narr_string = dem_prefix + narr_string
             narratives.append(narr_string.strip().lower())
             #print "Adding narr: " + narr_string.lower()
@@ -500,7 +501,7 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
         # Remove dem features because we've already added them to the narrative
         dict_keys.remove("CL_DeceasedSex")
         dict_keys.remove("CL_DeathAge")
-        dict_keys.remove("CL_ageunit")
+        #dict_keys.remove("CL_ageunit")
     data_util.write_to_file(matrix, dict_keys, outfile)
 
 ''' Get vector features

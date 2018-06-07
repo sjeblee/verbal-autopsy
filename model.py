@@ -1072,7 +1072,10 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
                         #print "max_seq_len: " + str(max_seq_len)
                         #features = numpy.asarray(features)#.reshape(max_seq_len, 1)
                         feature = numpy.asarray(feature)
-                        features.append(feature)
+                        if len(features) == 0:
+			    features = feature
+			else:
+			    features = numpy.concatenate((features, feature), axis = 0)
                         #print "narr_vec shape: " + str(features.shape)
                     elif not vec_feats:
                         if vector.has_key(key):
