@@ -19,23 +19,25 @@ import temporal_util as tutil
 # Global variables
 unk = "UNK"
 none_label = "NONE"
+list_name = "event_list"
 
 def main():
     argparser = argparse.ArgumentParser()
     argparser.add_argument('-i', '--in', action="store", dest="infile")
     argparser.add_argument('-r', '--relset', action="store", dest="relset")
+    argparser.add_argument('-o', '--out', action="store", dest="outfile")
     args = argparser.parse_args()
 
     if not (args.infile):
-        print("usage: ./listify.py --in [file_timeml.xml] --relset [binary/simple/exact]")
+        print("usage: ./listify.py --in [file_timeml.xml] --out [file.xml] --relset [binary/simple/exact]")
         exit()
 
     relset = 'exact'
     if args.relset:
         relset = args.relset
-    get_lists(args.infile, relset)
+    get_lists(args.infile, args.outfile, relset)
 
-def get_lists(filename, relation_set='exact'):
+def get_lists(filename, outfile, relation_set='exact'):
     print("creating graph: ", relation_set)
     starttime = time.time()
     # Get the xml from file
@@ -65,11 +67,12 @@ def get_lists(filename, relation_set='exact'):
             ids.append(rec_id)
             timelines.append(timeline)
             records += 1
-        # TODO: save timeline to the xml file
+            timeline_node = etree.SubElement(child, list_name)
+            timeline_to_xml(timeline, timeline_node)
 
     print("records:", str(records))
     print("dropped:", str(dropped))
-    # TODO: write xml output to file
+    tree.write(outfile)
     tutil.print_time(time.time()-starttime)
     return timelines
 
@@ -84,6 +87,7 @@ def listify(xml_node, relation_set='exact'):
     # Create the graph
     graph, node_to_ids = graphify.create_digraph(xml_node, relation_set, return_elements=True)
 
+    print("graph nodes:", str(len(graph.nodes())))
     # Create a binned list based on graph topological order
     timeline = []
     for node in nx.algorithms.dag.topological_sort(graph):
@@ -92,11 +96,31 @@ def listify(xml_node, relation_set='exact'):
     for x in range(len(timeline)):
         print("---", str(x), "---")
         for item in timeline[x]:
-            print(item.element.text, '| start:', item.start, 'end:', item.end, etree.tostring(item))
+            print_event(item)# etree.tostring(item.element))
 
     return timeline
 
-def event_to_string(element):
-    return element.attrib['eid'] + ": " + element.text
+def print_event(item):
+    print(str(item))
+    #print(item.eid, ':', item.element.text, ' | start:', item.start, 'end:', item.end)
 
+''' TODO: Make this xml?
+'''
+def timeline_to_string(timeline):
+    string = ""
+    for x in range(len(timeline)):
+        print("---", str(x), "---")
+        for item in timeline[x]:
+            string += str(item) + "\n"
+
+def timeline_to_xml(timeline, xml_parent):
+    for x in range(len(timeline)):
+        for item in timeline[x]:
+            event_node = item.element
+            event_node.attrib["rank"] = str(x)
+            event_node.attrib["start_time"] = item.start
+            event_node.attrib["end_time"] = item.end
+            xml_parent.append(event_node)
+            
+            
 if __name__ == "__main__":main()
