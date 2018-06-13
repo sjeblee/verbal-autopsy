@@ -577,9 +577,7 @@ def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_feature
         model.hyperopt(modeltype, trainfeatures, devfeatures, devresults, resultsloc, labels)
     else:
         print "Creating model..."
-        if modeltype == "nb":
-            svm.run(modeltype, trainfeatures, devfeatures, devresults, labels)
-        elif joint:
+        if joint:
             # The feature files here are lists
             model.run_joint(modeltype, modelname, trainfeatures, devfeatures, devresults, resultsloc, labels, arg_n_feats, arg_anova, arg_nodes, arg_rebalance)
         else:

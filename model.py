@@ -687,6 +687,7 @@ def test(model_type, model, testfile, anova_filter=None, hybrid=False, rec_type=
     #    attn_vec = get_attention_vector(model, testX)
     #    print "attention vector: " + str(attn_vec)
     else:
+        testX = testX.astype('float')
         results = model.predict(testX)
 
     # Score keywords from keyword model
