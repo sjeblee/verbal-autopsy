@@ -12,7 +12,7 @@ import os
 import subprocess
 
 # Parameters
-add_dct_links = False
+add_dct_links = True
 
 class ElementTag:
     def __init__(self, start, end, element):
@@ -63,12 +63,21 @@ def run(arg_outfile, arg_textdir, arg_anndir):
         narr_node.text = txt_narrs[rec_id]
         child.append(narr_node)
         narrt_node = etree.Element("narr_timeml_simple")
-        narrt_node.text = unescape(narr)
+        narrt_node.text = narr#unescape(narr)
         #print(narrt_node.text)
         child.append(narrt_node)
         root.append(child)
 
     tree.write(arg_outfile)
+
+    sed_command = r"sed -i -e 's/<Record>/\n<Record>/g' " + arg_outfile
+    print("sed_command: ", sed_command)
+    ps = subprocess.Popen(sed_command, shell=True, stdout=subprocess.PIPE)
+    output = ps.communicate()[0]
+    #out = open(arg_outfile, 'w')
+    #out.write(output)
+    #out.close()
+                                
     #subprocess.call(["sed", "-i", "-e", 's/&lt;/ </g', arg_outfile])
     #subprocess.call(["sed", "-i", "-e", 's/&gt;/> /g', arg_outfile])
     #subprocess.call(["sed", "-i", "-e", 's/  / /g', arg_outfile])
@@ -83,21 +92,24 @@ def convert_spans_to_xml(raw_text, xml_tree):
     dct_id = None
     dct_tlinks = []
     elements = [] # Dict of start span to ElementTags
+    time_id_nums = []
 
     # Find the document creation time
     for entity in annotations:
         entity_id_text = entity.find('id').text
         entity_id = entity_id_text[0:entity_id_text.index('@')]
         entity_type = entity.find('type').text
-        if entity_type == 'DOCTIME' or entity_type == 'SECTIONTIME':
+        dct_types = ['DOCTIME', 'SECTIONTIME']
+        if entity_type in dct_types:
             entity_type = 'TIMEX3'
-            dct_id = entity_id
+            dct_id = 't' + entity_id
+            time_id_nums.append(entity_id)
             print("DCT", str(entity_id))
             span = entity.find('span').text.split(',')
             span_start = int(span[0])
             span_end = int(span[1])
             xml_element = etree.Element(entity_type)
-            xml_element.set('tid', entity_id)
+            xml_element.set('tid', dct_id)
             xml_element.set('temporalFunction', "false")
             xml_element.set('functionInDocument', "CREATION_TIME")
             elements.append(ElementTag(span_start, span_end, xml_element))
@@ -113,18 +125,21 @@ def convert_spans_to_xml(raw_text, xml_tree):
             span_end = int(span[1])
             entity_type = entity.find('type').text
             id_type = 'tid'
-            if entity_type == "DOCTIME":
+            if entity_type in dct_types:
                 continue
                 #entity_type = "TIMEX3"
                 #dct_id = entity_id
                 #print("DCT", str(entity_id))
             if entity_type == "TIMEX3":
                 id_type = 'tid'
+                time_id_nums.append(entity_id)
                 entity_id = 't' + entity_id
             elif entity_type == "EVENT":
                 id_type = 'eid'
                 entity_id = 'e' + entity_id
-
+            else:
+                print("WARNING: unknown entity type!", entity_type)
+                
             # Get entity attributes
             properties = entity.find('properties')
             xml_element = etree.Element(entity_type)
@@ -141,8 +156,11 @@ def convert_spans_to_xml(raw_text, xml_tree):
                     #tlink_element.set('lid', 'l' + str(tlink_id_num))
                     #tlink_id_num += 1
                     tlink_element.set('relatedToTime', dct_id)
-                    tlink_element.set('eventID', entity_id)
                     tlink_element.set('relType', text)
+                    if entity_type == 'TIMEX':
+                        tlink_element.set('timeID', entity_id)
+                    else:
+                        tlink_element.set('eventID', entity_id)
                     dct_tlinks.append(tlink_element)
                     #tlink_text = tlink_text + str(etree.tostring(tlink_element))
                 if text == "N/A":
@@ -156,6 +174,7 @@ def convert_spans_to_xml(raw_text, xml_tree):
 
         # Process TLINKs
         elif entity.tag == "relation":
+            details = False
             tlink_element = etree.Element('TLINK')
             tlink_element.set('lid', 'l' + str(entity_id))
             tlink_id_num = int(entity_id)
@@ -164,22 +183,42 @@ def convert_spans_to_xml(raw_text, xml_tree):
                     at_index = prop.text.index('@')
                     source_id = prop.text[0:at_index]
                     source_type = prop.text[at_index+1:at_index+2]
-                    if source_type == 'e':
+                    if source_id in time_id_nums:
+                        att_name = 'timeID'
+                        tlink_element.set('timeID', 't' + source_id)
+                        if details:
+                            print('found time')
+                    elif source_type == 'e':
+                        if details:
+                            print('source_type is event')
                         att_name = 'eventID'
                         tlink_element.set('eventID', source_type + source_id)
+                    else:
+                        print("WARNING: unknown source type!", source_type)
                 elif prop.tag == 'Target':
                     at_index = prop.text.index('@')
                     target_id = prop.text[0:at_index]
                     target_type = prop.text[at_index+1:at_index+2]
-                    if target_type == 'e':
+                    if target_id in time_id_nums:
+                        att_name = 'relatedToTime'
+                        target_type = 't'
+                        if details:
+                            print('found time')
+                    elif target_type == 'e':
+                        if details:
+                            print('target_type: event')
                         att_name = 'relatedToEventID'
                     else:
-                        att_name = 'relatedToTime'
+                        print('WARNING: unknown target type!', target_type)
                     tlink_element.set(att_name, target_type + target_id)
+                    if details:
+                        print('setting', att_name, 'to', target_type + target_id)
                 elif prop.tag == 'Type':
                     reltype = prop.text
                     tlink_element.set('relType', reltype)
-            tlink_text = tlink_text + str(etree.tostring(tlink_element).decode('utf-8'))
+            if details:
+                print('adding tlink:', etree.tostring(tlink_element).decode('utf-8'))
+            tlink_text = tlink_text + etree.tostring(tlink_element).decode('utf-8')
 
     # Add DCT TLINKs
     if add_dct_links:
@@ -190,7 +229,7 @@ def convert_spans_to_xml(raw_text, xml_tree):
             #    print("WARNING: TLINK id collision!")
             #print("adding TLINK", str(tlink_id_num))
             element.set('lid', 'l' + str(tlink_id_num))
-            tlink_text = tlink_text + str(etree.tostring(element).decode('utf-8'))
+            tlink_text = tlink_text + etree.tostring(element).decode('utf-8')
 
     # Add the tags in order to the text
     #spanindex = 0
@@ -204,7 +243,7 @@ def convert_spans_to_xml(raw_text, xml_tree):
         entity_text = raw_text[span_start:span_end]
         element.text = entity_text
         #spanindex = span_end
-        doc_text = doc_text + str(etree.tostring(element).decode('utf-8'))
+        doc_text = doc_text + etree.tostring(element).decode('utf-8')
 
     return doc_text + tlink_text
 
