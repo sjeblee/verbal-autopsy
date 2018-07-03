@@ -18,8 +18,55 @@ import torch.nn.functional as F
 import data_util3
 
 numpy.set_printoptions(threshold=numpy.inf)
-use_cuda = torch.cuda.is_available()
-torch.cuda.set_device(2)
+#use_cuda = torch.cuda.is_available()
+use_cuda = False
+#torch.cuda.set_device(2)
+
+class CNN_Text(nn.Module):
+
+     def __init__(self, embed_dim, class_num, kernel_num=10, kernel_sizes='12345', dropout=0.1):
+          super(CNN_Text, self).__init__()
+          #self.args = args
+
+          #V = args.embed_num
+          D = embed_dim
+          C = class_num
+          Ci = 1
+          Co = kernel_num
+          Ks = kernel_sizes
+
+          self.conv11 = nn.Conv2d(Ci, Co, (1, D))
+          self.conv12 = nn.Conv2d(Ci, Co, (2, D))
+          self.conv13 = nn.Conv2d(Ci, Co, (3, D))
+          self.conv14 = nn.Conv2d(Ci, Co, (4, D))
+	  self.conv15 = nn.Conv2d(Ci, Co, (5, D))
+
+          self.dropout = nn.Dropout(dropout)
+          self.fc1 = nn.Linear(len(Ks)*Co, C)
+
+     def conv_and_pool(self, x, conv):
+          x = F.relu(conv(x)).squeeze(3)  # (N, Co, W)
+          x = F.max_pool1d(x, x.size(2)).squeeze(2)
+          return x
+
+     def forward(self, x):
+          #x = self.embed(x)  # (N, W, D)
+
+          x = x.unsqueeze(1)  # (N, Ci, W, D)
+          #x = [F.relu(conv(x)).squeeze(3) for conv in self.convs1]  # [(N, Co, W), ...]*len(Ks)
+          #x = [F.max_pool1d(i, i.size(2)).squeeze(2) for i in x]  # [(N, Co), ...]*len(Ks)
+          #x = torch.cat(x, 1)
+
+          x1 = self.conv_and_pool(x,self.conv11) #(N,Co)
+          x2 = self.conv_and_pool(x,self.conv12) #(N,Co)
+          x3 = self.conv_and_pool(x,self.conv13) #(N,Co)
+          x4 = self.conv_and_pool(x,self.conv14) #(N,Co)
+	  x5 = self.conv_and_pool(x,self.conv15)
+          x = torch.cat((x1, x2, x3, x4, x5), 1) # (N,len(Ks)*Co)
+
+          #x = self.dropout(x)  # (N, len(Ks)*Co)
+          logit = self.fc1(x)  # (N, C)
+          return logit
 
 # Neural Network Model (1 hidden layer)
 class Net(nn.Module):
@@ -28,11 +75,13 @@ class Net(nn.Module):
         self.fc1 = nn.Linear(input_size, hidden_size)
         self.relu = nn.ReLU()
         self.fc2 = nn.Linear(hidden_size, num_classes)
+	#self.sm = nn.Softmax()
 
     def forward(self, x):
         out = self.fc1(x)
         out = self.relu(out)
         out = self.fc2(out)
+	#out = self.sm(out)
         return out
 
 # Models from PyTorch Tutorial:
@@ -249,11 +298,14 @@ def nn_model(X, Y, num_nodes, act, num_epochs=10):
             # Convert torch tensor to Variable
             samples = Variable(X[i:i+batch_size])
             labels = Variable(Y[i:i+batch_size])
+	    print "Labels: " + str(labels)
 
             # Forward + Backward + Optimize
             optimizer.zero_grad()  # zero the gradient buffer
             outputs = net(samples)
             loss = criterion(outputs, labels)
+	    #loss = criterion(outputs, torch.max(labels,1)[1])
+	    print "Labe;s: " + str(torch.max(labels,1)[1])
             loss.backward()
             optimizer.step()
 
@@ -269,8 +321,11 @@ def nn_model(X, Y, num_nodes, act, num_epochs=10):
 
 def test_nn(net, testX):
     # Test the Model
-    #testX = testX.astype('float')
+    testX = testX.astype('float')
     pred = []
+    new_pred = [] # New prediction by assigning to UNKNOWN class if below the threshold
+    probs = [] # Probabilities, the softmax output of the final layer
+
     batch_size = 100
     i = 0
     length = len(testX) #testX.shape[0]
@@ -283,13 +338,38 @@ def test_nn(net, testX):
             sample_tensor = torch.cuda.FloatTensor(testX[i:i+batch_size])
         else:
             sample_tensor = torch.FloatTensor(testX[i:i+batch_size])
+	    #sample_tensor = torch.from_numpy(numpy.asarray(testX))
         samples = Variable(sample_tensor)
         outputs = net(samples)
-        _, predicted = torch.max(outputs.data, 1)
+
+        #_, predicted = torch.max(outputs.data, 1)
+	probabilities, predicted = torch.max(outputs.data, 1)
         pred = pred + predicted.tolist()
+	
+	# Get the probabilities, and making new prediction based on random threshold
+	probs = probs + probabilities.tolist()
+	print "Probabilties: " + str(probs)
+	for num, prob in enumerate(probs):
+	    if prob < 0.001:  # Set the threshold. Initially hard-coded. Will be modified.
+		new_pred.append(9) # What is the index location of UNKNOWN class? Figure it out!
+	    else:
+		new_pred.append(pred[num])
+
+
+	# Printing the probabilties of each class to determine the threshold for assigning to UNKNOWN class
+	prob_file = open('../../output_probabilty.txt', 'w')
+	label_file = open('../../output_label.txt', 'w')
+	
+	#print(probs)
+	prob_file.write(str(probs))	
+	label_file.write(str(pred))
+	prob_file.close()
+	label_file.close()
+
         del sample_tensor
         i = i+batch_size
-    return pred
+    #return pred
+    return new_pred
 
 ''' Creates and trains a recurrent neural network model. Supports SimpleRNN, LSTM, and GRU
     X: a list of training data
@@ -362,7 +442,154 @@ def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, loss_fu
     #input_arrays = [X]
     #hybrid = False
 
-    print("NOT IMPLEMENTED")
+    # Train the CNN, return the model
+    st = time.time()
+    Xarray = numpy.asarray(X).astype('float')
+    Yarray = Y.astype('int') #Y.toarray().astype('int')
+    print("X numpy shape: ", str(Xarray.shape), "Y numpy shape:", str(Yarray.shape))
+
+    # Params
+    X_len = Xarray.shape[0]
+    dim = Xarray.shape[-1]
+    num_labels = Yarray.shape[-1]
+    num_epochs = 20
+    steps = 0
+    best_acc = 0
+    last_step = 0
+    log_interval = 1000
+    batch_size = 100
+    num_batches = math.ceil(X_len/batch_size)
+    learning_rate = 0.001
+
+    cnn = CNN_Text(dim, num_labels)
+    if use_cuda:
+	cnn = cnn.cuda()
+
+    # Train
+    optimizer = torch.optim.Adam(cnn.parameters(), lr=learning_rate)
+
+    steps = 0
+    cnn.train()
+    for epoch in range(num_epochs):
+	print("epoch", str(epoch))
+        i = 0
+        numpy.random.seed(seed=1)
+        permutation = torch.from_numpy(numpy.random.permutation(X_len)).long()
+        Xiter = Xarray[permutation]
+        Yiter = Yarray[permutation]
+
+        while i+batch_size < X_len:
+             batchX = Xiter[i:i+batch_size]
+             batchY = Yiter[i:i+batch_size]
+             Xtensor = torch.from_numpy(batchX).float()
+             Ytensor = torch.from_numpy(batchY).long()
+             if use_cuda:
+                  Xtensor = Xtensor.cuda()
+                  Ytensor = Ytensor.cuda()
+             feature = Variable(Xtensor)
+             target = Variable(Ytensor)
+             i = i+batch_size
+
+             optimizer.zero_grad() 
+             logit = cnn(feature)
+
+             #print('logit vector', logit.size())
+             #print('target vector', target.size())
+             loss = F.cross_entropy(logit, torch.max(target,1)[1])
+             loss.backward()
+             optimizer.step()
+
+             #if steps % log_interval == 0:
+		#corrects = (torch.max(logit, 1)[1].view(target.size()).data == target.data).sum()
+                #accuracy = 100.0 * corrects/batch_size
+                #print('\rBatch[{}] - loss: {:.6f}  acc: {:.4f}%({}/{})'.format(steps,
+                 #                                                                 loss.data[0],
+                 #                                                                 accuracy,
+                 #                                                                 corrects,
+                 #                                                                 batch_size))
+             steps += 1
+ 
+        # Print epoch time
+        ct = time.time() - st
+        unit = "s"
+        if ct > 60:
+	    ct = ct/60
+            unit = "m"
+        print("time so far: ", str(ct), unit)
+    return cnn
+
+def test_cnn(model, testX, testids, probfile=None, labelencoder=None, collapse=False):
+    y_pred = []
+    y_pred_softmax = []
+    y_pred_logsoftmax = []
+    softmax = nn.Softmax(dim=1)
+    logsoftmax = nn.LogSoftmax(dim=1)
+    #labelnames = labelencoder.classes_
+
+    new_y_pred = []
+    if probfile is not None:
+        probs = []
+
+    for x in range(len(testX)):
+        input_row = testX[x]
+        #row_id = testids[x]
+        icd = None
+        if icd is None:
+            input_tensor = torch.from_numpy(numpy.asarray([input_row]).astype('float')).float()
+            if use_cuda:
+                input_tensor = input_tensor.cuda()
+            icd_var = model(Variable(input_tensor))
+            # Softmax and log softmax values
+            icd_vec = logsoftmax(icd_var)
+            icd_vec_softmax = softmax(icd_var)
+            icd_code = torch.max(icd_vec, 1)[1].data[0]
+            #icd = decode_one_hot([icd_code])[0]
+	    icd_prob = torch.max(icd_vec_softmax,1)[0]
+	    if icd_prob < 0.1:
+		new_y_pred.append(9)
+	    else:
+		new_y_pred.append(icd_code)
+	
+
+            #print("icd pred:", str(icd))
+            # Save the probabilities
+            if probfile is not None:
+                #icd_prob_dict = tools.prob_dict(icd_vec[0].data, labelencoder)
+                icd_prob_dict_softmax = tools.prob_dict(icd_vec_softmax[0].data, labelencoder)
+                #vals = list(icd_prob_dict.values())
+                #val_array = numpy.asarray(vals)
+                icd_prob_dict_softmax["ID"] = row_id
+                probs.append(icd_prob_dict_softmax)
+
+                # Probability audit
+                #print("icd prob:", str(icd_prob_dict[icd]))
+                #argmax = int(numpy.argmax(val_array))
+                #print("argmax:", str(argmax))
+                #argmax_prob = val_array[argmax]
+                #argmax_prob_softmax = icd_prob_dict_softmax[icd]
+                #print("argmax prob:", str(argmax_prob))
+                #print("--------------")
+                #y_pred_softmax.append(argmax_prob_softmax)
+                #y_pred_logsoftmax.append(argmax_prob)
+
+        y_pred.append(icd_code)
+
+    if probfile is not None:
+        pickle.dump(probs, open(probfile, "wb"))
+
+    #if collapse:
+    #    print("Collapsing icd codes into a list for each docid_lineid")
+    #    icd_dict = {}
+    #    for index in range(len(testids)):
+    #         recid = testids[index]
+    #         icd = y_pred[index]
+    #         if recid not in icd_dict:
+    #              icd_dict[recid] = []
+    #         icd_dict[recid].append(icd)
+    #    return icd_dict
+    #return y_pred
+    return new_y_pred
+
 
 def train_encoder_decoder(input_variable, target_variable, encoder, decoder, encoder_optimizer, decoder_optimizer, loss_func, max_length):
     # Parameters
