@@ -22,9 +22,12 @@ numpy.set_printoptions(threshold=numpy.inf)
 use_cuda = False
 #torch.cuda.set_device(2)
 
+# Set threshold for ill-defined class
+threshold = 0.2
+
 class CNN_Text(nn.Module):
 
-     def __init__(self, embed_dim, class_num, kernel_num=10, kernel_sizes='12345', dropout=0.1):
+     def __init__(self, embed_dim, class_num, kernel_num=200, kernel_sizes='12345', dropout=0.1):
           super(CNN_Text, self).__init__()
           #self.args = args
 
@@ -40,6 +43,9 @@ class CNN_Text(nn.Module):
           self.conv13 = nn.Conv2d(Ci, Co, (3, D))
           self.conv14 = nn.Conv2d(Ci, Co, (4, D))
 	  self.conv15 = nn.Conv2d(Ci, Co, (5, D))
+	  #self.conv16 = nn.Conv2d(Ci, Co, (6, D))
+	  #self.conv17 = nn.Conv2d(Ci, Co, (7, D))
+	  #self.conv18 = nn.Conv2d(Ci, Co, (8, D))
 
           self.dropout = nn.Dropout(dropout)
           self.fc1 = nn.Linear(len(Ks)*Co, C)
@@ -62,6 +68,9 @@ class CNN_Text(nn.Module):
           x3 = self.conv_and_pool(x,self.conv13) #(N,Co)
           x4 = self.conv_and_pool(x,self.conv14) #(N,Co)
 	  x5 = self.conv_and_pool(x,self.conv15)
+	  #x6 = self.conv_and_pool(x,self.conv16)
+	  #x7 = self.conv_and_pool(x,self.conv17)
+	  #x8 = self.conv_and_pool(x,self.conv18)
           x = torch.cat((x1, x2, x3, x4, x5), 1) # (N,len(Ks)*Co)
 
           #x = self.dropout(x)  # (N, len(Ks)*Co)
@@ -321,6 +330,9 @@ def nn_model(X, Y, num_nodes, act, num_epochs=10):
 
 def test_nn(net, testX):
     # Test the Model
+
+    softmax = nn.Softmax(dim=1)
+    logsoftmax = nn.LogSoftmax(dim=1)
     testX = testX.astype('float')
     pred = []
     new_pred = [] # New prediction by assigning to UNKNOWN class if below the threshold
@@ -338,19 +350,22 @@ def test_nn(net, testX):
             sample_tensor = torch.cuda.FloatTensor(testX[i:i+batch_size])
         else:
             sample_tensor = torch.FloatTensor(testX[i:i+batch_size])
-	    #sample_tensor = torch.from_numpy(numpy.asarray(testX))
         samples = Variable(sample_tensor)
         outputs = net(samples)
 
+	outputs = logsoftmax(outputs)
+	outputs_softmax = softmax(outputs)
         #_, predicted = torch.max(outputs.data, 1)
-	probabilities, predicted = torch.max(outputs.data, 1)
+	#probabilities, predicted = torch.max(outputs.data, 1)
+	predicted = torch.max(outputs, 1)[1]
+	probabilities = torch.max(outputs_softmax, 1)[0]
         pred = pred + predicted.tolist()
 	
 	# Get the probabilities, and making new prediction based on random threshold
 	probs = probs + probabilities.tolist()
 	print "Probabilties: " + str(probs)
 	for num, prob in enumerate(probs):
-	    if prob < 0.001:  # Set the threshold. Initially hard-coded. Will be modified.
+	    if prob < threshold:  # Set the threshold. Initially hard-coded. Will be modified.
 		new_pred.append(9) # What is the index location of UNKNOWN class? Figure it out!
 	    else:
 		new_pred.append(pred[num])
@@ -452,7 +467,7 @@ def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, loss_fu
     X_len = Xarray.shape[0]
     dim = Xarray.shape[-1]
     num_labels = Yarray.shape[-1]
-    num_epochs = 20
+    num_epochs = 10
     steps = 0
     best_acc = 0
     last_step = 0
@@ -493,20 +508,10 @@ def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, loss_fu
              optimizer.zero_grad() 
              logit = cnn(feature)
 
-             #print('logit vector', logit.size())
-             #print('target vector', target.size())
              loss = F.cross_entropy(logit, torch.max(target,1)[1])
              loss.backward()
              optimizer.step()
 
-             #if steps % log_interval == 0:
-		#corrects = (torch.max(logit, 1)[1].view(target.size()).data == target.data).sum()
-                #accuracy = 100.0 * corrects/batch_size
-                #print('\rBatch[{}] - loss: {:.6f}  acc: {:.4f}%({}/{})'.format(steps,
-                 #                                                                 loss.data[0],
-                 #                                                                 accuracy,
-                 #                                                                 corrects,
-                 #                                                                 batch_size))
              steps += 1
  
         # Print epoch time
@@ -524,7 +529,6 @@ def test_cnn(model, testX, testids, probfile=None, labelencoder=None, collapse=F
     y_pred_logsoftmax = []
     softmax = nn.Softmax(dim=1)
     logsoftmax = nn.LogSoftmax(dim=1)
-    #labelnames = labelencoder.classes_
 
     new_y_pred = []
     if probfile is not None:
@@ -532,7 +536,7 @@ def test_cnn(model, testX, testids, probfile=None, labelencoder=None, collapse=F
 
     for x in range(len(testX)):
         input_row = testX[x]
-        #row_id = testids[x]
+   
         icd = None
         if icd is None:
             input_tensor = torch.from_numpy(numpy.asarray([input_row]).astype('float')).float()
@@ -543,9 +547,9 @@ def test_cnn(model, testX, testids, probfile=None, labelencoder=None, collapse=F
             icd_vec = logsoftmax(icd_var)
             icd_vec_softmax = softmax(icd_var)
             icd_code = torch.max(icd_vec, 1)[1].data[0]
-            #icd = decode_one_hot([icd_code])[0]
+           
 	    icd_prob = torch.max(icd_vec_softmax,1)[0]
-	    if icd_prob < 0.1:
+	    if icd_prob < threshold:
 		new_y_pred.append(9)
 	    else:
 		new_y_pred.append(icd_code)
@@ -577,16 +581,6 @@ def test_cnn(model, testX, testids, probfile=None, labelencoder=None, collapse=F
     if probfile is not None:
         pickle.dump(probs, open(probfile, "wb"))
 
-    #if collapse:
-    #    print("Collapsing icd codes into a list for each docid_lineid")
-    #    icd_dict = {}
-    #    for index in range(len(testids)):
-    #         recid = testids[index]
-    #         icd = y_pred[index]
-    #         if recid not in icd_dict:
-    #              icd_dict[recid] = []
-    #         icd_dict[recid].append(icd)
-    #    return icd_dict
     #return y_pred
     return new_y_pred
 

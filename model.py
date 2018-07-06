@@ -35,7 +35,12 @@ import cluster_keywords
 import data_util
 import model_library
 import rebalance
+import model_library_torch
 #from layers import Attention
+
+import torch
+import pickle
+import dill
 
 global anova_filter
 labelencoder = None
@@ -44,6 +49,9 @@ labelencoder_child = None
 labelencoder_neonate = None
 vec_types = ["narr_vec", "narr_seq", "event_vec", "event_seq", "symp_vec", "kw_vec"]
 numpy.set_printoptions(threshold=numpy.inf)
+
+# Use keras or pytorch
+use_torch = True
 
 def main():
     argparser = argparse.ArgumentParser()
@@ -394,7 +402,11 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
         modelfile = arg_prefix + "/" + arg_modelname + ".model"
         if os.path.exists(modelfile):
             print "using pre-existing model at " + modelfile
-            model = load_model(modelfile)
+
+	    if use_torch:
+		model = torch.load(modelfile)
+	    else:
+		model = load_model(modelfile)
             X = numpy.asarray(X)
         else:
             print "creating a new neural network model"
@@ -411,7 +423,11 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
                 if len(X) == 0 and len(X2) > 0:
                     X = X2
                 Y = to_categorical(Y)
-                model, X, Y = model_library.nn_model(X, Y, num_nodes, 'relu')
+
+		if use_torch:
+		    model = model_library_torch.nn_model(X,Y,num_nodes,'relu')
+		else:
+		    model, X, Y = model_library.nn_model(X, Y, num_nodes, 'relu')
             elif arg_model == "rnn" or arg_model == "lstm" or arg_model == "gru":
                 num_nodes = 100
                 #Y = to_categorical(Y)
@@ -422,18 +438,27 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
                 model, X, Y = model_library.rnn_cnn_model(X, Y, num_nodes, arg_activation, arg_model, X2=X2)
             elif arg_model == "cnn":
                 Y = to_categorical(Y)
-                model, X, Y = model_library.cnn_model(X, Y, X2=X2)
+
+		if use_torch:
+		    model = model_library_torch.cnn_model(X,Y)
+		else:
+                    model, X, Y = model_library.cnn_model(X, Y, X2=X2)
             elif arg_model == "filternn":
                 num_nodes = 56
                 Y = to_categorical(Y)
                 model, X, Y = create_filter_rnn_model(X, Y, embedding_dim, num_nodes)
 
-            # Save the model
-            print "saving the model..."
-            model.save(modelfile)
-            plotname = modelfile + ".png"
-            plot_model(model, to_file=plotname)
+            # Save keras the model, Currently commenting it since pytorch model does not have save function
+            
+	    print "saving the model..."
 
+	    if not use_torch:
+	        model.save(modelfile)
+	        plotname = modelfile + ".png"
+	        plot_model(model, to_file=plotname)
+	    # Save pytorch model
+	    else: # Use pytorch model
+	        torch.save(model, modelfile)
     # Other models
     else:
          if arg_model == "svm":
@@ -682,8 +707,17 @@ def test(model_type, model, testfile, anova_filter=None, hybrid=False, rec_type=
         #if "keyword_clusters" not in keys:
         inputs.append(testX2)
     if is_nn:
-        predictedY = model.predict(inputs)
-        results = map_back(predictedY)
+	if use_torch:
+	    if model_type == "nn": 
+		results = model_library_torch.test_nn(model,testX)
+	    elif model_type == "cnn":
+		results = model_library_torch.test_cnn(model,testX, testY)
+	else:
+	    predictedY = model.predict(inputs)
+	    results = map_back(predictedY)
+	print "testX shape: " + str(testX.shape)
+        #predictedY = model.predict(inputs)
+        #results = map_back(predictedY)
     #elif model_type == "cnn":
     #    attn_vec = get_attention_vector(model, testX)
     #    print "attention vector: " + str(attn_vec)
@@ -727,11 +761,17 @@ def test(model_type, model, testfile, anova_filter=None, hybrid=False, rec_type=
         labenc = labelencoder_child
     elif rec_type == 'neonate':
         labenc = labelencoder_neonate
+
+    # Print out classes for index location of each class in the list
+    print "Index location of each class: "
+    print(str(labenc.classes_))
+
     predictedlabels = labenc.inverse_transform(results)
     etime = time.time()
     print "testing took " + str(etime - stime) + " s"
     print "testY: " + str(testY)
     print "results: " + str(results)
+    print "predicted labels: " + str(predictedlabels)
     return testids, testlabels, predictedlabels
 
 def test_multi(model_type, model, testfile, rec_type=None):
@@ -1079,7 +1119,7 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
                         #print "narr_vec shape: " + str(features.shape)
                     elif not vec_feats:
                         if vector.has_key(key):
-			    print "This is: " + str(key) + "and value is : " + str(vector[key])
+			    #print "This is: " + str(key) + "and value is : " + str(vector[key])
                             features.append(vector[key])
                         else:
                             features.append('0')
