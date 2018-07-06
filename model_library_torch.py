@@ -20,7 +20,7 @@ import data_util3
 numpy.set_printoptions(threshold=numpy.inf)
 use_cuda = torch.cuda.is_available()
 if use_cuda:
-    torch.cuda.set_device(2)
+    torch.cuda.set_device(0)
 
 # Neural Network Model (1 hidden layer)
 class Net(nn.Module):
@@ -213,21 +213,19 @@ class AttnDecoderRNN(nn.Module):
     Y: a python list or numpy array of training labels of shape [num_samples]
     returns: the model and the modified X and Y arrays
 '''
-def nn_model(X, Y, num_nodes, act, num_epochs=10):
+def nn_model(X, Y, num_nodes, act, num_epochs=10, batch_size=100):
     print("use_cuda", str(use_cuda))
-    X = torch.Tensor(X)
-    Y = torch.Tensor(Y).long()
-    if use_cuda:
-        X = X.cuda()
-        Y = Y.cuda()
-    print("X: ", str(X.size()))
-    print("Y: ", str(Y.size()))
+    if type(X) is list:
+        X = numpy.asarray(X)
+    if type(Y) is list:
+        Y = numpy.asarray(Y)
+    print("X: ", str(X.shape))
+    print("Y: ", str(Y.shape))
 
     # Hyper Parameters
-    input_dim = X.size()[-1]
-    num_examples = X.size()[0]
-    num_classes = Y.size()[-1]
-    batch_size = 100
+    input_dim = X.shape[-1]
+    num_examples = X.shape[0]
+    num_classes = Y.shape[-1]
     learning_rate = 0.001
 
     print("neural network: nodes: ", str(num_nodes))
@@ -245,11 +243,16 @@ def nn_model(X, Y, num_nodes, act, num_epochs=10):
         print("epoch", str(epoch))
         i = 0
         while (i+batch_size) < num_examples:
-            if i%100000 == 0:
+            if i%10000 == 0:
                 print("batch i=", str(i))
             # Convert torch tensor to Variable
-            samples = Variable(X[i:i+batch_size])
-            labels = Variable(Y[i:i+batch_size])
+            batchX = torch.Tensor(X[i:i+batch_size])
+            batchY = torch.Tensor(Y[i:i+batch_size]).long()
+            if use_cuda:
+                batchX = batchX.cuda()
+                batchY = batchY.cuda()
+            samples = Variable(batchX)
+            labels = Variable(batchY)
 
             # Forward + Backward + Optimize
             optimizer.zero_grad()  # zero the gradient buffer
@@ -258,12 +261,12 @@ def nn_model(X, Y, num_nodes, act, num_epochs=10):
             loss.backward()
             optimizer.step()
 
-            if (i+1) % 10 == 0:
-                print ('Epoch [%d/%d], Step [%d/%d], Loss: %.4f' %(epoch+1, num_epochs, i+1, len(train_dataset)//batch_size, loss.data[0]))
+            if (i) % 10000 == 0:
+                print ('Epoch [%d/%d], Step [%d/%d], Loss: %.4f' %(epoch, num_epochs, i//batch_size, num_examples//batch_size, loss.data[0]))
             i = i+batch_size
 
-    del X
-    del Y
+            del batchX
+            del batchY
     if use_cuda:
         torch.cuda.empty_cache()
     return net
@@ -286,7 +289,8 @@ def test_nn(net, testX):
             sample_tensor = torch.FloatTensor(testX[i:i+batch_size])
         samples = Variable(sample_tensor)
         outputs = net(samples)
-        _, predicted = torch.max(outputs.data, 1)
+        #print('test output shape', str(outputs.size()))
+        _, predicted = torch.max(outputs.data, dim=1)
         pred = pred + predicted.tolist()
         del sample_tensor
         i = i+batch_size
