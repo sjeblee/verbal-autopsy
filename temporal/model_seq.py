@@ -86,13 +86,14 @@ def run(trainfile, testfile, outfile="", modelname="crf"):
         #crf_event = train_crf(trainx, trainy_event)
 
         # Test CRF
-        y_pred = model.predict(testx)
+        testy_labels = testy
+        y_pred_labels = model.predict(testx)
         #y_pred_time = crf_time.predict(testx)
         #y_pred_event = crf_event.predict(testx)
     elif modelname == 'gru':
         nodes = 100
         epochs = 5
-        model = models_pytorch.rnn_model(trainx, trainy, num_nodes=nodes, loss_function='mse', num_epochs=epochs)
+        model = models_pytorch.rnn_model(trainx, trainy, num_nodes=nodes, loss_function='mse', num_epochs=epochs, use_prev_labels=True)
         y_pred = models_pytorch.test_rnn(model, testx)
         y_pred_labels = decode_all_labels(y_pred)
         testy_labels = decode_all_labels(testy)

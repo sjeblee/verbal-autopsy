@@ -27,24 +27,24 @@ def main():
     argparser.add_argument('--tagger', action="store", dest="tagger")
     args = argparser.parse_args()
 
-    if not (args.infile and args.outfile):
+    if not (args.infile and args.outfile and args.trainfile):
         print "usage: ./tag_symptoms.py --in [file.xml] --out [outfile.xml] --train [trainfile.xml] --tagger [tagger]"
-        print "tagger options: keyword_match, crf, medttk"
+        print "tagger options: keyword_match, crf, medttk, nn"
         exit()
 
-    run(args.infile, args.outfile, args.tagger)
+    run(args.infile, args.outfile, args.trainfile, args.tagger)
 
-def run(infile, outfile, tagger="keyword_match"):
+def run(infile, outfile, trainfile=None, tagger="crf"):
     if tagger == "crf":
         crf_tagger(infile, outfile)
+    elif tagger == "nn":
+        seq2seq(infile, outfile, trainfile)
     else:
         tree = etree.parse(infile)
         if tagger == "keyword_match": # DO NOT USE KEYWORD MATCH FOR TEST/DEV
             tree = keyword_match(tree)
         elif tagger == "medttk":
             tree = medttk(tree)
-        elif tagger == seq2seq:
-            tree = seq2seq(tree)
         tree.write(outfile)
         data_util.fix_escaped_chars(outfile)
 
@@ -57,10 +57,9 @@ def crf_tagger(infile, outfile):
     #newtree = filter_narr(tree, "crf")
     #newtree.write(outfile)
 
-def seq2seq(infile, outfile):
-    print "TODO"
+def seq2seq(infile, outfile, trainfile):
     trainfile = '/u/sjeblee/research/data/i2b2/all_timeml_fixed.xml'
-    model_seq.run(trainfile, infile, outfile, "seq2seq")
+    model_seq.run(trainfile, infile, outfile, "nn")
 
 def keyword_match(tree, usecardinal=True):
     diff_threshold = 0.8

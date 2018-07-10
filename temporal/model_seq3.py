@@ -59,11 +59,11 @@ def run(trainfile, testfile, outfile="", modelname="crf"):
     elif modelname == "nn":
         extra_seqs = get_seqs('/u/sjeblee/research/data/TimeBank/timebank_all_timeml_simple.xml', split_sents=True)
         train_seqs = extra_seqs + train_seqs
-        trainx, trainy = get_feats(train_seqs, True)
+        trainx, trainy = get_feats(train_seqs, train=True)
         testx, testy = get_feats(test_seqs)
     elif modelname == 'gru':
-        trainx, trainy = get_feats(train_seqs, True)
-        testx, testy = get_feats(test_seqs)
+        trainx, trainy = get_feats(train_seqs, pad=True, train=True)
+        testx, testy = get_feats(test_seqs, pad=True)
 
     print("train:", str(len(trainx)), " ", str(len(trainy)))
     print("test: ", str(len(testx)), " ", str(len(testy)))
@@ -90,10 +90,10 @@ def run(trainfile, testfile, outfile="", modelname="crf"):
         #y_pred_time = crf_time.predict(testx)
         #y_pred_event = crf_event.predict(testx)
     elif modelname == 'gru':
-        nodes = 100
+        nodes = 256
         epochs = 5
-        model = models_pytorch.rnn_model(trainx, trainy, num_nodes=nodes, loss_function='mse', num_epochs=epochs, use_prev_labels=True)
-        y_pred = models_pytorch.test_rnn(model, testx)
+        model = models_pytorch.rnn_model(trainx, trainy, num_nodes=nodes, loss_function='crossentropy', num_epochs=epochs, batch_size=100, use_prev_labels=False)
+        y_pred = models_pytorch.test_rnn(model, testx, batch_size=1)
         y_pred_labels = decode_all_labels(y_pred)
         testy_labels = decode_all_labels(testy)
 
@@ -354,7 +354,7 @@ def split_labels(y):
    Get word vectors for each word and encode labels
    seqs: the sequence of pairs (word, label)
 '''
-def get_feats(seqs, train=False):
+def get_feats(seqs, pad=True, train=False):
     print("get_feats")
     vec_model, dim = word2vec.load(vecfile)
     zero_vec = data_util.zero_vec(dim)
@@ -384,27 +384,28 @@ def get_feats(seqs, train=False):
     #feats = pad_sequences(numpy.array(feats), maxlen=max_seq_len, dtype='float32', padding="pre")
     #labels = pad_sequences(numpy.array(labels), maxlen=max_seq_len, dtype='str', padding="pre", value='O')
 
-    padded_feats = []
-    padded_labels = []
-    for feat in feats:
-        #print "seq len: " + str(len(feat))
-        while len(feat) > max_seq_len:
-            feat_part = feat[0:max_seq_len]
-            padded_feats.append(pad_feat(feat_part, max_seq_len, zero_vec))
-            feat = feat[max_seq_len:]
-        new_feat = pad_feat(feat, max_seq_len, zero_vec)
-        padded_feats.append(new_feat)
-    for labs in labels:
-        while len(labs) > max_seq_len:
-            labs_part = labs[0:max_seq_len]
-            padded_labels.append(pad_feat(labs_part, max_seq_len, 'O'))
-            labs = labs[max_seq_len:]
-        padded_labels.append(pad_feat(labs, max_seq_len, 'O'))
-    feats = padded_feats
-    labels = padded_labels
+    if pad:
+        padded_feats = []
+        padded_labels = []
+        for feat in feats:
+            #print "seq len: " + str(len(feat))
+            while len(feat) > max_seq_len:
+                feat_part = feat[0:max_seq_len]
+                padded_feats.append(pad_feat(feat_part, max_seq_len, zero_vec))
+                feat = feat[max_seq_len:]
+            new_feat = pad_feat(feat, max_seq_len, zero_vec)
+            padded_feats.append(new_feat)
+        for labs in labels:
+            while len(labs) > max_seq_len:
+                labs_part = labs[0:max_seq_len]
+                padded_labels.append(pad_feat(labs_part, max_seq_len, 'O'))
+                labs = labs[max_seq_len:]
+            padded_labels.append(pad_feat(labs, max_seq_len, 'O'))
+        feats = padded_feats
+        labels = padded_labels
 
     # Encode labels
-    encoded_labels = encode_labels(labels, max_len=max_seq_len)
+    encoded_labels = encode_labels(labels, max_len=max_seq_len, pad=pad)
     print("labels[0]: ", str(encoded_labels[0]))
     #for row in labels:
     #    encoded_row = encode_labels(row)
@@ -481,9 +482,9 @@ def get_seqs(filename, split_sents=False, inline=True):
             narr = narrs[x]
             ann = anns[x]
             rec_id = ids[x]
-            print("split_sents: ", str(split_sents))
+            #print("split_sents: ", str(split_sents))
             ann_seqs = xmltoseq.ann_to_seq(narr, ann, split_sents)
-            print("seqs: ", str(len(ann_seqs)))
+            #print("seqs: ", str(len(ann_seqs)))
             for s in ann_seqs:
                 seqs.append(s)
                 seq_ids.append(rec_id)
@@ -505,7 +506,7 @@ def create_labelencoder(data, num=0):
     data: a 1D array of labels
     num_labels: the number of label classes
 '''
-def encode_labels(data, labenc=None, max_len=50):
+def encode_labels(data, labenc=None, max_len=50, pad=True):
     if labenc is None:
         labenc = labelencoder
     if labenc is None: # or onehotencoder == None:
@@ -529,13 +530,12 @@ def encode_labels(data, labenc=None, max_len=50):
                 onehot[lab] = 1
                 new_item.append(onehot)
         # Pad vectors
-        if len(new_item) > max_len:
-            new_item = new_item[0:max_len]
-        while len(new_item) < max_len:
-            new_item.append(zero_vec)
+        if pad:
+            if len(new_item) > max_len:
+                new_item = new_item[0:max_len]
+            while len(new_item) < max_len:
+                new_item.append(zero_vec)
         data2.append(new_item)
-        #else:
-        #    data2.append([])
     return data2
 
 ''' Decodes one sequence of labels
