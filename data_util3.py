@@ -290,8 +290,11 @@ def score_vec_labels(true_labs, pred_labs):
     node: etree.Element
 '''
 def stringify_children(node):
-    parts = ([node.text] + list(chain(*([tostring(c)] for c in node.getchildren()))))
+    parts = ([str(node.text)] + list(chain(*([tostring(c)] for c in node.getchildren()))))
     # filter removes possible Nones in texts and tails
+    for x in range(len(parts)):
+        if type(parts[x]) != str:
+            parts[x] = str(parts[x])
     return ''.join(filter(None, parts))
 
 ''' Get contents of tags as a list of strings
