@@ -261,7 +261,7 @@ def nn_model(X, Y, num_nodes, act, num_epochs=10, batch_size=100):
             loss.backward()
             optimizer.step()
 
-            if (i) % 10000 == 0:
+            if (i) % 1000 == 0:
                 print ('Epoch [%d/%d], Step [%d/%d], Loss: %.4f' %(epoch, num_epochs, i//batch_size, num_examples//batch_size, loss.data[0]))
             i = i+batch_size
 
@@ -271,11 +271,10 @@ def nn_model(X, Y, num_nodes, act, num_epochs=10, batch_size=100):
         torch.cuda.empty_cache()
     return net
 
-def test_nn(net, testX):
+def test_nn(net, testX, batch_size=100):
     # Test the Model
     #testX = testX.astype('float')
     pred = []
-    batch_size = 100
     i = 0
     length = len(testX) #testX.shape[0]
     while i < length:
