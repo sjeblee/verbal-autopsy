@@ -16,6 +16,7 @@ import torch.nn.functional as F
 #import matplotlib.ticker as ticker
 
 import data_util3
+import pickle
 
 numpy.set_printoptions(threshold=numpy.inf)
 #use_cuda = torch.cuda.is_available()
@@ -23,7 +24,7 @@ use_cuda = False
 #torch.cuda.set_device(2)
 
 # Set threshold for ill-defined class
-threshold = 0.2
+threshold = 0.01
 
 class CNN_Text(nn.Module):
 
@@ -270,6 +271,7 @@ class AttnDecoderRNN(nn.Module):
     Y: a python list or numpy array of training labels of shape [num_samples]
     returns: the model and the modified X and Y arrays
 '''
+'''
 def nn_model(X, Y, num_nodes, act, num_epochs=10):
     print("use_cuda", str(use_cuda))
     X = torch.Tensor(X)
@@ -280,12 +282,17 @@ def nn_model(X, Y, num_nodes, act, num_epochs=10):
     print("X: ", str(X.size()))
     print("Y: ", str(Y.size()))
 
-    # Hyper Parameters
-    input_dim = X.size()[-1]
-    num_examples = X.size()[0]
-    num_classes = Y.size()[-1]
+    # Hyper Parameters () # Print out the whole thing:
+    input_dim = X.size()[-1] #100
+    num_examples = X.size()[0] #11000
+    num_classes = Y.size()[-1] #18
+
     batch_size = 100
     learning_rate = 0.001
+
+    print "Input dimension: " + str(input_dim)
+    print "Number of examples: " + str(num_examples)
+    print "Number of classes: " + str(num_classes)
 
     print("neural network: nodes: ", str(num_nodes))
     net = Net(input_dim, num_nodes, num_classes)
@@ -298,6 +305,7 @@ def nn_model(X, Y, num_nodes, act, num_epochs=10):
     optimizer = torch.optim.Adam(net.parameters(), lr=learning_rate)
 
     # Train the Model
+    net.train()
     for epoch in range(num_epochs):
         print("epoch", str(epoch))
         i = 0
@@ -312,9 +320,9 @@ def nn_model(X, Y, num_nodes, act, num_epochs=10):
             # Forward + Backward + Optimize
             optimizer.zero_grad()  # zero the gradient buffer
             outputs = net(samples)
-            loss = criterion(outputs, labels)
-	    #loss = criterion(outputs, torch.max(labels,1)[1])
-	    print "Labe;s: " + str(torch.max(labels,1)[1])
+            #loss = criterion(outputs, labels)
+	    loss = criterion(outputs, torch.max(labels,1)[1])
+	    print "Labels: " + str(torch.max(labels,1)[1])
             loss.backward()
             optimizer.step()
 
@@ -327,6 +335,70 @@ def nn_model(X, Y, num_nodes, act, num_epochs=10):
     if use_cuda:
         torch.cuda.empty_cache()
     return net
+'''
+def nn_model(X, Y, num_nodes, act, num_epochs=10):
+	st = time.time()
+	Xarray = numpy.asarray(X).astype('float')
+	Yarray = Y.astype('int')
+	print "X numpy shape: " + str(Xarray.shape) + "Y numpy shape: " + str(Yarray.shape)
+
+	X_len = Xarray.shape[0]
+	dim = Xarray.shape[-1]
+	num_labels = Yarray.shape[-1]
+	num_epochs = 10
+	steps = 0
+	best_acc = 0
+	last_step = 0
+	log_interval = 1000
+	batch_size = 100
+	num_batches = math.ceil(X_len/batch_size)
+	learning_rate = 0.001
+
+	net = Net(dim, num_nodes, num_labels)
+	if use_cuda:
+		net = net.cuda()
+
+	# Train
+	optimizer = torch.optim.Adam(net.parameters(), lr=learning_rate)
+
+	steps = 0
+	net.train()
+	for epoch in range(num_epochs):
+		print "epoch: " + str(epoch)
+		i = 0
+		numpy.random.seed(seed=1)
+		permutation = torch.from_numpy(numpy.random.permutation(X_len)).long()
+		Xiter = Xarray[permutation]
+		Yiter = Yarray[permutation]
+	
+		while i+batch_size < X_len:
+			batchX = Xiter[i:i+batch_size]
+			batchY = Yiter[i:i+batch_size]
+			Xtensor = torch.from_numpy(batchX).float()
+			Ytensor = torch.from_numpy(batchY).long()
+			if use_cuda:
+				Xtensor = Xtensor.cuda()
+				Ytensor = Ytensor.cuda()
+			feature = Variable(Xtensor)
+			target = Variable(Ytensor)
+			i = i+batch_size
+
+			optimizer.zero_grad()
+			logit = net(feature)
+
+			loss = F.cross_entropy(logit, torch.max(target,1)[1])
+			loss.backward()
+			optimizer.step()
+
+			steps+=1
+		ct = time.time() - st
+		unit = "s" 
+		if ct> 60:
+			ct = ct/60
+			unit = "m"
+		print "Time so far: " + str(ct) + unit
+	return net
+
 
 def test_nn(net, testX):
     # Test the Model
@@ -342,6 +414,8 @@ def test_nn(net, testX):
     i = 0
     length = len(testX) #testX.shape[0]
     while i < length:
+	pred = []
+	probs = []
         if i%100000 == 0:
             print("test batch", str(i))
         if (i+batch_size) > length:
@@ -353,33 +427,25 @@ def test_nn(net, testX):
         samples = Variable(sample_tensor)
         outputs = net(samples)
 
-	outputs = logsoftmax(outputs)
+	outputs_ls = logsoftmax(outputs)
 	outputs_softmax = softmax(outputs)
         #_, predicted = torch.max(outputs.data, 1)
 	#probabilities, predicted = torch.max(outputs.data, 1)
-	predicted = torch.max(outputs, 1)[1]
+	predicted = torch.max(outputs_ls, 1)[1]
 	probabilities = torch.max(outputs_softmax, 1)[0]
         pred = pred + predicted.tolist()
 	
 	# Get the probabilities, and making new prediction based on random threshold
 	probs = probs + probabilities.tolist()
-	print "Probabilties: " + str(probs)
+	print "Predicted Lables: " + str(pred)
+	print "Max Probabilties: " + str(probs)
+	print "Not log probabilities: " + str(outputs)
+	print "Probabilities: " + str(outputs_softmax)
 	for num, prob in enumerate(probs):
 	    if prob < threshold:  # Set the threshold. Initially hard-coded. Will be modified.
 		new_pred.append(9) # What is the index location of UNKNOWN class? Figure it out!
 	    else:
 		new_pred.append(pred[num])
-
-
-	# Printing the probabilties of each class to determine the threshold for assigning to UNKNOWN class
-	prob_file = open('../../output_probabilty.txt', 'w')
-	label_file = open('../../output_label.txt', 'w')
-	
-	#print(probs)
-	prob_file.write(str(probs))	
-	label_file.write(str(pred))
-	prob_file.close()
-	label_file.close()
 
         del sample_tensor
         i = i+batch_size
@@ -523,7 +589,7 @@ def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, loss_fu
         print("time so far: ", str(ct), unit)
     return cnn
 
-def test_cnn(model, testX, testids, probfile=None, labelencoder=None, collapse=False):
+def test_cnn(model, testX, testids, probfile='/u/yoona/data/torch/probs_win200_epo10', labelencoder=None, collapse=False):
     y_pred = []
     y_pred_softmax = []
     y_pred_logsoftmax = []
@@ -541,7 +607,7 @@ def test_cnn(model, testX, testids, probfile=None, labelencoder=None, collapse=F
         if icd is None:
             input_tensor = torch.from_numpy(numpy.asarray([input_row]).astype('float')).float()
             if use_cuda:
-                input_tensor = input_tensor.cuda()
+                input_tensor = input_tensor.contiguous().cuda()
             icd_var = model(Variable(input_tensor))
             # Softmax and log softmax values
             icd_vec = logsoftmax(icd_var)
@@ -554,32 +620,16 @@ def test_cnn(model, testX, testids, probfile=None, labelencoder=None, collapse=F
 	    else:
 		new_y_pred.append(icd_code)
 	
-
-            #print("icd pred:", str(icd))
-            # Save the probabilities
+            # Save the probabilties
             if probfile is not None:
-                #icd_prob_dict = tools.prob_dict(icd_vec[0].data, labelencoder)
-                icd_prob_dict_softmax = tools.prob_dict(icd_vec_softmax[0].data, labelencoder)
-                #vals = list(icd_prob_dict.values())
-                #val_array = numpy.asarray(vals)
-                icd_prob_dict_softmax["ID"] = row_id
-                probs.append(icd_prob_dict_softmax)
-
-                # Probability audit
-                #print("icd prob:", str(icd_prob_dict[icd]))
-                #argmax = int(numpy.argmax(val_array))
-                #print("argmax:", str(argmax))
-                #argmax_prob = val_array[argmax]
-                #argmax_prob_softmax = icd_prob_dict_softmax[icd]
-                #print("argmax prob:", str(argmax_prob))
-                #print("--------------")
-                #y_pred_softmax.append(argmax_prob_softmax)
-                #y_pred_logsoftmax.append(argmax_prob)
+                probs.append(icd_prob)
 
         y_pred.append(icd_code)
 
     if probfile is not None:
         pickle.dump(probs, open(probfile, "wb"))
+
+    print "Probabilities: " + str(probs)
 
     #return y_pred
     return new_y_pred
