@@ -252,7 +252,7 @@ def tag_symptoms(tree):
     chv = csv.reader(open(chv_tsvfile_path), delimiter = '\t')
 
     symptoms = []
-    dict_symp = {}
+    dict_symp = {} # For standarized symptoms. Training with standarized symptoms perform worse.
 
 
     # Loop over the rows in SYMP.csv file and get the list of symptoms
@@ -266,9 +266,17 @@ def tag_symptoms(tree):
     for row in chv:
         if row[1] not in symptoms:
             symptoms.append(row[1])
-            dict_symp[row[1]] = row[2]
-            print(row[1])
-
+	    print(row[1])
+	    # For standarized symptoms, replace "<" & ">" to ","
+	    '''
+	    stand_word = row[2]
+	    if "<" in stand_word:
+	    	stand_word = stand_word.replace("<","")
+	    if ">" in stand_word:
+		stand_word = stand_word.replace(">","")
+            dict_symp[row[1]] = stand_word
+	    '''
+	
     # Loop over 
     max_word_count = count_max_len_symptoms(symptoms)
 
@@ -277,28 +285,59 @@ def tag_symptoms(tree):
     for child in root:
         node = child.find("narrative")
         narr = ""
+	narr_symp = ""
         if node != None:
             narr = node.text.encode('utf-8')
-
+	    narr = narr.lower()
             # Remove punctuation
-            narr_words = [w.strip() for w in narr.lower().translate(string.maketrans("",""), string.punctuation).split(' ')]
-            narr = " ".join(narr_words)
-            ngrams = get_substrings_with_limit(narr, max_word_count)
+            #narr_words = [w.strip() for w in narr.lower().translate(string.maketrans("",""), string.punctuation).split(' ')]
+            #narr = " ".join(narr_words)
+	    
+	    # For standrized symptoms. Currently not in used since training with standarized symptoms perform worse. 
+	    '''
+	    standarized = []
+	    keys = dict_symp.keys()
+	    for symp in symptoms:
+		if symp in narr:
+			if symp in keys:
+				symp = dict_symp[symp]
+			if symp not in standarized:
+				standarized.append(symp)
+	    for symp in standarized:
+		narr_symp = narr_symp + ", " + symp
+		
+            '''
+	    '''
+	    # For non-standarized symptoms.
+	    phrases = []
+	    non_standarized = []
+	    for symp in symptoms:
+		start_index = narr.find(symp)
+		if (start_index != -1) and (symp not in non_standarized):
+		    match = [symp, start_index, start_index+len(symp)]
+		    non_standarized.append(symp)
+		    phrases.append(match)
+
+	    
+	    '''
+	    ngrams = get_substrings_with_limit(narr, max_word_count)
 	    ngrams = filter(None, ngrams)
             # Find all phrases that contains words in the list of symptoms. 
             possible_phrases = find_possible_phrases(ngrams, symptoms, narr)
-
+	
+	    
             # Remove duplicates in possible phrases
             clean_possible_phrases = remove_duplicates(possible_phrases)
-
+	    '''
             narr_symp = ""
+	    keys = dict_symp.keys()
             for phrase in clean_possible_phrases:
-                keys = dict_symp.keys()
-                if phrase in keys:
-                    phrase = dict_symp[phrase]
-                    narr_symp = narr_symp + " " + phrase
-
-            '''
+		phrase_text = phrase[0]
+                if phrase_text in keys:
+                    phrase_text = dict_symp[phrase_text]
+                narr_symp = narr_symp + " " + phrase_text
+	    '''
+            
             # Sort possible phrases by start index
             sorted_phrases = sorted(clean_possible_phrases, key=lambda tup: tup[1])
             
@@ -334,12 +373,12 @@ def tag_symptoms(tree):
 
             if lastindex < len(narr):
                 narr_fixed = narr_fixed + narr[lastindex:]
-            '''
-            if node == None:
-                node = etree.SubElement(child, "narrative")
+            
+        #if node == None:
+            #node = etree.SubElement(child, "narrative")
             #node.text = narr_fixed.decode('utf-8').strip()
-            node = etree.SubElement(child, symp_narr_tag)
-            node.text = narr_symp.decode('utf-8').strip()
+        node = etree.SubElement(child, symp_narr_tag)
+        node.text = narr_symp.decode('utf-8').strip()
 
         '''
             temp = open(narr_temp, "w")
