@@ -271,71 +271,6 @@ class AttnDecoderRNN(nn.Module):
     Y: a python list or numpy array of training labels of shape [num_samples]
     returns: the model and the modified X and Y arrays
 '''
-'''
-def nn_model(X, Y, num_nodes, act, num_epochs=10):
-    print("use_cuda", str(use_cuda))
-    X = torch.Tensor(X)
-    Y = torch.Tensor(Y).long()
-    if use_cuda:
-        X = X.cuda()
-        Y = Y.cuda()
-    print("X: ", str(X.size()))
-    print("Y: ", str(Y.size()))
-
-    # Hyper Parameters () # Print out the whole thing:
-    input_dim = X.size()[-1] #100
-    num_examples = X.size()[0] #11000
-    num_classes = Y.size()[-1] #18
-
-    batch_size = 100
-    learning_rate = 0.001
-
-    print "Input dimension: " + str(input_dim)
-    print "Number of examples: " + str(num_examples)
-    print "Number of classes: " + str(num_classes)
-
-    print("neural network: nodes: ", str(num_nodes))
-    net = Net(input_dim, num_nodes, num_classes)
-
-    if use_cuda:
-        net = net.cuda()
-
-    # Loss and Optimizer
-    criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(net.parameters(), lr=learning_rate)
-
-    # Train the Model
-    net.train()
-    for epoch in range(num_epochs):
-        print("epoch", str(epoch))
-        i = 0
-        while (i+batch_size) < num_examples:
-            if i%100000 == 0:
-                print("batch i=", str(i))
-            # Convert torch tensor to Variable
-            samples = Variable(X[i:i+batch_size])
-            labels = Variable(Y[i:i+batch_size])
-	    print "Labels: " + str(labels)
-
-            # Forward + Backward + Optimize
-            optimizer.zero_grad()  # zero the gradient buffer
-            outputs = net(samples)
-            #loss = criterion(outputs, labels)
-	    loss = criterion(outputs, torch.max(labels,1)[1])
-	    print "Labels: " + str(torch.max(labels,1)[1])
-            loss.backward()
-            optimizer.step()
-
-            if (i+1) % 10 == 0:
-                print ('Epoch [%d/%d], Step [%d/%d], Loss: %.4f' %(epoch+1, num_epochs, i+1, len(train_dataset)//batch_size, loss.data[0]))
-            i = i+batch_size
-
-    del X
-    del Y
-    if use_cuda:
-        torch.cuda.empty_cache()
-    return net
-'''
 def nn_model(X, Y, num_nodes, act, num_epochs=10):
 	st = time.time()
 	Xarray = numpy.asarray(X).astype('float')
@@ -513,16 +448,6 @@ def rnn_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', dropout=0
     returns: the CNN model
 '''
 def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, loss_func='categorical_crossentropy'):
-    #Y = to_categorical(Y)
-    #X = numpy.asarray(X)
-    #embedding_size = X.shape[-1]
-    #max_seq_len = X.shape[1]
-    #print "train X shape: " + str(X.shape)
-    #print "max_seq_len: " + str(max_seq_len)
-    #inputs = []
-    #input_arrays = [X]
-    #hybrid = False
-
     # Train the CNN, return the model
     st = time.time()
     Xarray = numpy.asarray(X).astype('float')

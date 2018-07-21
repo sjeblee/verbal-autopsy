@@ -44,6 +44,7 @@ def main():
     argparser.add_argument('-v', '--vectors', action="store", dest="vecfile")
     argparser.add_argument('-i', '--prefix', action="store", dest="prefix")
     argparser.add_argument('-a', '--dataloc', action="store", dest="dataloc")
+    argparser.add_argument('-u', '--usepytorch', action="store", dest="usepytorch")
     args = argparser.parse_args()
 
     if not (args.train and args.name):
@@ -61,6 +62,7 @@ def main():
         print "--ex [traintest/hyperopt] (optional, default: traintest)"
         print "--dataset [mds_one/mds_tr/mds_one+tr] (optional, default: mds_one)"
         print "--rebalance [adasyn/smote](optional, default: no rebalancing"
+	print "--usepytorch [True/False]"
         exit()
 
     # Timing
@@ -112,6 +114,11 @@ def main():
     if args.model:
         models = args.model
 
+    global use_pytorch
+    use_pytorch  = False
+    if args.usepytorch:
+	use_pytorch = args.usepytorch
+
     # Model parameters
     n_feats = 200
     anova = "f_classif"
@@ -138,7 +145,7 @@ def main():
     elif experiment == "hyperopt":
         run(args.model, modelname, args.train, testset, args.features, fn, args.name, pre, labels, arg_dev=dev, arg_hyperopt=True, arg_dataset=dataset)
     elif experiment == "crossval":
-        crossval(models, args.train, args.features, fn, args.name, pre, labels, args.data, arg_vecfile=args.vecfile, arg_dataloc=args.dataloc)
+        crossval(models, args.train, args.features, fn, args.name, pre, labels, args.data, arg_vecfile=args.vecfile, arg_dataloc=args.dataloc, arg_prefix=args.prefix)
 
     end_time = time.time()
     total_time = end_time - start_time
@@ -147,7 +154,7 @@ def main():
     else:
         print "Total time: " + str(total_time/60) + " mins"
 
-def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dataset="mds+rct", arg_vecfile="", arg_dataloc="/u/sjeblee/research/va/data/datasets"):
+def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dataset="mds+rct", arg_vecfile="", arg_dataloc="/u/sjeblee/research/va/data/datasets", arg_prefix = "/nbb/sjeblee/va/data/"):
     print "10-fold cross-validation"
     models = arg_models.split(',')
     dataloc = arg_dataloc
@@ -161,7 +168,7 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
     datafile_child = dataloc + "/" + dset + "/all_child_cat_spell.txt"
     datafile_neo = dataloc + "/" + dset + "/all_neonate_cat_spell.txt"
     datafile_adult = dataloc + "/" + dset + "/all_adult_cat_spell.txt"
-    datafile = dataloc + "/" + dset + "/all_" + arg_train + "_cat_spell.txt"
+    datafile = dataloc + "/" + dset + "/all_" + arg_train + "_cat_spell_symp.txt"
     train_extra = []
 
     #if "spell" in arg_preprocess:
@@ -171,13 +178,14 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
     xml_footer = '</root>'
 
     # Set up file paths
-    datadir = "/nbb/sjeblee/va/data/" + arg_name
     #datadir = "/u/sjeblee/research/va/data/" + arg_name
-    datapath = datadir + "/" + arg_dataset
+    datadir = arg_prefix + "/" + arg_name
+    #datapath = datadir + "/" + arg_dataset
+    datapath = dataloc + "/" + dset
     create_datasets = True
     if os.path.exists(datapath):
         print "Data files already exist, re-using them"
-        create_datasets = False
+        #create_datasets = False
     else:
         os.mkdir(datapath)
 
@@ -208,9 +216,11 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
         for filename in main_files:
             # Read data file
             print "Reading main data file: " + filename
+	    #root = etree.parse(filename).getroot()
             data = {}
             datasets = []
             total = 0
+	    
             with open(filename, 'r') as f:
                 for line in f:
                     #print "line: " + line
@@ -224,6 +234,17 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
                     if cat is not None:
                         data[cat].append(line.strip())
                         total = total + 1
+	    '''
+	    for child in root:
+		node = child.find(arg_labels)
+		if node != None:
+		    cat = node.text
+		if not cat in data:
+		    data[cat] = []
+		if cat is not None:
+		    data[cat].append(child)
+		    total = total + 1
+	    '''
             print "Records in main data file: " + str(total)
 
             # Determine how many records we need from each category
@@ -283,8 +304,10 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
                         trainname = "neonate_" + str(z)
                 else:
                     trainname = arg_train + "_" + str(z)
-                trainfile = datapath + "/train_" + trainname +  "_cat.xml"
-                testfile = datapath + "/test_" + trainname + "_cat.xml"
+                #trainfile = datapath + "/train_" + trainname +  "_cat.xml"
+                #testfile = datapath + "/test_" + trainname + "_cat.xml"
+		trainfile = datapath + "/train_"+  trainname + "_cat_spell_symp.xml"
+		testfile = datapath + "/test_" + trainname + "_cat_spell_symp.xml"  
                 outfile = open(trainfile, 'w')
                 outfile.write(xml_header + "\n")
                 for item in trainset:
@@ -300,7 +323,7 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
                 outfile2.close()
 
     # Run models
-    for z in range(9, 10):
+    for z in range(10):
         trainname = arg_train + "_" + str(z)
         if joint_training:
             trainname = 'all'
@@ -332,15 +355,18 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
                                 outfile.write(line)
                     outfile.write(xml_footer + "\n")
             else:
-                trainfile = datapath + "/train_" + trainname +  "_cat_spell.xml"
+                #trainfile = datapath + "/train_" + trainname +  "_cat.xml"
+		trainfile = datapath + "/train_"+ trainname + "_cat_spell_symp.xml" 
 
             #TEMP for keyphrase crossval
-            trainfile = datapath + "/train_all_" + str(z) + "_cat.txt"
+            #trainfile = datapath + "/train_all_" + str(z) + "_cat.txt"
 
             dim = 100
             shouldstem = "stem" in arg_preprocess
             name = "ice+medhelp+narr_all_" + str(z)
             vecfile = word2vec.run(trainfile, dim, name, stem=shouldstem)
+	    # Yoona: No vector file for cross validation. Use original vector file used for train-test instead
+	    vecfile = arg_vecfile
 
         for m in models:
             name = arg_name + "/" + m + "_" + str(z)
@@ -367,7 +393,7 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
                 else:
                     n_feats = 350
             
-            run(m, modelname, trainname, trainname, arg_features, arg_featurename, name, arg_preprocess, arg_labels, arg_dev=False, arg_hyperopt=False, arg_dataset=dset, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes, dataloc=datadir, arg_vecfile=vecfile, arg_crossval_num=z)
+            run(m, modelname, trainname, trainname, arg_features, arg_featurename, name, arg_preprocess, arg_labels, arg_dev=False, arg_hyperopt=False, arg_dataset=dset, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes, arg_dataloc=dataloc, arg_vecfile=vecfile, arg_crossval_num=z, arg_prefix = arg_prefix)
 
 def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, arg_dataloc, arg_vecfile, crossval_num=None, arg_prefix="/u/sjeblee/research/va/data"):
     print "setup prefix: " + arg_prefix
@@ -396,7 +422,8 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
     # Setup
     if not os.path.exists(resultsloc):
         os.mkdir(resultsloc)
-    trainset = dataloc + "/train_" + trainname + ".xml"
+    #trainset = dataloc + "/train_" + trainname + ".xml"
+    trainset = dataloc + "/train_" + trainname + ".xml" # Trying to make spell_symp for all dataset. Make cross-validation faster
     devset = ""
     devfeatures = ""
     devresults = ""
@@ -420,7 +447,8 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
     print "Preprocessing..."
     if "spell" in pre:
         print "Running spelling correction..."
-        trainsp = dataloc + "/train_" + trainname + "_" + spname + ".xml"
+        #trainsp = dataloc + "/train_" + trainname + "_" + spname + ".xml"
+	trainsp = dataloc + "/train_" + trainname + "_" + spname + ".xml"
         devsp = ""
         if arg_dev:
             devsp = dataloc + "/dev_" + devname + "_" + spname + ".xml"
@@ -482,7 +510,8 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
         print "Tagging symptoms..."
         sympname = "symp"
         tagger_name = "tag_symptoms"
-        trainsp = dataloc + "/train_" + trainname + "_" + sympname + ".xml"
+        #trainsp = dataloc + "/train_" + trainname + "_" + sympname + ".xml"
+	trainsp = dataloc + "/train_" + trainname + "_" + sympname + ".xml"
         devsp = ""
         if arg_dev:
             devsp = dataloc + "/dev_" + devname + "_" + sympname + ".xml"
@@ -505,7 +534,7 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
         element.append("narr_symp")
 
     if "kwc" in pre:
-        numc = "100"
+        numc = "300"
         kwname = "kwkm" + str(numc)
         # TODO: move this setup to a function
         trainkw = dataloc + "/train_" + trainname + "_" + kwname + ".xml"

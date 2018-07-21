@@ -423,7 +423,6 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
                 if len(X) == 0 and len(X2) > 0:
                     X = X2
                 Y = to_categorical(Y)
-
 		if use_torch:
 		    model = model_library_torch.nn_model(X,Y,num_nodes,'relu')
 		else:
@@ -438,7 +437,6 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
                 model, X, Y = model_library.rnn_cnn_model(X, Y, num_nodes, arg_activation, arg_model, X2=X2)
             elif arg_model == "cnn":
                 Y = to_categorical(Y)
-
 		if use_torch:
 		    model = model_library_torch.cnn_model(X,Y)
 		else:
@@ -452,12 +450,11 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
             
 	    print "saving the model..."
 
-	    if not use_torch:
+	    if not use_torch: # Save Keras model
 	        model.save(modelfile)
 	        plotname = modelfile + ".png"
 	        plot_model(model, to_file=plotname)
-	    # Save pytorch model
-	    else: # Use pytorch model
+	    else: # Save Pytorch model
 	        torch.save(model, modelfile)
     # Other models
     else:
@@ -707,17 +704,15 @@ def test(model_type, model, testfile, anova_filter=None, hybrid=False, rec_type=
         #if "keyword_clusters" not in keys:
         inputs.append(testX2)
     if is_nn:
-	if use_torch:
+	if use_torch: # Test using pytorch model
 	    if model_type == "nn": 
 		results = model_library_torch.test_nn(model,testX)
 	    elif model_type == "cnn":
 		results = model_library_torch.test_cnn(model,testX, testY)
-	else:
+	else: # Test using Keras model
 	    predictedY = model.predict(inputs)
 	    results = map_back(predictedY)
 	print "testX shape: " + str(testX.shape)
-        #predictedY = model.predict(inputs)
-        #results = map_back(predictedY)
     #elif model_type == "cnn":
     #    attn_vec = get_attention_vector(model, testX)
     #    print "attention vector: " + str(attn_vec)
@@ -1187,6 +1182,7 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
         labenc = labelencoder_neonate
     if trainlabels:
         labenc.fit(labels)
+    print(labels)
     y = labenc.transform(labels)
 
     # Normalize features to 0 to 1 (if not word vectors)

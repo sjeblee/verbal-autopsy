@@ -537,8 +537,8 @@ def vector_features(feat_name, narratives, matrix, dict_keys, vecfile):
         #print "narr: " + narr
         vectors = []
         tags = ['EVENT', 'TIMEX3']
-
-        if feat_name == event_vec or feat_name == narr_vec or feat_name == kw_vec or feat_name == symp_vec:
+	#if feat_name == event_vec or feat_name == narr_vec or feat_name == kw_vec or feat_name == symp_vec:
+        if feat_name == event_vec or feat_name == narr_vec or feat_name == kw_vec:
             if feat_name == event_vec:
                 narr = data_util.text_from_tags(narr, tags)
                 print "narr_filtered: " + narr
@@ -549,6 +549,14 @@ def vector_features(feat_name, narratives, matrix, dict_keys, vecfile):
                     #    word = "didn't"
                     vec = word2vec.get(word, vec_model)
                     vectors.append(vec)
+
+	# Symptoms separated by ' '
+	elif feat_name == symp_vec:
+	    vec = zero_vec
+	    for word in narr.split(' '):
+		if len(word) > 0:
+		    vec = word2vec.get(word,vec_model)
+		    vectors.append(vec)
         elif feat_name == event_seq:
             phrases = data_util.phrases_from_tags(narr, tags)
             print "phrases: " + str(len(phrases))
