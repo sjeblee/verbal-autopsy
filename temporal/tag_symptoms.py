@@ -50,7 +50,7 @@ def main():
 
     run(args.infile, args.outfile, args.tagger)
 
-def run(infile, outfile, tagger="keyword_match"):
+def run(infile, outfile, tagger="keyword_match", arg_sympfile=None, arg_chvfile=None):
     if tagger == "crf":
         crf_tagger(infile, outfile)
     else:
@@ -62,7 +62,7 @@ def run(infile, outfile, tagger="keyword_match"):
         elif tagger == seq2seq:
             tree = seq2seq(tree)
         elif tagger == "tag_symptoms":
-            tree = tag_symptoms(tree)
+            tree = tag_symptoms(tree, arg_sympfile, arg_chvfile)
         tree.write(outfile)
         data_util.fix_escaped_chars(outfile)
 
@@ -234,7 +234,7 @@ def medttk(tree):
             print "med_narr: " + med_narr
     return tree
 
-def tag_symptoms(tree):
+def tag_symptoms(tree,arg_sympfile,arg_chvfile):
    
     starttag = '<SYMPTOM>'
     endtag = '</SYMPTOM>'
@@ -242,7 +242,7 @@ def tag_symptoms(tree):
 
     # Open SYMP.csv file
     #csvfile_path = symptomfile
-    csvfile_path = "/u/yoona/symptom_files/SYMP.csv" # hard-coded. To be updated. 
+    csvfile_path = arg_sympfile 
     mycsv = csv.reader(open(csvfile_path))
 
     # Uncomment this to create temp file which contain only the narrative of each data
@@ -250,7 +250,7 @@ def tag_symptoms(tree):
     #narr_temp = dirpath + "/temp.txt"
 
     # Open tsv file. Comment this if you don't want to add symptoms listed in chv file. 
-    chv_tsvfile_path = "/u/yoona/symptom_files/CHV_concepts_terms_flatfile_20110204.tsv" # hard-coded. To be updated
+    chv_tsvfile_path = arg_chvfile
     chv = csv.reader(open(chv_tsvfile_path), delimiter = '\t')
 
     symptoms = []

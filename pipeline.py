@@ -44,6 +44,8 @@ def main():
     argparser.add_argument('-v', '--vectors', action="store", dest="vecfile")
     argparser.add_argument('-i', '--prefix', action="store", dest="prefix")
     argparser.add_argument('-a', '--dataloc', action="store", dest="dataloc")
+    argparser.add_argument('-y', '--sympfile', action="store", dest="sympfile")
+    argparser.add_argument('-c', '--chvfile', action="store", dest="chvfile")
     args = argparser.parse_args()
 
     if not (args.train and args.name):
@@ -61,7 +63,6 @@ def main():
         print "--ex [traintest/hyperopt] (optional, default: traintest)"
         print "--dataset [mds_one/mds_tr/mds_one+tr] (optional, default: mds_one)"
         print "--rebalance [adasyn/smote](optional, default: no rebalancing"
-	print "--usepytorch [True/False]"
         exit()
 
     # Timing
@@ -135,11 +136,11 @@ def main():
     #nodes = 600
 
     if experiment == "traintest":
-        run(args.model, modelname, args.train, testset, args.features, fn, args.name, pre, labels, arg_dev=dev, arg_hyperopt=False, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes, arg_dataset=dataset, arg_rebalance=rebal, arg_vecfile=args.vecfile, arg_dataloc=args.dataloc, arg_prefix=args.prefix)
+        run(args.model, modelname, args.train, testset, args.features, fn, args.name, pre, labels, arg_dev=dev, arg_hyperopt=False, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes, arg_dataset=dataset, arg_rebalance=rebal, arg_vecfile=args.vecfile, arg_dataloc=args.dataloc, arg_prefix=args.prefix, arg_sympfile=args.sympfile, arg_chvfile=args.chvfile)
     elif experiment == "hyperopt":
         run(args.model, modelname, args.train, testset, args.features, fn, args.name, pre, labels, arg_dev=dev, arg_hyperopt=True, arg_dataset=dataset)
     elif experiment == "crossval":
-        crossval(models, args.train, args.features, fn, args.name, pre, labels, args.data, arg_vecfile=args.vecfile, arg_dataloc=args.dataloc, arg_prefix=args.prefix)
+        crossval(models, args.train, args.features, fn, args.name, pre, labels, args.data, arg_vecfile=args.vecfile, arg_dataloc=args.dataloc, arg_prefix=args.prefix, arg_sympfile=args.sympfile, arg_chvfile=args.chvfile)
 
     end_time = time.time()
     total_time = end_time - start_time
@@ -148,7 +149,7 @@ def main():
     else:
         print "Total time: " + str(total_time/60) + " mins"
 
-def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dataset="mds+rct", arg_vecfile="", arg_dataloc="/u/sjeblee/research/va/data/datasets", arg_prefix = "/nbb/sjeblee/va/data/"):
+def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dataset="mds+rct", arg_vecfile="", arg_dataloc="/u/sjeblee/research/va/data/datasets", arg_prefix = "/nbb/sjeblee/va/data/",arg_sympfile=None, arg_chvfile=None):
     print "10-fold cross-validation"
     models = arg_models.split(',')
     dataloc = arg_dataloc
@@ -271,7 +272,7 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
                 datasets.append(recset)
                 print "total recs: " + str(len(recset))
 
-            for z in range(10):
+            for z in range(1):
                 # Construct train and test sets
                 testset = datasets[z]
                 trainset = train_extra
@@ -387,9 +388,9 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
                 else:
                     n_feats = 350
             
-            run(m, modelname, trainname, trainname, arg_features, arg_featurename, name, arg_preprocess, arg_labels, arg_dev=False, arg_hyperopt=False, arg_dataset=dset, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes, arg_dataloc=dataloc, arg_vecfile=vecfile, arg_crossval_num=z, arg_prefix = arg_prefix)
+            run(m, modelname, trainname, trainname, arg_features, arg_featurename, name, arg_preprocess, arg_labels, arg_dev=False, arg_hyperopt=False, arg_dataset=dset, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes, arg_dataloc=dataloc, arg_vecfile=vecfile, arg_crossval_num=z, arg_prefix = arg_prefix,arg_sympfile=arg_sympfile, arg_chvfile=arg_chvfile)
 
-def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, arg_dataloc, arg_vecfile, crossval_num=None, arg_prefix="/u/sjeblee/research/va/data"):
+def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, arg_dataloc, arg_vecfile, crossval_num=None, arg_prefix="/u/sjeblee/research/va/data", arg_sympfile=None, arg_chvfile=None):
     print "setup prefix: " + arg_prefix
     if crossval_num is not None:
         trainname = arg_train + "_" + str(crossval_num)
@@ -501,6 +502,8 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
         element = "narr_medttk"
 
     if "symp" in pre:
+	if (arg_sympfile == None or arg_chvfile == None):
+	    print "Symptom files are not provided."
         print "Tagging symptoms..."
         sympname = "symp"
         tagger_name = "tag_symptoms"
@@ -513,11 +516,11 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
             devsp = dataloc + "/test_" + devname + "_" + sympname + ".xml"
         if not os.path.exists(trainsp):
             print "tag_symptoms on train data..."
-            tag_symptoms.run(trainset, trainsp, tagger=tagger_name)
+            tag_symptoms.run(trainset, trainsp, tagger_name, arg_sympfile, arg_chvfile)
             #fixtags(trainsp)
         if not os.path.exists(devsp):
             print "tag_symptoms on test data..."
-            tag_symptoms.run(devset, devsp, tagger=tagger_name)
+            tag_symptoms.run(devset, devsp, tagger_name, arg_sympfile, arg_chvfile)
         #    fixtags(devsp)
 
         trainset = trainsp
@@ -575,7 +578,7 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
             extract_features.run(trainset, trainfeatures, devset, devfeatures, features, labels, stem, lemma, element)
     return trainfeatures, devfeatures, devresults
 
-def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev=True, arg_hyperopt=False, arg_dataset="mds", arg_n_feats=398, arg_anova="f_classif", arg_nodes=297, arg_dataloc="/u/sjeblee/research/va/data/datasets", arg_rebalance="", arg_vecfile=None, arg_crossval_num=None, arg_prefix="/u/sjeblee/research/va/data"):
+def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev=True, arg_hyperopt=False, arg_dataset="mds", arg_n_feats=398, arg_anova="f_classif", arg_nodes=297, arg_dataloc="/u/sjeblee/research/va/data/datasets", arg_rebalance="", arg_vecfile=None, arg_crossval_num=None, arg_prefix="/u/sjeblee/research/va/data",arg_sympfile=None,arg_chvfile=None):
 
     print "run prefix: " + arg_prefix
     dataloc = arg_dataloc + "/" + arg_dataset
@@ -594,7 +597,7 @@ def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_feature
         devfeatures = [devfeatures_adult, devfeatures_child, devfeatures_neonate]
         devresults = [devresults_adult, devresults_child, devresults_neonate]
     else:
-        trainfeatures, devfeatures, devresults = setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, dataloc, arg_vecfile, arg_prefix=arg_prefix)
+        trainfeatures, devfeatures, devresults = setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, dataloc, arg_vecfile, arg_prefix=arg_prefix,arg_sympfile=arg_sympfile, arg_chvfile=arg_chvfile)
 
     labels = arg_labels
     modeltype = arg_model # svm, knn, nn, lstm, nb, rf
