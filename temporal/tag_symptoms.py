@@ -5,6 +5,8 @@
 import sys
 #sys.path.append('/u/sjeblee/research/va/git/verbal-autopsy')
 sys.path.append('/u/yoona/ypark_branch/verbal-autopsy')
+sys.path.append('/u/yoona/ypark_branch/verbal-autopsy/negex.python')
+from negex import *
 
 from lxml import etree
 import argparse
@@ -276,7 +278,10 @@ def tag_symptoms(tree):
 		stand_word = stand_word.replace(">","")
             dict_symp[row[1]] = stand_word
 	    '''
-	
+    # Negex preparation : Set rules for finding negation
+    rfile = open(r"/u/yoona/ypark_branch/verbal-autopsy/negex.python/negex_triggers.txt")
+    irules = sortRules(rfile.readlines())
+
     # Loop over 
     max_word_count = count_max_len_symptoms(symptoms)
 
@@ -368,7 +373,15 @@ def tag_symptoms(tree):
                 if start > lastindex:
                     narr_fixed = narr_fixed + narr[lastindex:start]
                 narr_fixed = narr_fixed + starttag + " " + narr[start:end] + " " + endtag
-                narr_symp = narr_symp + narr[start:end] + " "
+
+		# Check negation of symptoms
+		symp_tagger = negTagger(narr[0:start], [narr[start:end]], rules=irules, negP=False)
+		symp_negated = symp_tagger.getNegationFlag()
+		if symp_negated == "affirmed":
+		    narr_symp = narr_symp + narr[start:end] + " "
+		else: #negated
+		    narr_symp = narr_symp + "no " + narr[start:end] + " "
+		
                 lastindex = end
 
             if lastindex < len(narr):
@@ -491,6 +504,7 @@ def find_possible_phrases(ngrams, symptoms, narr):
             if (temp_substring.lower() in symptoms):
                 startindex = narr.find(substring)
                 while startindex != -1:
+		#if startindex != -1:
                     endindex = startindex + len(substring)
                     match = [substring, startindex, endindex]
                     possible_phrases.append(match)
@@ -501,6 +515,7 @@ def find_possible_phrases(ngrams, symptoms, narr):
             if (substring.lower() in symptoms):
                 startindex = narr.find(substring)
                 while startindex != -1:
+		#if startindex != -1:
                     endindex = startindex + len(substring)
                     match = [substring, startindex, endindex]
                     possible_phrases.append(match)
