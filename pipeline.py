@@ -44,7 +44,6 @@ def main():
     argparser.add_argument('-v', '--vectors', action="store", dest="vecfile")
     argparser.add_argument('-i', '--prefix', action="store", dest="prefix")
     argparser.add_argument('-a', '--dataloc', action="store", dest="dataloc")
-    argparser.add_argument('-u', '--usepytorch', action="store", dest="usepytorch")
     args = argparser.parse_args()
 
     if not (args.train and args.name):
@@ -113,11 +112,6 @@ def main():
     models = "rb,rf,svm,nn"
     if args.model:
         models = args.model
-
-    global use_pytorch
-    use_pytorch  = False
-    if args.usepytorch:
-	use_pytorch = args.usepytorch
 
     # Model parameters
     n_feats = 200
