@@ -26,13 +26,11 @@ use_cuda = False
 # Set threshold for ill-defined class
 threshold = 0.01
 
+# Convolutional Neural Network (5 convlutional layers with max pooling, followed by a fully connected network)
 class CNN_Text(nn.Module):
 
      def __init__(self, embed_dim, class_num, kernel_num=200, kernel_sizes='12345', dropout=0.1):
           super(CNN_Text, self).__init__()
-          #self.args = args
-
-          #V = args.embed_num
           D = embed_dim
           C = class_num
           Ci = 1
@@ -44,6 +42,8 @@ class CNN_Text(nn.Module):
           self.conv13 = nn.Conv2d(Ci, Co, (3, D))
           self.conv14 = nn.Conv2d(Ci, Co, (4, D))
 	  self.conv15 = nn.Conv2d(Ci, Co, (5, D))
+
+	  # Uncomment the following lines if need more convolutional layers with different filter sizes.
 	  #self.conv16 = nn.Conv2d(Ci, Co, (6, D))
 	  #self.conv17 = nn.Conv2d(Ci, Co, (7, D))
 	  #self.conv18 = nn.Conv2d(Ci, Co, (8, D))
@@ -57,8 +57,6 @@ class CNN_Text(nn.Module):
           return x
 
      def forward(self, x):
-          #x = self.embed(x)  # (N, W, D)
-
           x = x.unsqueeze(1)  # (N, Ci, W, D)
           #x = [F.relu(conv(x)).squeeze(3) for conv in self.convs1]  # [(N, Co, W), ...]*len(Ks)
           #x = [F.max_pool1d(i, i.size(2)).squeeze(2) for i in x]  # [(N, Co), ...]*len(Ks)
@@ -68,13 +66,15 @@ class CNN_Text(nn.Module):
           x2 = self.conv_and_pool(x,self.conv12) #(N,Co)
           x3 = self.conv_and_pool(x,self.conv13) #(N,Co)
           x4 = self.conv_and_pool(x,self.conv14) #(N,Co)
-	  x5 = self.conv_and_pool(x,self.conv15)
+	  x5 = self.conv_and_pool(x,self.conv15) #(N,Co)
+
+	  # Uncomment the following lines if need more convolutional layers with different filter sizes. 
 	  #x6 = self.conv_and_pool(x,self.conv16)
 	  #x7 = self.conv_and_pool(x,self.conv17)
 	  #x8 = self.conv_and_pool(x,self.conv18)
-          x = torch.cat((x1, x2, x3, x4, x5), 1) # (N,len(Ks)*Co)
+          x = torch.cat((x1, x2, x3, x4, x5), 1) # (N,len(Ks)*Co), This line must be adjusted if using more/less convolutional layers 
 
-          #x = self.dropout(x)  # (N, len(Ks)*Co)
+          #x = self.dropout(x)  # (N, len(Ks)*Co) 
           logit = self.fc1(x)  # (N, C)
           return logit
 
@@ -85,13 +85,11 @@ class Net(nn.Module):
         self.fc1 = nn.Linear(input_size, hidden_size)
         self.relu = nn.ReLU()
         self.fc2 = nn.Linear(hidden_size, num_classes)
-	#self.sm = nn.Softmax()
 
     def forward(self, x):
         out = self.fc1(x)
         out = self.relu(out)
         out = self.fc2(out)
-	#out = self.sm(out)
         return out
 
 # Models from PyTorch Tutorial:
@@ -347,7 +345,7 @@ def test_nn(net, testX):
 
     batch_size = 100
     i = 0
-    length = len(testX) #testX.shape[0]
+    length = len(testX) 
     while i < length:
 	pred = []
 	probs = []
@@ -364,28 +362,22 @@ def test_nn(net, testX):
 
 	outputs_ls = logsoftmax(outputs)
 	outputs_softmax = softmax(outputs)
-        #_, predicted = torch.max(outputs.data, 1)
-	#probabilities, predicted = torch.max(outputs.data, 1)
 	predicted = torch.max(outputs_ls, 1)[1]
 	probabilities = torch.max(outputs_softmax, 1)[0]
         pred = pred + predicted.tolist()
 	
-	# Get the probabilities, and making new prediction based on random threshold
+	# Get the probabilities, if the highest probability is less than the threshold, assign it to the ill-defined class.
 	probs = probs + probabilities.tolist()
-	print "Predicted Lables: " + str(pred)
-	print "Max Probabilties: " + str(probs)
-	print "Not log probabilities: " + str(outputs)
-	print "Probabilities: " + str(outputs_softmax)
 	for num, prob in enumerate(probs):
 	    if prob < threshold:  # Set the threshold. Initially hard-coded. Will be modified.
-		new_pred.append(9) # What is the index location of UNKNOWN class? Figure it out!
+		new_pred.append(9) # Index location of the ill-defined class. 
 	    else:
 		new_pred.append(pred[num])
 
         del sample_tensor
         i = i+batch_size
-    #return pred
-    return new_pred
+    #return pred # Uncomment this line if threshold is not in used.
+    return new_pred # Comment this line out if threshold is not in used. 
 
 ''' Creates and trains a recurrent neural network model. Supports SimpleRNN, LSTM, and GRU
     X: a list of training data
@@ -451,7 +443,7 @@ def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, loss_fu
     # Train the CNN, return the model
     st = time.time()
     Xarray = numpy.asarray(X).astype('float')
-    Yarray = Y.astype('int') #Y.toarray().astype('int')
+    Yarray = Y.astype('int') 
     print("X numpy shape: ", str(Xarray.shape), "Y numpy shape:", str(Yarray.shape))
 
     # Params
@@ -539,6 +531,7 @@ def test_cnn(model, testX, testids, probfile='/u/yoona/data/torch/probs_win200_e
             icd_vec_softmax = softmax(icd_var)
             icd_code = torch.max(icd_vec, 1)[1].data[0]
            
+	    # Assign to ill-defined class if the maximum probabilities is less than a threshold.
 	    icd_prob = torch.max(icd_vec_softmax,1)[0]
 	    if icd_prob < threshold:
 		new_y_pred.append(9)
@@ -556,8 +549,8 @@ def test_cnn(model, testX, testids, probfile='/u/yoona/data/torch/probs_win200_e
 
     print "Probabilities: " + str(probs)
 
-    #return y_pred
-    return new_y_pred
+    #return y_pred  # Uncomment this line if threshold is not in used. 
+    return new_y_pred  # Comment this line out if threshold is not in used. 
 
 
 def train_encoder_decoder(input_variable, target_variable, encoder, decoder, encoder_optimizer, decoder_optimizer, loss_func, max_length):
