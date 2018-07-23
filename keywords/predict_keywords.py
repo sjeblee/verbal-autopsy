@@ -3,8 +3,10 @@
 # Identify and label symptom phrases in narrative
 
 import sys
-sys.path.append('/u/sjeblee/research/va/git/verbal-autopsy')
-sys.path.append('/u/sjeblee/research/va/git/verbal-autopsy/temporal')
+#sys.path.append('/u/sjeblee/research/va/git/verbal-autopsy')
+#sys.path.append('/u/sjeblee/research/va/git/verbal-autopsy/temporal')
+sys.path.append('/u/yoona/ypark_branch/verbal-autopsy')
+sys.path.append('/u/yoona/ypark_branch/verbal-autopsy/temporal')
 
 from collections import Counter
 from lxml import etree
@@ -18,10 +20,11 @@ import os
 import time
 
 import data_util
-import extract_features_temp as extract_features
+import extract_features
+#import extract_features_temp as extract_features
 import cluster_keywords
 import model_library
-import model_library_torch
+#import model_library_torch
 import model_seq
 
 def main():
@@ -156,7 +159,8 @@ def run(trainfile, testfile, outfile, num_clusters, model='seq', clusterfile=Non
     # CNN
     elif model == 'cnn':
         #modelfile = "keyword_cnn_kwkm" + str(num_clusters) + ".model"
-        modelfile = "/u/sjeblee/research/va/data/crossval_kw/gru_cnn_1/gru_cnn_1_adult.model"
+        #modelfile = "/u/sjeblee/research/va/data/crossval_kw/gru_cnn_1/gru_cnn_1_adult.model"
+	modelfile = "../../mds+rct/gru_cnn_1_adult.model"
         nodes = 100
         if os.path.exists(modelfile):
             print "Using existing model"
