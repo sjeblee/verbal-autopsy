@@ -375,12 +375,12 @@ def tag_symptoms(tree,arg_sympfile,arg_chvfile):
                 narr_fixed = narr_fixed + starttag + " " + narr[start:end] + " " + endtag
 
 		# Check negation of symptoms
-		symp_tagger = negTagger(narr[0:start], [narr[start:end]], rules=irules, negP=False)
-		symp_negated = symp_tagger.getNegationFlag()
-		if symp_negated == "affirmed":
-		    narr_symp = narr_symp + narr[start:end] + " "
-		else: #negated
-		    narr_symp = narr_symp + "no " + narr[start:end] + " "
+		#symp_tagger = negTagger(narr[0:start], [narr[start:end]], rules=irules, negP=False)
+		#symp_negated = symp_tagger.getNegationFlag()
+		#if symp_negated == "affirmed":
+		narr_symp = narr_symp + narr[start:end] + " "
+		#else: #negated
+		#    narr_symp = narr_symp + "no " + narr[start:end] + " "
 		
                 lastindex = end
 
@@ -504,7 +504,6 @@ def find_possible_phrases(ngrams, symptoms, narr):
             if (temp_substring.lower() in symptoms):
                 startindex = narr.find(substring)
                 while startindex != -1:
-		#if startindex != -1:
                     endindex = startindex + len(substring)
                     match = [substring, startindex, endindex]
                     possible_phrases.append(match)
@@ -515,7 +514,6 @@ def find_possible_phrases(ngrams, symptoms, narr):
             if (substring.lower() in symptoms):
                 startindex = narr.find(substring)
                 while startindex != -1:
-		#if startindex != -1:
                     endindex = startindex + len(substring)
                     match = [substring, startindex, endindex]
                     possible_phrases.append(match)
