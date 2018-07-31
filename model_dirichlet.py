@@ -29,7 +29,7 @@ from sklearn.feature_selection import SelectKBest, f_classif, chi2
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.pipeline import make_pipeline
 
-import attention_utils
+#import attention_utils
 import rebalance
 
 labelencoder = None
@@ -438,12 +438,15 @@ def test(model_type, model, testfile):
     return testids, testlabels, predictedlabels
 
 def create_nn_model(X, Y, anova_function, num_feats, num_nodes, act):
-    anova_filter, X = create_anova_filter(X, Y, anova_function, num_feats)
+    #anova_filter, X = create_anova_filter(X, Y, anova_function, num_feats)
 #    X = anova_filter.transform(X)
     Y = to_categorical(Y)
 
+    if type(X) is list:
+	X = numpy.asarray(X)
+
     print "neural network: nodes: " + str(num_nodes) + ", feats: " + str(num_feats)
-    nn = Sequential([Dense(num_nodes, input_dim=num_feats),
+    nn = Sequential([Dense(num_nodes, input_dim=X.shape[-1]),
                     Activation(act),
                     #Dense(num_nodes, input_dim=num_feats),
                     #Activation(activation),

@@ -24,7 +24,7 @@ use_cuda = False
 #torch.cuda.set_device(2)
 
 # Set threshold for ill-defined class
-threshold = 0.01
+#threshold = 0.01
 
 # Convolutional Neural Network (5 convlutional layers with max pooling, followed by a fully connected network)
 class CNN_Text(nn.Module):
@@ -74,7 +74,7 @@ class CNN_Text(nn.Module):
 	  #x8 = self.conv_and_pool(x,self.conv18)
           x = torch.cat((x1, x2, x3, x4, x5), 1) # (N,len(Ks)*Co), This line must be adjusted if using more/less convolutional layers 
 
-          #x = self.dropout(x)  # (N, len(Ks)*Co) 
+          x = self.dropout(x)  # (N, len(Ks)*Co) 
           logit = self.fc1(x)  # (N, C)
           return logit
 
@@ -333,7 +333,7 @@ def nn_model(X, Y, num_nodes, act, num_epochs=10):
 	return net
 
 
-def test_nn(net, testX):
+def test_nn(net, testX, threshold=0.01):
     # Test the Model
 
     softmax = nn.Softmax(dim=1)
@@ -439,7 +439,7 @@ def rnn_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', dropout=0
     Does NOT support joint training yet
     returns: the CNN model
 '''
-def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, loss_func='categorical_crossentropy'):
+def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, loss_func='categorical_crossentropy',dropout=0.0):
     # Train the CNN, return the model
     st = time.time()
     Xarray = numpy.asarray(X).astype('float')
@@ -459,7 +459,7 @@ def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, loss_fu
     num_batches = math.ceil(X_len/batch_size)
     learning_rate = 0.001
 
-    cnn = CNN_Text(dim, num_labels)
+    cnn = CNN_Text(dim, num_labels,dropout=dropout)
     if use_cuda:
 	cnn = cnn.cuda()
 
@@ -506,7 +506,7 @@ def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, loss_fu
         print("time so far: ", str(ct), unit)
     return cnn
 
-def test_cnn(model, testX, testids, probfile='/u/yoona/data/torch/probs_win200_epo10', labelencoder=None, collapse=False):
+def test_cnn(model, testX, testids, probfile='/u/yoona/data/torch/probs_win200_epo10', labelencoder=None, collapse=False, threshold=0.1):
     y_pred = []
     y_pred_softmax = []
     y_pred_logsoftmax = []

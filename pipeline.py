@@ -138,7 +138,7 @@ def main():
     if experiment == "traintest":
         run(args.model, modelname, args.train, testset, args.features, fn, args.name, pre, labels, arg_dev=dev, arg_hyperopt=False, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes, arg_dataset=dataset, arg_rebalance=rebal, arg_vecfile=args.vecfile, arg_dataloc=args.dataloc, arg_prefix=args.prefix, arg_sympfile=args.sympfile, arg_chvfile=args.chvfile)
     elif experiment == "hyperopt":
-        run(args.model, modelname, args.train, testset, args.features, fn, args.name, pre, labels, arg_dev=dev, arg_hyperopt=True, arg_dataset=dataset)
+        run(args.model, modelname, args.train, testset, args.features, fn, args.name, pre, labels, arg_dev=dev, arg_hyperopt=True, arg_dataset=dataset, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes, arg_rebalance=rebal, arg_vecfile=args.vecfile, arg_dataloc=args.dataloc, arg_prefix=args.prefix, arg_sympfile=args.sympfile, arg_chvfile=args.chvfile)
     elif experiment == "crossval":
         crossval(models, args.train, args.features, fn, args.name, pre, labels, args.data, arg_vecfile=args.vecfile, arg_dataloc=args.dataloc, arg_prefix=args.prefix, arg_sympfile=args.sympfile, arg_chvfile=args.chvfile)
 
@@ -272,7 +272,7 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
                 datasets.append(recset)
                 print "total recs: " + str(len(recset))
 
-            for z in range(1):
+            for z in range(10):
                 # Construct train and test sets
                 testset = datasets[z]
                 trainset = train_extra
@@ -301,8 +301,8 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
                     trainname = arg_train + "_" + str(z)
                 #trainfile = datapath + "/train_" + trainname +  "_cat.xml"
                 #testfile = datapath + "/test_" + trainname + "_cat.xml"
-		trainfile = datapath + "/train_"+  trainname + "_cat_spell_symp.xml"
-		testfile = datapath + "/test_" + trainname + "_cat_spell_symp.xml"  
+		trainfile = datapath + "/train_"+  trainname + "_cat_spell.xml"
+		testfile = datapath + "/test_" + trainname + "_cat_spell.xml"  
                 outfile = open(trainfile, 'w')
                 outfile.write(xml_header + "\n")
                 for item in trainset:
@@ -351,7 +351,7 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
                     outfile.write(xml_footer + "\n")
             else:
                 #trainfile = datapath + "/train_" + trainname +  "_cat.xml"
-		trainfile = datapath + "/train_"+ trainname + "_cat_spell_symp.xml" 
+		trainfile = datapath + "/train_"+ trainname + "_cat_spell.xml" 
 
             #TEMP for keyphrase crossval
             #trainfile = datapath + "/train_all_" + str(z) + "_cat.txt"
@@ -361,7 +361,7 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
             name = "ice+medhelp+narr_all_" + str(z)
             vecfile = word2vec.run(trainfile, dim, name, stem=shouldstem)
 	    # Yoona: No vector file for cross validation. Use original vector file used for train-test instead
-	    vecfile = arg_vecfile
+	    #vecfile = arg_vecfile
 
         for m in models:
             name = arg_name + "/" + m + "_" + str(z)

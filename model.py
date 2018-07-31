@@ -37,6 +37,7 @@ import model_library
 import rebalance
 import model_library_torch
 #from layers import Attention
+from model_dirichlet import create_nn_model
 
 import torch
 import pickle
@@ -104,8 +105,19 @@ def hyperopt(arg_model, arg_train_feats, arg_test_feats, arg_result_file, arg_pr
             'activation':hp.choice('activation', [('relu', 'relu'), ('tanh', 'tanh'), ('sigmoid','sigmoid')]),
             'n_nodes':hp.uniform('n_nodes', 50, 300),
             'n_feats':hp.uniform('n_feats', 100, 400),
-            'anova_name':hp.choice('anova_name', [('f_classif', 'f_classif'), ('chi2', 'chi2')])
+            'anova_name':hp.choice('anova_name', [('f_classif', 'f_classif'), ('chi2', 'chi2')]),
+	    'threshold':hp.uniform('threshold',0.05,0.3)
         }
+
+    if h_model == "cnn":
+	objective = obj_cnn
+	global activation
+	activation = 'relu'
+	space = {
+	    #'activation':hp.choice('activation', [('relu','relu'), ('tanh','tank'),('sigmoid','sigmoid')]),
+	    'dropout':hp.uniform('dropout',0,0.5),
+	    'threshold':hp.uniform('threshold',0.05,0.3)
+	}
 
     elif h_model == "lstm":
         objective = obj_lstm
@@ -148,7 +160,8 @@ def obj_nn(params):
     n_nodes = int(params['n_nodes'])
     n_feats = int(params['n_feats'])
     anova_name = params['anova_name'][0]
-    print "obj_nn: " + str(activation) + ", nodes:" + str(n_nodes) + ", feats:" + str(n_feats) + ", anova: " + str(anova_name)
+    threshold = float(params['threshold'])
+    print "obj_nn: " + str(activation) + ", nodes:" + str(n_nodes) + ", feats:" + str(n_feats) + ", anova: " + str(anova_name) + ", threshold: " + str(threshold)
 
     anova_function = None
     if anova_name == 'chi2':
@@ -168,15 +181,53 @@ def obj_nn(params):
     trainlabels = []
     X = []
     Y = []
-    Y = preprocess(h_train, trainids, trainlabels, X, Y, True)
+    Y = preprocess(h_train, trainids, trainlabels, X, Y, keys, trainlabels=True)
     #print "X: " + str(len(X)) + "\nY: " + str(len(Y))
-
-    model, X, Y = create_nn_model(X, Y, anova_function, n_feats, n_nodes, activation)
-
+    if use_torch == False:
+	model, X, Y = create_nn_model(X, Y, anova_function, n_feats, n_nodes, activation)
+    else: # Use pytorch model
+	Y = to_categorical(Y)
+	model = model_library_torch.nn_model(X,Y,n_nodes,activation)
     # Run test
-    testids, testlabels, predictedlabels = test('nn', model, h_test)
-    f1score = metrics.f1_score(testlabels, predictedlabels)
+    testids, testlabels, predictedlabels = test('nn', model, h_test,threshold=threshold)
+    print "Real Labels shape: " + str(testlabels)
+    print "Predicted Labels shape: " + str(predictedlabels)
+    f1score = metrics.f1_score(testlabels, predictedlabels, average='weighted')
     print "F1: " + str(f1score)
+
+    # Return a score to minimize
+    return 1 - f1score
+
+def obj_cnn(params):
+    dropout = float(params['dropout'])
+    threshold = float(params['threshold'])
+    print "obj_cnn: " + "dropout = " + str(dropout) + ", threshold = " + str(threshold)
+
+    global keys
+    with open(h_train + ".keys", "r") as kfile:
+	keys = eval(kfile.read())
+
+    global labelencoder, typeencoder
+    labelencoder = preprocessing.LabelEncoder() # Transforms ICD codes to numbers
+    typeencoder = preprocessing.LabelEncoder()
+    trainids = []
+    trainlabels = []
+    X = []
+    Y = []
+    Y = preprocess(h_train, trainids, trainlabels, X, Y, keys, trainlabels=True)
+
+    Y = to_categorical(Y)
+    if use_torch == False:
+	model, X, Y = model_library.cnn_model(X,Y)
+    else:
+	model = model_library_torch.cnn_model(X,Y, dropout=dropout)
+
+    testids, testlabels, predictedlabels = test('cnn', model, h_test, threshold=threshold)
+    print "Real Labels shape: " + str(testlabels)
+    print "Predicted Labels shape: " + str(predictedlabels)
+    f1score = metrics.f1_score(testlabels, predictedlabels, average='weighted')
+    print "F1: " + str(f1score)
+
 
     # Return a score to minimize
     return 1 - f1score
@@ -676,7 +727,7 @@ def write_results(filename, testids, testlabels, predictedlabels):
         output.write(str(out) + "\n")
     output.close()
 
-def test(model_type, model, testfile, anova_filter=None, hybrid=False, rec_type=None, kw_cnn=None):
+def test(model_type, model, testfile, anova_filter=None, hybrid=False, rec_type=None, kw_cnn=None, threshold=0.01):
     print "testing..."
     stime = time.time()
     testids = []
@@ -706,9 +757,9 @@ def test(model_type, model, testfile, anova_filter=None, hybrid=False, rec_type=
     if is_nn:
 	if use_torch: # Test using pytorch model
 	    if model_type == "nn": 
-		results = model_library_torch.test_nn(model,testX)
+		results = model_library_torch.test_nn(model,testX,threshold=threshold)
 	    elif model_type == "cnn":
-		results = model_library_torch.test_cnn(model,testX, testY)
+		results = model_library_torch.test_cnn(model,testX, testY,threshold=threshold)
 	else: # Test using Keras model
 	    predictedY = model.predict(inputs)
 	    results = map_back(predictedY)
