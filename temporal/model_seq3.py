@@ -6,12 +6,13 @@ import sys
 sys.path.append('/u/sjeblee/research/va/git/verbal-autopsy')
 import data_util3 as data_util
 import models_pytorch
+import tools
 import word2vec3 as word2vec
 import xmltoseq3 as xmltoseq
 
 from keras.models import Model
 from keras.layers import Input, GRU, LSTM, Dense, Dropout
-from keras.preprocessing.sequence import pad_sequences
+#from keras.preprocessing.sequence import pad_sequences
 from lxml import etree
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 from sklearn_crfsuite import CRF, metrics
@@ -34,22 +35,26 @@ def main():
     argparser.add_argument('--test', action="store", dest="testfile")
     argparser.add_argument('--out', action="store", dest="outfile")
     argparser.add_argument('--model', action="store", dest="model")
+    argparser.add_argument('--inline', action="store_true", dest="inline")
+    argparser.set_defaults(inline=False)
     args = argparser.parse_args()
 
     if not (args.trainfile and args.testfile):
-        print("usage: ./model_seq.py --train [file.xml] --test [file.xml] (--out [file.xml] --model [crf/gru])")
+        print("usage: ./model_seq.py --train [file.xml] --test [file.xml] (--out [file.xml] --model [crf/gru] --inline)")
         exit()
 
     if args.outfile and args.model:
-        run(args.trainfile, args.testfile, args.outfile, args.model)
+        run(args.trainfile, args.testfile, args.outfile, args.model, args.inline)
     elif args.outfile:
-        run(args.trainfile, args.testfile, args.outfile)
+        run(args.trainfile, args.testfile, args.outfile, arg_inline=args.inline)
     else:
-        run(args.trainfile, args.testfile)
+        run(args.trainfile, args.testfile, arg_inline=args.inline)
 
-def run(trainfile, testfile, outfile="", modelname="crf"):
-    train_ids, train_seqs = get_seqs(trainfile, split_sents=True, inline=False)
-    test_ids, test_seqs = get_seqs(testfile, split_sents=True, inline=False)
+def run(trainfile, testfile, outfile="", modelname="crf", arg_inline=False):
+    # Extract sequences with labels
+    train_ids, train_seqs = get_seqs(trainfile, split_sents=True, inline=arg_inline)
+    test_ids, test_seqs = get_seqs(testfile, split_sents=True, inline=arg_inline)
+    print("test_ids:", len(test_ids))
 
     if modelname == "crf":
         trainx = [sent2features(s) for s in train_seqs]
@@ -87,6 +92,7 @@ def run(trainfile, testfile, outfile="", modelname="crf"):
         # Test CRF
         testy_labels = testy
         y_pred_labels = model.predict(testx)
+        print("testy:", len(testy), "ypred:", len(y_pred_labels))
         #y_pred_time = crf_time.predict(testx)
         #y_pred_event = crf_event.predict(testx)
     elif modelname == 'gru':
@@ -140,12 +146,14 @@ def run(trainfile, testfile, outfile="", modelname="crf"):
     test_dict = {}
     for x in range(len(test_ids)):
         rec_id = test_ids[x]
+        print("x:", str(x), "rec_id:", rec_id)
         rec_seq = list(zip((item[0] for item in test_seqs[x]), y_pred_labels[x]))
         # Concatenate all the sequences for each record
         if rec_id not in test_dict:
             test_dict[rec_id] = []
         test_dict[rec_id] = test_dict[rec_id] + rec_seq # TODO: add line breaks???
-    xml_tree = xmltoseq.seq_to_xml(test_dict, testfile)
+        print("rec_seq:", str(rec_seq))
+    xml_tree = xmltoseq.seq_to_xml(test_dict, testfile, tag="narr_timeml_"+modelname)
 
     # write the xml to file
     if len(outfile) > 0:
@@ -190,7 +198,7 @@ def train_seq2seq(trainx, trainy, num_nodes=100, vec_labels=False, loss_function
     trainy_target = numpy.asarray(trainy_target)
 
     print("trainy_target shape: ", str(trainy_target.shape))
-        
+
     # Set up the encoder
     latent_dim = num_nodes
     dropout = 0.1
@@ -221,8 +229,8 @@ def train_seq2seq(trainx, trainy, num_nodes=100, vec_labels=False, loss_function
     #model = Model(inputs=encoder_inputs, outputs=prediction)
     #model.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
     #model.fit(trainx, trainy, nb_epoch=20)
-    
-    model.summary()                                       
+
+    model.summary()
     model.save('seq2seq.model')
 
     # Create models for inference
@@ -283,7 +291,7 @@ def decode_sequence(encoder_model, decoder_model, input_seq, output_seq_len, out
             stop_condition = True
 
         # Update the target sequence (of length 1).
-        target_seq = numpy.zeros((1, 1, output_dim)) 
+        target_seq = numpy.zeros((1, 1, output_dim))
         for x in range(output_dim):
             target_seq[0, 0, x] = token[x]
 
@@ -423,19 +431,19 @@ def pad_feat(feat, max_seq_len, pad_item):
     for k in range(pad_size):
         new_feat.append(pad_item)
     return new_feat
-                          
-def get_seqs(filename, split_sents=False, inline=True):
+
+def get_seqs(filename, split_sents=False, inline=True, add_spaces=False):
     print("get_seqs ", filename)
     ids = []
     narrs = []
     anns = []
     seqs = []
     seq_ids = []
-    
+
     # Get the xml from file
     tree = etree.parse(filename)
     root = tree.getroot()
-    
+
     for child in root:
         narr = ""
         rec_id = child.find(id_name).text
@@ -454,9 +462,17 @@ def get_seqs(filename, split_sents=False, inline=True):
             else:
                 rec_id = child.find(id_name).text
                 #print "rec_id: " + rec_id
-                narr = data_util.stringify_children(node).encode('utf-8')
-                #print "narr: " + narr
-                ids.append(rec_id)
+                #narr = etree.tostring(node, encoding='utf-8').decode('utf-8')
+                narr = tools.stringify_children(node)
+                if add_spaces:
+                    narr = narr.replace('<', ' <')
+                    narr = narr.replace('>', '> ')
+                    narr = narr.replace('.', ' .')
+                    narr = narr.replace(',', ' ,')
+                    narr = narr.replace(':', ' :')
+                    narr = narr.replace('  ', ' ')
+                #print("narr: ", narr)
+                #ids.append(rec_id)
                 narrs.append(narr)
         else: # NOT inline
             anns.append(data_util.stringify_children(node).encode('utf8'))
@@ -464,6 +480,7 @@ def get_seqs(filename, split_sents=False, inline=True):
             narrs.append(narr_node.text)
 
     if inline:
+        split_sents = False
         for x in range(len(narrs)):
             narr = narrs[x]
             rec_id = ids[x]
@@ -590,6 +607,7 @@ def word2features(sent, i):
         features['BOS'] = True
 
     if i < len(sent)-1:
+        print("sent[i+1]", str(sent[i+1]))
         word1 = sent[i+1][0]
         postag1 = sent[i+1][1]
         features.update({

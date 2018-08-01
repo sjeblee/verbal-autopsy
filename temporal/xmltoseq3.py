@@ -10,6 +10,7 @@ from lxml import etree
 import argparse
 import re
 
+debug=False
 id_name = "record_id"
 symp_narr_tag = "narr_timeml_gru"
 #symp_narr_tag = "narr_symp"
@@ -69,7 +70,7 @@ def run(infile, outfile):
 '''
 Get sequence tags from separate xml tags and text
 narr: the text-only narrative
-ann: just the xml tags 
+ann: just the xml tags
 split_sents: NOT IMPLEMENTED YET
 '''
 def ann_to_seq(narr, ann, split_sents):
@@ -141,7 +142,7 @@ Convert inline xml-tagged text to sequences
 '''
 def xml_to_seq(text):
     seq = [] # List of tuples
-    #print "text: " + text
+    if debug: print("text: ", text)
     event_start = "<EVENT"
     time_start = ["<TIMEX3", "<SECTIME"]
     event_end = "</EVENT>"
@@ -151,14 +152,16 @@ def xml_to_seq(text):
     b_event = False
     b_time = False
     in_time = False
-    chunks = text.split(" ")
+    keep_linebreaks = True
+    text = re.sub('\n', ' LINEBREAK ', text)
+    chunks = text.split()
     #chunk = chunks[0]
     x = 0
 
     while x < len(chunks):
         chunk = chunks[x].strip()
         if len(chunk) > 0:
-            #print "chunk: " + chunk
+            if debug: print("chunk: ", chunk)
             # Handle EVENTs
             if in_event:
                 if chunk == event_end:
@@ -213,20 +216,26 @@ def xml_to_seq(text):
                 # Ignore the whole tag
                 while x < len(chunks) and '>' not in chunks[x]:
                     x = x+1
-            else:
+                if chunks[x] == 'LINEBREAK': # Ignore line breaks after ignored tags
+                    x = x+1
+                keep_linebreaks = False # Discard blank lines after main text
+            elif chunk not in ['<narr_timeml_simple>', '</narr_timeml_simple>']:
                 pair = (chunk, O)
-                seq.append(pair)
+                if chunk != 'LINEBREAK' or keep_linebreaks:
+                    seq.append(pair)
         x = x+1
-    #print "seq: " + str(seq)
+    if debug: print("seq: ", str(seq))
     return seq
+
 
 '''
    seqs: dict[id] -> [(word, label),...]
    filename: optional, the xml file to add the sequences to. If blank, will create a new tree
    tag: the tag to use for new elements if creating a new tree
 '''
-def seq_to_xml(seqs, filename="", tag="Adult_Anonymous"):
+def seq_to_xml(seqs, filename="", tag=symp_narr_tag, elementname="Record"):
     print("seq_to_xml")
+    print(str(seqs.keys()))
     tree = None
     usefile = False
     if len(filename) >0:
@@ -235,17 +244,19 @@ def seq_to_xml(seqs, filename="", tag="Adult_Anonymous"):
         usefile = True
         for child in root:
             rec_id = child.find(id_name).text
+            print("docid:", rec_id)
             seq = ""
             if rec_id in seqs:
                 seq = seqs[rec_id]
-            narr_node = etree.SubElement(child, symp_narr_tag)
+            narr_node = etree.SubElement(child, tag)
             narr_node.text = to_xml(seq)
+            print("output:", len(narr_node.text))
     else:
         root = etree.Element("root")
         for key in seqs:
             seq = seqs[key]
-            child = etree.SubElement(root, tag)
-            narr_node = etree.SubElement(child, symp_narr_tag)
+            child = etree.SubElement(root, elementname)
+            narr_node = etree.SubElement(child, tag)
             narr_node.text = to_xml(seq)
             #print "added seq: " + child.text
         tree =  etree.ElementTree(root)
@@ -259,34 +270,56 @@ def to_xml(seq):
     event_end = "</EVENT>"
 
     text = ""
+    elem_text = ""
     tid = 0
     eid = 0
     prevlabel = O
+    in_elem = False
     for word,label in seq:
+        # Add xml tags if necessary
         if label == O:
+            in_elem = False
             if prevlabel != O:
-                text = text + closelabel(prevlabel)
+                text = text + closelabel(prevlabel, elem_text)
+                elem_text = ""
         elif label == BT or (label == IT and (prevlabel != BT and prevlabel != IT)):
-            text = text + closelabel(prevlabel) + ' <TIMEX3 tid="t' + str(tid) + '">'
+            text = text + closelabel(prevlabel, elem_text) + ' <TIMEX3 tid="t' + str(tid) + '" type="TIME" value="">'
             tid = tid+1
+            in_elem = True
+            elem_text = ""
         elif label == BE or (label == IE and (prevlabel != BE and prevlabel != IE)):
-            text = text + closelabel(prevlabel) + ' <EVENT tid="e' + str(eid) + '">'
+            text = text + closelabel(prevlabel, elem_text) + ' <EVENT eid="e' + str(eid) + '" class="OCCURRENCE">'
             eid = eid+1
+            in_elem = True
+            elem_text = ""
 
         # Add word
-        text = text + ' ' + word
+        if in_elem:
+            elem_text = elem_text + word + ' '
+        else:
+            text = text + ' ' + word
         prevlabel = label
-    text = text + closelabel(prevlabel)
-    return text.strip()
 
-def closelabel(prevlabel):
+    # Close the final tag
+    text = text + closelabel(prevlabel, elem_text)
+    in_elem = False
+    elem_text = ""
+    text = re.sub('LINEBREAK', '\n', text.strip())
+
+    # Fix lines
+    lines = []
+    for line in text.splitlines():
+        lines.append(line.strip())
+    return '\n'.join(lines) + '\n'
+
+def closelabel(prevlabel, elem_text):
     t_labels = ['BT', 'IT']
     e_labels = ['BE', 'IE']
     text = ""
     if prevlabel in t_labels:
-        text = text + ' </TIMEX3>'
+        text = elem_text.strip() + '</TIMEX3>'
     elif prevlabel in e_labels:
-        text = text + ' </EVENT>'
+        text = elem_text.strip() + '</EVENT>'
     return text
 
 if __name__ == "__main__":main()
