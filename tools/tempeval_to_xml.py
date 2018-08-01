@@ -9,6 +9,7 @@ import data_util
 from lxml import etree
 import argparse
 import os
+import random
 import string
 import subprocess
 
@@ -32,15 +33,17 @@ def main():
     #argparser.add_argument('--in', action="store", dest="infile")
     argparser.add_argument('--out', action="store", dest="outfile")
     argparser.add_argument('--dir', action="store", dest="ann_dir")
+    argparser.add_argument('--dev', action="store", dest="dev_percent")
+    argparser.set_defaults(dev_percent=0)
     args = argparser.parse_args()
 
     if not (args.outfile and args.ann_dir):
-        print "usage: ./tempeval_to_xml.py --dir [path/to/dir] --out [file.xml]"
+        print "usage: ./tempeval_to_xml.py --dir [path/to/dir] --out [file.xml] --dev [number from 0 to 100]"
         exit()
 
-    run(args.outfile, args.ann_dir)
+    run(args.outfile, args.ann_dir, int(args.dev_percent))
 
-def run(arg_outfile, arg_dir):
+def run(arg_outfile, arg_dir, devp=0):
 
     txt_narrs = {}
     ann_narrs = {} # map from record id to annotated narrative
@@ -56,7 +59,14 @@ def run(arg_outfile, arg_dir):
     # Add the annotated narrative to the xml file
     root = etree.Element("root")
     tree = etree.ElementTree(root)
+
+    if devp > 0:
+        devcount = 0
+        devroot = etree.Element("root")
+        devtree = etree.ElementTree(devroot)
+
     for rec_id in ann_narrs:
+
         child = etree.Element("Record")
         narr = ann_narrs[rec_id]
         id_node = etree.Element("record_id")
@@ -68,17 +78,32 @@ def run(arg_outfile, arg_dir):
         narrt_node = etree.Element("narr_timeml_simple")
         narrt_node.text = narr.decode('utf-8')
         child.append(narrt_node)
-        root.append(child)
+
+        if devp > 0 and random.uniform(0, 1) < (float(devp)/100):
+            devroot.append(child)
+            devcount += 1
+        else:
+            root.append(child)
 
     tree.write(arg_outfile)
+
     subprocess.call(["sed", "-i", "-e", 's/&lt;/ </g', arg_outfile])
     subprocess.call(["sed", "-i", "-e", 's/&gt;/> /g', arg_outfile])
     subprocess.call(["sed", "-i", "-e", 's/  / /g', arg_outfile])
 
+    if devp > 0:
+        filename = arg_outfile + ".dev"
+        devtree.write(filename)
+        print "dev records: " + str(devcount)
+        subprocess.call(["sed", "-i", "-e", 's/&lt;/ </g', filename])
+        subprocess.call(["sed", "-i", "-e", 's/&gt;/> /g', filename])
+        subprocess.call(["sed", "-i", "-e", 's/  / /g', filename])
+
 def convert_spans_to_xml(text):
     lines = text.splitlines()
     lines = lines[1:] # ignore the xml header
-    root  = etree.fromstring("<root>" + ' '.join(lines) + "</root>")
+    #root  = etree.fromstring("<root>" + ' '.join(lines) + "</root>")
+    root  = etree.fromstring("<root>" + '\n'.join(lines) + "</root>")
     timeml = root.find("TimeML")
     tags = []
 
@@ -89,7 +114,7 @@ def convert_spans_to_xml(text):
     # Get document text
     text_node = timeml.find("TEXT")
     text_text = dct_text + data_util.stringify_children(text_node)
-    #print "text: " + text_text
+    print "text: " + text_text
 
     build_list = etree.XPath("//EVENT")
     events = build_list(text_node)
@@ -125,7 +150,7 @@ def convert_spans_to_xml(text):
             tl.attrib['relatedToEventID'] = instance_to_event[tl.attrib['relatedToEventInstance']]
         if 'subordinatedEventInstance' in tl.attrib:
             tl.attrib['subordinatedEventID'] = instance_to_event[tl.attrib['subordinatedEventInstance']]
-    
+
     #print "Updated node: " + etree.tostring(text_node)
 
     text_root = etree.fromstring("<root>" + text_text + "</root>")
@@ -134,7 +159,7 @@ def convert_spans_to_xml(text):
 
     for tag in tags:
         xml_text = xml_text + etree.tostring(tag)
-    #print "narr_text: " + narr_text
+    print "narr_text: " + narr_text
     #print "xml_text: " + xml_text
 
     return narr_text, xml_text
@@ -159,7 +184,7 @@ def create_tag(line):
     chunks = line.split(' ')
 
     x = 0
-    
+
     while x<len(chunks):
         chunk = chunks[x]
         if timex in chunk:
@@ -198,7 +223,7 @@ def create_tag(line):
 
     # TODO: process TLINKS?
     print "name: " + name + ", tid: " + tid + ", text: " + text + ", atts: " + attributes
-    
+
     tag = Tag(name, tid, text, attributes)
     return tag
 
@@ -234,5 +259,6 @@ def text_to_list(text):
     if len(string) > 0:
         chunks.append(string)
     return chunks
+
 
 if __name__ == "__main__":main()
