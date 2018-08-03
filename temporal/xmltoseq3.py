@@ -10,7 +10,7 @@ from lxml import etree
 import argparse
 import re
 
-debug=False
+debug = False
 id_name = "record_id"
 symp_narr_tag = "narr_timeml_gru"
 #symp_narr_tag = "narr_symp"
@@ -66,6 +66,7 @@ def run(infile, outfile):
     output = open(outfile, 'w')
     output.write(str(seqs))
     output.close()
+
 
 '''
 Get sequence tags from separate xml tags and text
@@ -136,6 +137,7 @@ def get_seqs(text, label, seqs):
 
 def split_words(text):
     return re.findall(r"[\w']+|[.,!?;=/\-\[\]]", text.strip())
+
 
 '''
 Convert inline xml-tagged text to sequences
@@ -258,16 +260,14 @@ def seq_to_xml(seqs, filename="", tag=symp_narr_tag, elementname="Record"):
             child = etree.SubElement(root, elementname)
             narr_node = etree.SubElement(child, tag)
             narr_node.text = to_xml(seq)
-            #print "added seq: " + child.text
-        tree =  etree.ElementTree(root)
+            if debug: print("added seq: ", child.text)
+        tree = etree.ElementTree(root)
     return tree
+
 
 def to_xml(seq):
     t_labels = [BT, IT]
     e_labels = [BE, IE]
-    event_start = "<EVENT"
-    time_start = ["<TIMEX3", "<SECTIME"]
-    event_end = "</EVENT>"
 
     text = ""
     elem_text = ""
@@ -276,6 +276,7 @@ def to_xml(seq):
     prevlabel = O
     in_elem = False
     for word,label in seq:
+        print(word, label)
         # Add xml tags if necessary
         if label == O:
             in_elem = False
@@ -312,6 +313,7 @@ def to_xml(seq):
         lines.append(line.strip())
     return '\n'.join(lines) + '\n'
 
+
 def closelabel(prevlabel, elem_text):
     t_labels = ['BT', 'IT']
     e_labels = ['BE', 'IE']
@@ -321,5 +323,6 @@ def closelabel(prevlabel, elem_text):
     elif prevlabel in e_labels:
         text = elem_text.strip() + '</EVENT>'
     return text
+
 
 if __name__ == "__main__":main()

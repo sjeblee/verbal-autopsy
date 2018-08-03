@@ -8,12 +8,9 @@ import tools
 
 import argparse
 import os
-import re
 import subprocess
 from copy import deepcopy
 from lxml import etree
-from lxml.etree import tostring
-from itertools import chain
 from xml.sax.saxutils import unescape
 
 none_label = "NONE"
@@ -40,7 +37,7 @@ def main():
 
     # Run evaluations
     if eval_seq:
-        #write_eval_files(args.infile, args.outdir)
+        write_eval_files(args.infile, args.outdir)
         run_tempeval(args.testdir, args.outdir)
     if eval_rel:
         print("TODO: relation evaluation")
@@ -62,13 +59,14 @@ def write_eval_files(output_file, eval_dir):
     if not os.path.exists(eval_dir):
         os.mkdir(eval_dir)
 
+    tools.fix_arrows(output_file)
     treeroot = etree.parse(output_file).getroot()
 
     for child in treeroot:
         docid = child.find("record_id").text
         print(docid)
         dct = ""
-        narr_node = child.find("narr_timeml_crf")
+        narr_node = child.find("narr_timeml_ncrf")
         if narr_node is not None:
             orig_node = narr_node.find("TIMEX3")
             timex_node = deepcopy(orig_node)
