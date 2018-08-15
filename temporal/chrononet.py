@@ -278,6 +278,28 @@ def rank_pairwise_accuracy(pred_ranks, true_ranks, eps=0.001):
         acc = accuracies[0]
     return acc
 
+def poa_pairs(pred_pairs, pred_relations, true_pairs, true_relations):
+    accuracies = []
+    for n in range(len(true_ranks)):
+        pr = pred_ranks[n]
+        se, so = get_ordered_pairs(true_ranks[n])
+        num_pairs = len(so) + len(se)
+        so_correct = 0
+        se_correct = 0
+        for pair in so:
+            if pr[pair[0]] < pr[pair[1]]:
+                so_correct += 1
+        for pair in se:
+            if math.fabs(pr[pair[0]] - pr[pair[1]]) <= eps:
+                se_correct += 1
+        accuracy = (so_correct + se_correct)/float(num_pairs)
+        accuracies.append(accuracy)
+    if len(accuracies) > 1:
+        acc = numpy.average(numpy.asarray(accuracies))
+    else:
+        acc = accuracies[0]
+    return acc
+
 
 ''' Score predicted ranks against correct ranks
 '''
