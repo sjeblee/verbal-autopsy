@@ -218,7 +218,7 @@ def xml_to_seq(text):
                 # Ignore the whole tag
                 while x < len(chunks) and '>' not in chunks[x]:
                     x = x+1
-                if chunks[x] == 'LINEBREAK': # Ignore line breaks after ignored tags
+                if x < len(chunks) and chunks[x] == 'LINEBREAK': # Ignore line breaks after ignored tags
                     x = x+1
                 keep_linebreaks = False # Discard blank lines after main text
             elif chunk not in ['<narr_timeml_simple>', '</narr_timeml_simple>']:
@@ -246,13 +246,13 @@ def seq_to_xml(seqs, filename="", tag=symp_narr_tag, elementname="Record"):
         usefile = True
         for child in root:
             rec_id = child.find(id_name).text
-            print("docid:", rec_id)
+            if debug: print("docid:", rec_id)
             seq = ""
             if rec_id in seqs:
                 seq = seqs[rec_id]
             narr_node = etree.SubElement(child, tag)
             narr_node.text = to_xml(seq)
-            print("output:", len(narr_node.text))
+            if debug: print("output:", len(narr_node.text))
     else:
         root = etree.Element("root")
         for key in seqs:

@@ -1,14 +1,16 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # Identify and label symptom phrases in narrative
 
 import sys
 sys.path.append('/u/sjeblee/research/va/git/verbal-autopsy')
-import model_seq
+import model_seq3 as model_seq
+import xmltoseq3 as xmltoseq
 
 from lxml import etree
 import argparse
-import numpy
+import re
+import os
 
 id_name = "record_id"
 #vecfile = "/u/sjeblee/research/va/data/datasets/mds+rct/narr+ice+medhelp.vectors.100"
@@ -18,28 +20,52 @@ def main():
     argparser = argparse.ArgumentParser()
     argparser.add_argument('--in', action="store", dest="infile")
     argparser.add_argument('--out', action="store", dest="outfile")
+    argparser.add_argument('--test', action="store", dest="testfile")
+    argparser.add_argument('--reverse', action="store_true", dest="reverse")
+    argparser.set_defaults(reverse=False)
     args = argparser.parse_args()
 
     if not (args.infile and args.outfile):
-        print "usage: ./xml_to_ncrf.py --in [file.xml] --out [file.xml]"
+        print("usage: ./xml_to_ncrf.py --in [infile.xml or ncrf_data_dir] --out [file.xml] (--test [testfile.xml] --reverse)")
         exit()
 
-    extract_features(args.infile, args.outfile)
+    if args.reverse:
+        ncrf_to_xml(args.infile, args.outfile, args.testfile)
+    else:
+        extract_features(args.infile, args.outfile)
+
 
 def extract_features(infile, outfile):
-    seq_ids, seqs = model_seq.get_seqs(infile, split_sents=True, inline=False)
+    seq_ids, seqs = model_seq.get_seqs(infile, split_sents=False, inline=True, add_spaces=True)
     # seqs: list of lists of tuples of (word, label)
     outdata = open(outfile, 'w')
     outids = open(outfile + ".ids", 'w')
+    outorig = open(outfile + ".orig", 'w')
     for x in range(len(seqs)):
         seq = seqs[x]
         seqid = seq_ids[x]
         for pair in seq:
-            outdata.write(pair[0] + " " + map_label(pair[1]) + "\n")
-        outdata.write("\n")
-        outids.write(seqid + "\n")
+            word = pair[0].strip()
+            feats = word_feats(word)
+            outorig.write(word + " " + map_label(pair[1]) + "\n")
+            if word != 'LINEBREAK':
+                word = word.lower()
+            outdata.write(word + " " + feats + ' ' + map_label(pair[1]) + "\n")
+            outids.write(seqid + "\n")
+            if word == 'LINEBREAK':
+                outdata.write('\n')
+                outids.write('\n')
+                outorig.write('\n')
     outdata.close()
     outids.close()
+
+def word_feats(word):
+    num_feat = '[Num]'
+    val = 0
+    if any(char.isdigit() for char in word):
+        val = 1
+    return num_feat + str(val)
+
 
 def map_label(label):
     if label == 'BE':
@@ -54,4 +80,60 @@ def map_label(label):
         return label
 
 
-if __name__ == "__main__":main()    
+def unmap_label(label):
+    return label.replace('-', '')
+
+
+def ncrf_to_xml(infile, outfile, testfile):
+    if os.path.isdir(infile):
+        origfile = infile + '/test.bio.orig'
+        infile = infile + '/test.out'
+    idfile = infile + '.ids'
+    ftext = open(infile, 'r')
+    fids = open(idfile, 'r')
+    forig = open(origfile, 'r')
+    textlines = ftext.readlines()
+
+    # Remove lines with hashes
+    regex = re.compile(r'^# [0-9]')
+    textlines = list(filter(lambda i: not regex.search(i), textlines))
+    textlines = list(filter(lambda i: len(i.strip())>0, textlines)) # Remove blank lines
+
+    idlines = fids.readlines()
+    idlines = list(filter(lambda i: len(i.strip())>0, idlines))
+
+    origlines = forig.readlines()
+    origlines = list(filter(lambda i: len(i.strip())>0, origlines))
+    ftext.close()
+    fids.close()
+    forig.close()
+
+    id_to_seq = {}
+
+    print("textlines:", len(textlines), "ids:", len(idlines), "orig:", len(origlines))
+    assert(len(textlines) == len(idlines) == len(origlines))
+    for x in range(len(textlines)):
+        id = idlines[x].strip()
+        text = textlines[x].strip()
+        orig = origlines[x].strip()
+
+        if (len(text) > 0) and (len(id) > 0): # Ignore blank lines
+            if len(text) == 0:
+                text = 'LINEBREAK O'
+            text = text.split(' ')
+
+            if id not in id_to_seq:
+                id_to_seq[id] = []
+            word = text[0]
+            # Get word from origlines and make sure it matches the current output line
+            orig_word = orig.split(' ')[0]
+            #print("orig:", orig_word, "word:", word)
+            assert(orig_word.lower() == word.lower())
+            tag = unmap_label(text[1])
+            id_to_seq[id].append((orig_word, tag))
+
+    tree = xmltoseq.seq_to_xml(id_to_seq, testfile, tag="narr_timeml_ncrf")
+    tree.write(outfile)
+
+
+if __name__ == "__main__":main()

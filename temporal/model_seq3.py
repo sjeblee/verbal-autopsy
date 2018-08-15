@@ -3,15 +3,16 @@
 # Identify and label symptom phrases in narrative
 
 import sys
-sys.path.append('/u/sjeblee/research/va/git/verbal-autopsy')
+sys.path.append('..') # verbal-autopsy dir
 import data_util3 as data_util
 import models_pytorch
 import tools
 import word2vec3 as word2vec
 import xmltoseq3 as xmltoseq
+import xml_to_ncrf
 
 from keras.models import Model
-from keras.layers import Input, GRU, LSTM, Dense, Dropout
+#from keras.layers import Input, GRU, LSTM, Dense, Dropout
 #from keras.preprocessing.sequence import pad_sequences
 from lxml import etree
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
@@ -24,6 +25,7 @@ import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 global labelencoder, onehotencoder, label_set, max_seq_len, num_labels
+debug = False
 id_name = "record_id"
 max_seq_len = 100
 #vecfile = "/u/sjeblee/research/va/data/datasets/mds+rct/narr+ice+medhelp.vectors.100"
@@ -32,29 +34,51 @@ vecfile = "/u/sjeblee/research/vectors/GoogleNews-vectors-negative300.bin"
 def main():
     argparser = argparse.ArgumentParser()
     argparser.add_argument('--train', action="store", dest="trainfile")
+    argparser.add_argument('--dev', action="store", dest="devfile")
     argparser.add_argument('--test', action="store", dest="testfile")
     argparser.add_argument('--out', action="store", dest="outfile")
     argparser.add_argument('--model', action="store", dest="model")
     argparser.add_argument('--inline', action="store_true", dest="inline")
     argparser.set_defaults(inline=False)
+    argparser.set_defaults(devfile="")
     args = argparser.parse_args()
 
     if not (args.trainfile and args.testfile):
-        print("usage: ./model_seq.py --train [file.xml] --test [file.xml] (--out [file.xml] --model [crf/gru] --inline)")
+        print("usage: ./model_seq.py --train [file.xml] --test [file.xml] (--out [file.xml] --dev [dev.xml] --model [crf/gru/ncrf] --inline)")
+        print("For NCRF model, use --dev path/to/dev.xml")
+        print("For TempEval data, use --inline")
         exit()
 
     if args.outfile and args.model:
-        run(args.trainfile, args.testfile, args.outfile, args.model, args.inline)
+        run(args.trainfile, args.testfile, args.outfile, args.model, args.inline, devfile=args.devfile)
     elif args.outfile:
-        run(args.trainfile, args.testfile, args.outfile, arg_inline=args.inline)
+        run(args.trainfile, args.testfile, args.outfile, arg_inline=args.inline, devfile=args.devfile)
     else:
-        run(args.trainfile, args.testfile, arg_inline=args.inline)
+        run(args.trainfile, args.testfile, arg_inline=args.inline, devfile=args.devfile)
 
-def run(trainfile, testfile, outfile="", modelname="crf", arg_inline=False):
-    # Extract sequences with labels
-    train_ids, train_seqs = get_seqs(trainfile, split_sents=True, inline=arg_inline)
-    test_ids, test_seqs = get_seqs(testfile, split_sents=True, inline=arg_inline)
-    print("test_ids:", len(test_ids))
+def run(trainfile, testfile, outfile="", modelname="crf", arg_inline=False, devfile=""):
+    if modelname == 'ncrf':
+        if devfile == "":
+            print("WARNING: missing devfile argument")
+        if outfile == "":
+            print("WARNING: missing outfile argument")
+        # Convert data to ncrf format
+        ncrf_path = '/u/sjeblee/research/git/NCRFpp'
+        if 'TempEval' in trainfile:
+            ncrf_dir = '/u/sjeblee/research/git/NCRFpp/tempeval_data'
+        elif 'thyme' in trainfile:
+            ncrf_dir = '/u/sjeblee/research/git/NCRFpp/thyme_data'
+        train_ncrf = ncrf_dir + '/train.bio'
+        dev_ncrf = ncrf_dir + '/dev.bio'
+        test_ncrf = ncrf_dir + '/test.bio'
+        #xml_to_ncrf.extract_features(trainfile, train_ncrf)
+        #xml_to_ncrf.extract_features(devfile, dev_ncrf)
+        #xml_to_ncrf.extract_features(testfile, test_ncrf)
+    else:
+        # Extract sequences with labels
+        train_ids, train_seqs = get_seqs(trainfile, split_sents=True, inline=arg_inline, add_spaces=True)
+        test_ids, test_seqs = get_seqs(testfile, split_sents=True, inline=arg_inline, add_spaces=True)
+        print("test_ids:", len(test_ids))
 
     if modelname == "crf":
         trainx = [sent2features(s) for s in train_seqs]
@@ -67,11 +91,12 @@ def run(trainfile, testfile, outfile="", modelname="crf", arg_inline=False):
         trainx, trainy = get_feats(train_seqs, train=True)
         testx, testy = get_feats(test_seqs)
     elif modelname == 'gru':
-        trainx, trainy = get_feats(train_seqs, pad=True, train=True)
-        testx, testy = get_feats(test_seqs, pad=True)
+        trainx, trainy = get_feats(train_seqs, pad=False, train=True)
+        testx, testy = get_feats(test_seqs, pad=False)
 
-    print("train:", str(len(trainx)), " ", str(len(trainy)))
-    print("test: ", str(len(testx)), " ", str(len(testy)))
+    if modelname != 'ncrf':
+        print("train:", str(len(trainx)), " ", str(len(trainy)))
+        print("test: ", str(len(testx)), " ", str(len(testy)))
 
     # Split labels into time and event only
     split = False
@@ -84,7 +109,7 @@ def run(trainfile, testfile, outfile="", modelname="crf", arg_inline=False):
     encoder_model = None
     decoder_model = None
     y_pred = []
-    if modelname == "crf":
+    if modelname == 'crf':
         model = train_crf(trainx, trainy)
         #crf_time = train_crf(trainx, trainy_time)
         #crf_event = train_crf(trainx, trainy_event)
@@ -95,10 +120,17 @@ def run(trainfile, testfile, outfile="", modelname="crf", arg_inline=False):
         print("testy:", len(testy), "ypred:", len(y_pred_labels))
         #y_pred_time = crf_time.predict(testx)
         #y_pred_event = crf_event.predict(testx)
+
+    elif modelname == 'ncrf':
+        # Run NCRF model
+        subprocess.call(["python", "main.py", "--config", "tempeval.train.config"], cwd=ncrf_path)
+        subprocess.call(["python", "main.py", "--config", "tempeval.decode.config"], cwd=ncrf_path)
+        xml_to_ncrf.ncrf_to_xml(ncrf_dir, outfile, testfile)
+
     elif modelname == 'gru':
         nodes = 256
-        epochs = 5
-        model = models_pytorch.rnn_model(trainx, trainy, num_nodes=nodes, loss_function='crossentropy', num_epochs=epochs, batch_size=100, use_prev_labels=False)
+        epochs = 2
+        model = models_pytorch.rnn_model(trainx, trainy, num_nodes=nodes, loss_function='crossentropy', num_epochs=epochs, batch_size=1, use_prev_labels=False)
         y_pred = models_pytorch.test_rnn(model, testx, batch_size=1)
         y_pred_labels = decode_all_labels(y_pred)
         testy_labels = decode_all_labels(testy)
@@ -130,7 +162,7 @@ def run(trainfile, testfile, outfile="", modelname="crf", arg_inline=False):
     #print "testy: " + str(testy[0])
     #print "y_pred: " + str(y_pred[0])
     #print "labels: " + str(labels[0])
-    f1_score = score(testy_labels, y_pred_labels, model, modelname)
+
     #f1_score_time = score(testy_time, y_pred_time, time_model, modelname)
     #f1_score_event = score(testy_event, y_pred_event, event_model, modelname)
 
@@ -143,24 +175,30 @@ def run(trainfile, testfile, outfile="", modelname="crf", arg_inline=False):
     #    y_pred = temp_pred
 
     # Convert crf output to xml tags
-    test_dict = {}
-    for x in range(len(test_ids)):
-        rec_id = test_ids[x]
-        print("x:", str(x), "rec_id:", rec_id)
-        rec_seq = list(zip((item[0] for item in test_seqs[x]), y_pred_labels[x]))
-        # Concatenate all the sequences for each record
-        if rec_id not in test_dict:
-            test_dict[rec_id] = []
-        test_dict[rec_id] = test_dict[rec_id] + rec_seq # TODO: add line breaks???
-        print("rec_seq:", str(rec_seq))
-    xml_tree = xmltoseq.seq_to_xml(test_dict, testfile, tag="narr_timeml_"+modelname)
+    if modelname != 'ncrf':
+        f1_score = score(testy_labels, y_pred_labels, model, modelname)
+        print("F1:", str(f1_score))
+        test_dict = {}
+        for x in range(len(test_ids)):
+            rec_id = test_ids[x]
+            if debug: print("x:", str(x), "rec_id:", rec_id)
+            rec_seq = list(zip((item[0] for item in test_seqs[x]), y_pred_labels[x]))
+            # Concatenate all the sequences for each record
+            if rec_id not in test_dict:
+                test_dict[rec_id] = []
+            test_dict[rec_id] = test_dict[rec_id] + rec_seq # TODO: add line breaks???
+            if debug: print("rec_seq:", str(rec_seq))
+        xml_tree = xmltoseq.seq_to_xml(test_dict, testfile, tag="narr_timeml_"+modelname)
 
-    # write the xml to file
-    if len(outfile) > 0:
-        print("Writing test output to xml file...")
-        xml_tree.write(outfile)
-        subprocess.call(["sed", "-i", "-e", 's/&lt;/</g', outfile])
-        subprocess.call(["sed", "-i", "-e", 's/&gt;/>/g', outfile])
+        # write the xml to file
+        if len(outfile) > 0:
+            print("Writing test output to xml file...")
+            xml_tree.write(outfile)
+            subprocess.call(["sed", "-i", "-e", 's/&lt;/</g', outfile])
+            subprocess.call(["sed", "-i", "-e", 's/&gt;/>/g', outfile])
+
+        # TODO: run appropriate evaluation script
+
 
 def train_crf(trainx, trainy):
     print("training CRF...")
@@ -173,6 +211,7 @@ def train_crf(trainx, trainy):
         )
     crf.fit(trainx, trainy)
     return crf
+
 
 def train_seq2seq(trainx, trainy, num_nodes=100, vec_labels=False, loss_function="cosine_proximity", num_epochs=10):
     trainx = numpy.array(trainx)
@@ -246,6 +285,7 @@ def train_seq2seq(trainx, trainy, num_nodes=100, vec_labels=False, loss_function
 
     return model, encoder_model, decoder_model, output_dim
 
+
 def decode_sequence(encoder_model, decoder_model, input_seq, output_seq_len, output_dim, vec_labels=False):
     # Encode the input as state vectors.
     states_value = encoder_model.predict(input_seq, batch_size=1)
@@ -300,6 +340,7 @@ def decode_sequence(encoder_model, decoder_model, input_seq, output_seq_len, out
 
     return decoded_sentence
 
+
 ''' Predict sequences for test input
     encoder_model: the encoder model
     decoder_model: the decoder model
@@ -322,6 +363,7 @@ def predict_seqs(encoder_model, decoder_model, testx, output_seq_len, output_dim
         testy_pred.append(decoded_sentence)
     return testy_pred
 
+
 def score(testy, y_pred, model, modelname):
     # Ignore O tags for evaluation
     if modelname == "crf":
@@ -334,6 +376,7 @@ def score(testy, y_pred, model, modelname):
     sorted_labels = sorted(labels, key=lambda name: (name[1:], name[0]))
     print(metrics.flat_classification_report(testy, y_pred, labels=sorted_labels, digits=3))
     return f1_score
+
 
 def split_labels(y):
     t_labels = ['BT', 'IT']
@@ -357,6 +400,7 @@ def split_labels(y):
         y_time.append(time_seq)
         y_event.append(event_seq)
     return y_time, y_event
+
 
 '''
    Get word vectors for each word and encode labels
@@ -383,7 +427,12 @@ def get_feats(seqs, pad=True, train=False):
         labels.append(s_labels)
     if train:
         num_labels = len(list(label_set))
-        create_labelencoder(list(label_set), num_labels)
+        if debug: print("num original labels:", str(num_labels))
+        label_list = list(label_set)
+        print('label_list:', str(label_list))
+        label_list.append('IE') # Add the IE label in case it wasn't in training data
+        print('label_list:', str(labels))
+        create_labelencoder(label_list, num_labels)
         global max_seq_len
         #max_seq_len = max([len(txt) for txt in feats])
     print("max_seq_len: ", str(max_seq_len))
@@ -408,18 +457,21 @@ def get_feats(seqs, pad=True, train=False):
                 labs_part = labs[0:max_seq_len]
                 padded_labels.append(pad_feat(labs_part, max_seq_len, 'O'))
                 labs = labs[max_seq_len:]
+                #print("labs:", str(labs))
             padded_labels.append(pad_feat(labs, max_seq_len, 'O'))
         feats = padded_feats
         labels = padded_labels
 
     # Encode labels
+    print("labels[0]: ", str(labels[0]))
     encoded_labels = encode_labels(labels, max_len=max_seq_len, pad=pad)
-    print("labels[0]: ", str(encoded_labels[0]))
+    print("encoded_labels[0]: ", str(encoded_labels[0]))
     #for row in labels:
     #    encoded_row = encode_labels(row)
     #    encoded_labels.append(encoded_row)
     print("feats: ", str(len(feats)), " labels: ", str(len(encoded_labels)))
     return feats, encoded_labels
+
 
 def pad_feat(feat, max_seq_len, pad_item):
     pad_size = max_seq_len - len(feat)
@@ -431,6 +483,7 @@ def pad_feat(feat, max_seq_len, pad_item):
     for k in range(pad_size):
         new_feat.append(pad_item)
     return new_feat
+
 
 def get_seqs(filename, split_sents=False, inline=True, add_spaces=False):
     print("get_seqs ", filename)
@@ -453,7 +506,7 @@ def get_seqs(filename, split_sents=False, inline=True, add_spaces=False):
         if inline:
             if node is None:
                 narr_node = child.find("narrative")
-                if narr_node == None:
+                if narr_node is None:
                     print("no narrative: ", data_util.stringify_children(child))
                 else:
                     narr = narr_node.text
@@ -506,7 +559,9 @@ def get_seqs(filename, split_sents=False, inline=True, add_spaces=False):
                 seqs.append(s)
                 seq_ids.append(rec_id)
 
+    if debug: print("seqs[0]", str(seqs[0]))
     return seq_ids, seqs
+
 
 def create_labelencoder(data, num=0):
     global labelencoder, onehotencoder, num_labels
@@ -518,6 +573,7 @@ def create_labelencoder(data, num=0):
     #onehotencoder.fit(data2)
 
     return labelencoder
+
 
 ''' Encodes labels as one-hot vectors (entire dataset: 2D array)
     data: a 1D array of labels
@@ -534,7 +590,7 @@ def encode_labels(data, labenc=None, max_len=50, pad=True):
 
     num_labels = len(labenc.classes_)
     zero_vec = data_util.zero_vec(num_labels)
-    print("data: ", str(len(data)))
+    if debug: print("data: ", str(len(data)))
     for item in data:
         #print "item len: " + str(len(item))
         new_item = []
@@ -555,6 +611,7 @@ def encode_labels(data, labenc=None, max_len=50, pad=True):
         data2.append(new_item)
     return data2
 
+
 ''' Decodes one sequence of labels
 '''
 def decode_labels(data, labenc=None):
@@ -571,12 +628,14 @@ def decode_labels(data, labenc=None):
     return labenc.inverse_transform(data2)
     #return labelencoder.inverse_transform(onehotencoder.reverse_transform(data))
 
+
 def decode_all_labels(data, labenc=None):
     decoded_labels = []
     for sequence in data:
         labs = decode_labels(sequence, labenc)
         decoded_labels.append(labs)
     return decoded_labels
+
 
 def word2features(sent, i):
     word = sent[i][0]
@@ -626,11 +685,14 @@ def word2features(sent, i):
 def sent2features(sent):
     return [word2features(sent, i) for i in range(len(sent))]
 
+
 def sent2labels(sent):
     return [label for token, label in sent]
 
+
 def sent2tokens(sent):
     return [token for token, label in sent]
+
 
 def ispunc(input_string, start, end):
     punc = ' :;,./?'
@@ -639,5 +701,6 @@ def ispunc(input_string, start, end):
         if char not in punc:
             return False
     return True
+
 
 if __name__ == "__main__":main()
