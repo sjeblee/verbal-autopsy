@@ -35,15 +35,27 @@ import cluster_keywords
 import data_util
 import model_library
 import rebalance
+import model_library_torch
 #from layers import Attention
+from model_dirichlet import create_nn_model
+
+import torch
+import pickle
+import dill
 
 global anova_filter
 labelencoder = None
 labelencoder_adult = None
 labelencoder_child = None
 labelencoder_neonate = None
-vec_types = ["narr_vec", "narr_seq", "event_vec", "event_seq"]
+vec_types = ["narr_vec", "narr_seq", "event_vec", "event_seq", "symp_vec", "kw_vec"]
 numpy.set_printoptions(threshold=numpy.inf)
+
+# Use keras or pytorch
+use_torch = True
+
+# Output top K features
+output_topk_features = True
 
 def main():
     argparser = argparse.ArgumentParser()
@@ -96,8 +108,22 @@ def hyperopt(arg_model, arg_train_feats, arg_test_feats, arg_result_file, arg_pr
             'activation':hp.choice('activation', [('relu', 'relu'), ('tanh', 'tanh'), ('sigmoid','sigmoid')]),
             'n_nodes':hp.uniform('n_nodes', 50, 300),
             'n_feats':hp.uniform('n_feats', 100, 400),
-            'anova_name':hp.choice('anova_name', [('f_classif', 'f_classif'), ('chi2', 'chi2')])
+            'anova_name':hp.choice('anova_name', [('f_classif', 'f_classif'), ('chi2', 'chi2')]),
+	    'threshold':hp.choice('threshold',[0.0,0.05,0.1,0.15,0.2,0.25,3]),
+	    'num_epochs':hp.choice('num_epochs', [10,15,20,25,30])
         }
+
+    if h_model == "cnn":
+	objective = obj_cnn
+	global activation
+	activation = 'relu'
+	space = {
+	    #'activation':hp.choice('activation', [('relu','relu'), ('tanh','tank'),('sigmoid','sigmoid')]),
+	    'dropout':hp.uniform('dropout',0,0.01),
+	    'threshold':hp.choice('threshold',[0.0,0.05,0.1,0.15]),
+	    'kernel_sizes':hp.choice('kernel_sizes', [5,6,7,8]),
+	    'num_epochs':hp.choice('num_epochs', [10,15,20,25,30])
+	}
 
     elif h_model == "lstm":
         objective = obj_lstm
@@ -140,7 +166,9 @@ def obj_nn(params):
     n_nodes = int(params['n_nodes'])
     n_feats = int(params['n_feats'])
     anova_name = params['anova_name'][0]
-    print "obj_nn: " + str(activation) + ", nodes:" + str(n_nodes) + ", feats:" + str(n_feats) + ", anova: " + str(anova_name)
+    threshold = float(params['threshold'])
+    num_epochs = int(params['num_epochs'])
+    print "obj_nn: " + str(activation) + ", nodes:" + str(n_nodes) + ", feats:" + str(n_feats) + ", anova: " + str(anova_name) + ", threshold: " + str(threshold) + ", num_epochs:" + str(num_epochs)
 
     anova_function = None
     if anova_name == 'chi2':
@@ -160,15 +188,55 @@ def obj_nn(params):
     trainlabels = []
     X = []
     Y = []
-    Y = preprocess(h_train, trainids, trainlabels, X, Y, True)
+    Y = preprocess(h_train, trainids, trainlabels, X, Y, keys, trainlabels=True)
     #print "X: " + str(len(X)) + "\nY: " + str(len(Y))
-
-    model, X, Y = create_nn_model(X, Y, anova_function, n_feats, n_nodes, activation)
-
+    if use_torch == False:
+	model, X, Y = create_nn_model(X, Y, anova_function, n_feats, n_nodes, activation)
+    else: # Use pytorch model
+	Y = to_categorical(Y)
+	model = model_library_torch.nn_model(X,Y,n_nodes,activation, num_epochs=num_epochs)
     # Run test
-    testids, testlabels, predictedlabels = test('nn', model, h_test)
-    f1score = metrics.f1_score(testlabels, predictedlabels)
+    testids, testlabels, predictedlabels = test('nn', model, h_test,threshold=threshold)
+    print "Real Labels shape: " + str(testlabels)
+    print "Predicted Labels shape: " + str(predictedlabels)
+    f1score = metrics.f1_score(testlabels, predictedlabels, average='weighted')
     print "F1: " + str(f1score)
+
+    # Return a score to minimize
+    return 1 - f1score
+
+def obj_cnn(params):
+    dropout = float(params['dropout'])
+    threshold = float(params['threshold'])
+    kernel_sizes = int(params['kernel_sizes'])
+    num_epochs = int(params['num_epochs'])
+    print "obj_cnn: " + "dropout = " + str(dropout) + ", threshold = " + str(threshold) + ", kernel_sizes = " + str(kernel_sizes) + ", num_epochs = " + str(num_epochs)
+
+    global keys
+    with open(h_train + ".keys", "r") as kfile:
+	keys = eval(kfile.read())
+
+    global labelencoder, typeencoder
+    labelencoder = preprocessing.LabelEncoder() # Transforms ICD codes to numbers
+    typeencoder = preprocessing.LabelEncoder()
+    trainids = []
+    trainlabels = []
+    X = []
+    Y = []
+    Y = preprocess(h_train, trainids, trainlabels, X, Y, keys, trainlabels=True)
+
+    Y = to_categorical(Y)
+    if use_torch == False:
+	model, X, Y = model_library.cnn_model(X,Y)
+    else:
+	model = model_library_torch.cnn_model(X,Y, dropout=dropout, kernel_sizes=kernel_sizes, num_epochs=num_epochs)
+
+    testids, testlabels, predictedlabels = test('cnn', model, h_test, threshold=threshold)
+    print "Real Labels shape: " + str(testlabels)
+    print "Predicted Labels shape: " + str(predictedlabels)
+    f1score = metrics.f1_score(testlabels, predictedlabels, average='weighted')
+    print "F1: " + str(f1score)
+
 
     # Return a score to minimize
     return 1 - f1score
@@ -354,6 +422,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
         Y = preprocess(arg_train_feats, trainids, trainlabels, X, Y, vec_keys, trainlabels=True)
         preprocess(arg_train_feats, [], [], X2, [], point_keys, trainlabels=True)
     else:
+	print("Keys tested")
         Y = preprocess(arg_train_feats, trainids, trainlabels, X, Y, keys, trainlabels=True, Y2_labels='keyword_clusters')
     print "X: " + str(len(X)) + " Y: " + str(len(Y))
     print "X2: " + str(len(X2))
@@ -384,6 +453,11 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     if ((not is_nn) or arg_model == "nn") and num_feats < x_feats:
         anova_filter, X = create_anova_filter(X, Y, anova_function, num_feats)
 
+    # Select k best features for each class
+    if output_topk_features == True:
+        if arg_model == "nn":
+	    select_top_k_features_per_class(X,Y,anova_function,arg_prefix, 100)
+
     global model
     model = None
     cnn_model = None
@@ -393,8 +467,35 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
         modelfile = arg_prefix + "/" + arg_modelname + ".model"
         if os.path.exists(modelfile):
             print "using pre-existing model at " + modelfile
-            model = load_model(modelfile)
+
+	    if use_torch:
+		model = torch.load(modelfile)
+	    else:
+		model = load_model(modelfile)
             X = numpy.asarray(X)
+
+	# For CNN-RNN ensemble
+	elif arg_model == "cnn-rnn":
+	    cnn_modelfile = arg_prefix + "/" + arg_modelname + "_cnn.model"
+	    rnn_modelfile = arg_prefix + "/" + arg_modelname + "_rnn.model"
+	    if (os.path.exists(cnn_modelfile) and os.path.exists(rnn_modelfile)):
+		print "using pre-existing model at " + cnn_modelfile + " and " + rnn_modelfile
+		cnn_input_model = torch.load(cnn_modelfile)
+		rnn_model = torch.load(rnn_modelfile)
+		model = [cnn_input_model, rnn_model]
+		X = numpy.asarray(X)
+	    else:
+		print "creating a new cnn-rnn ensemble model"
+		if use_torch:
+                    Y = to_categorical(Y)
+                    cnn_input_model, rnn_model = model_library_torch.cnn_attnrnn(X,Y)
+                    model = [cnn_input_model, rnn_model]
+
+		    # Save both models
+		    torch.save(cnn_input_model,cnn_modelfile)
+                    torch.save(rnn_model, rnn_modelfile)
+                else:
+                    print "cnn-rnn model must use pytorch"
         else:
             print "creating a new neural network model"
             embedding_dim = 100
@@ -410,7 +511,10 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
                 if len(X) == 0 and len(X2) > 0:
                     X = X2
                 Y = to_categorical(Y)
-                model, X, Y = model_library.nn_model(X, Y, num_nodes, 'relu')
+		if use_torch:
+		    model = model_library_torch.nn_model(X,Y,num_nodes,'relu')
+		else:
+		    model, X, Y = model_library.nn_model(X, Y, num_nodes, 'relu')
             elif arg_model == "rnn" or arg_model == "lstm" or arg_model == "gru":
                 num_nodes = 100
                 #Y = to_categorical(Y)
@@ -421,18 +525,23 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
                 model, X, Y = model_library.rnn_cnn_model(X, Y, num_nodes, arg_activation, arg_model, X2=X2)
             elif arg_model == "cnn":
                 Y = to_categorical(Y)
-                model, X, Y = model_library.cnn_model(X, Y, X2=X2)
+		if use_torch:
+		    model = model_library_torch.cnn_model(X,Y)
+		else:
+                    model, X, Y = model_library.cnn_model(X, Y, X2=X2)
             elif arg_model == "filternn":
                 num_nodes = 56
                 Y = to_categorical(Y)
                 model, X, Y = create_filter_rnn_model(X, Y, embedding_dim, num_nodes)
+	  
+	    print "saving the model..."
 
-            # Save the model
-            print "saving the model..."
-            model.save(modelfile)
-            plotname = modelfile + ".png"
-            plot_model(model, to_file=plotname)
-
+	    if not use_torch: # Save Keras model
+	        model.save(modelfile)
+	        plotname = modelfile + ".png"
+	        plot_model(model, to_file=plotname)
+	    else: # Save Pytorch model
+	        torch.save(model, modelfile)
     # Other models
     else:
          if arg_model == "svm":
@@ -653,7 +762,7 @@ def write_results(filename, testids, testlabels, predictedlabels):
         output.write(str(out) + "\n")
     output.close()
 
-def test(model_type, model, testfile, anova_filter=None, hybrid=False, rec_type=None, kw_cnn=None):
+def test(model_type, model, testfile, anova_filter=None, hybrid=False, rec_type=None, kw_cnn=None, threshold=0.01):
     print "testing..."
     stime = time.time()
     testids = []
@@ -681,8 +790,17 @@ def test(model_type, model, testfile, anova_filter=None, hybrid=False, rec_type=
         #if "keyword_clusters" not in keys:
         inputs.append(testX2)
     if is_nn:
-        predictedY = model.predict(inputs)
-        results = map_back(predictedY)
+	if use_torch: # Test using pytorch model
+	    if model_type == "nn": 
+		results = model_library_torch.test_nn(model,testX,threshold=threshold)
+	    elif model_type == "cnn":
+		results = model_library_torch.test_cnn(model,testX, testY,threshold=threshold)
+	    elif model_type == "cnn-rnn":
+		results = model_library_torch.test_cnn_attnrnn(model[0],model[1], testX, testY)
+	else: # Test using Keras model
+	    predictedY = model.predict(inputs)
+	    results = map_back(predictedY)
+	print "testX shape: " + str(testX.shape)
     #elif model_type == "cnn":
     #    attn_vec = get_attention_vector(model, testX)
     #    print "attention vector: " + str(attn_vec)
@@ -727,11 +845,17 @@ def test(model_type, model, testfile, anova_filter=None, hybrid=False, rec_type=
         labenc = labelencoder_child
     elif rec_type == 'neonate':
         labenc = labelencoder_neonate
+
+    # Print out classes for index location of each class in the list
+    print "Index location of each class: "
+    print(str(labenc.classes_))
+
     predictedlabels = labenc.inverse_transform(results)
     etime = time.time()
     print "testing took " + str(etime - stime) + " s"
     print "testY: " + str(testY)
     print "results: " + str(results)
+    print "predicted labels: " + str(predictedlabels)
     return testids, testlabels, predictedlabels
 
 def test_multi(model_type, model, testfile, rec_type=None):
@@ -1013,6 +1137,7 @@ def create_anova_filter(X, Y, function, num_feats):
 '''
 def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=False, Y2_labels=None):
     global labelencoder, labelencoder_adult, labelencoder_child, labelencoder_neonate
+    #ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4","symp_vec"]
     ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4"]
 
     # Read in the feature vectors
@@ -1024,11 +1149,25 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
     Y_arrays = []
     labels2 = []
     extra_labels = False
+
+    # Edit by Yoona for narrative symptoms
+    #symptoms_keys = []
+    #symptoms_keys_fixed = False
+
     with open(filename, 'r') as f:
         for line in f:
             vector = eval(line)
             features = []
+
+            # Edit by Yoona. Fix keys in narrative symptoms vector. 
+            #if not symptoms_keys_fixed:
+            #    if "narr_symptoms" in keys:
+            #        symptoms_vec = vector["narr_symptoms"]
+            #        symptoms_keys = symptoms_vec.keys()
+            #        symptoms_keys_fixed = True
+
             for key in keys:
+            #for key in feats:
                 if key == 'MG_ID':
                     ids.append(vector[key])
                     #print "ID: " + vector[key]
@@ -1046,7 +1185,8 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
                         kw_clusters.append(kw_list)
                     elif key in vec_types:
                         # The feature matrix for word2vec can't have other features
-                        features = vector[key]
+                        #features = vector[key]
+                        feature = vector[key]
                         vec_feats = True
                         if key == "narr_seq":
                             global vocab_size
@@ -1054,13 +1194,28 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
                         global max_seq_len
                         max_seq_len = vector['max_seq_len']
                         #print "max_seq_len: " + str(max_seq_len)
-                        features = numpy.asarray(features)#.reshape(max_seq_len, 1)
+                        #features = numpy.asarray(features)#.reshape(max_seq_len, 1)
+                        feature = numpy.asarray(feature)
+                        if len(features) == 0:
+			    features = feature
+			else:
+			    features = numpy.concatenate((features, feature), axis = 0)
                         #print "narr_vec shape: " + str(features.shape)
                     elif not vec_feats:
                         if vector.has_key(key):
+			    #print "This is: " + str(key) + "and value is : " + str(vector[key])
                             features.append(vector[key])
                         else:
                             features.append('0')
+
+                # Edit by Yoona for appending narrative symptoms
+                #elif key == "narr_symptoms":
+                #    symp_vector = vector[key]
+                #    for symp_key in symptoms_keys:
+                #        if symp_vector.has_key(symp_key):
+                #            features.append(symp_vector[symp_key])
+                #        else:
+                #            features.append('0')
             x.append(features)
 
     # Convert type features to numerical features
@@ -1116,11 +1271,12 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
         labenc = labelencoder_neonate
     if trainlabels:
         labenc.fit(labels)
+    print(labels)
     y = labenc.transform(labels)
 
     # Normalize features to 0 to 1 (if not word vectors)
     if not vec_feats:
-        preprocessing.minmax_scale(x, copy=False)
+	preprocessing.minmax_scale(x, copy=False)
     endtime = time.time()
     mins = float(endtime-starttime)/60
     print "preprocessing took " + str(mins) + " mins"
@@ -1139,7 +1295,7 @@ def map_back(results):
     return output
 
 def split_feats(keys, labelname):
-    ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4"]
+    ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4"] # symp_vec added by Yoona
     vec_keys = [] # vector/matrix features for CNN and RNN models
     point_keys = [] # traditional features for other models
     for key in keys:
@@ -1147,8 +1303,45 @@ def split_feats(keys, labelname):
             vec_keys.append(key)
         elif key == labelname or key not in ignore_feats:
             point_keys.append(key)
+
     print "vec_keys: " + str(vec_keys)
     print "point_keys: " + str(point_keys)
+    print("Keys printed")
     return vec_keys, point_keys
+
+#########################################################
+# Select K Best symptoms for each class
+# Create output files containing best k features for each class
+# Arguments
+# 	X		: list of features
+# 	Y		: ndarray after labelencoder transformation
+# 	function	: type of anova function (ex. f_classif, chi2)
+#	output_path	: path to the output file
+# 	k		: number of top-k features to be selected
+#
+#
+def select_top_k_features_per_class(X, Y, function, output_path, k = 100):
+    classes = labelencoder.classes_
+
+    for i in range(len(classes)):
+	output = open(output_path + "/top_" + str(k) + "_features_class_" + classes[i], 'w')
+	output.write("Class : " + str(classes[i]))
+	print "Class: " + str(classes[i])
+	this_Y = []
+	for j in range(len(Y)):
+	    if Y[j] == i:
+		binary = 1
+	    else:
+		binary = 0
+	    this_Y.append(binary)
+	anova_symp = SelectKBest(function, k)
+	anova_symp.fit(X,this_Y)
+	best_indices = anova_symp.get_support(True)
+	print "Best indices: " + str(best_indices)
+	for i in range(len(best_indices)):
+	    selected = str(keys[best_indices[i] + 2])
+	    print selected
+	    output.write("\n")
+	    output.write(selected)
 
 if __name__ == "__main__":main() 

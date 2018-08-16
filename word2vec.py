@@ -28,12 +28,16 @@ def main():
 
 def run(infile, vec_size, name="narr+ice+medhelp", stem=False):
 
-    bin_dir = "/u/sjeblee/tools/word2vec/word2vec/bin"
+    #bin_dir = "/u/sjeblee/tools/word2vec/word2vec/bin"
+    bin_dir = "/u/yoona/word2vec/bin"
 
     # Input data
-    data_dir = "/u/sjeblee/research/va/data/datasets/mds+rct"
-    ice_data = "/u/sjeblee/research/data/ICE-India/Corpus/all-lower.txt"
-    medhelp_data = "/u/sjeblee/research/data/medhelp/all_medhelp_clean_lower.txt"
+    #data_dir = "/u/sjeblee/research/va/data/datasets/mds+rct"
+    data_dir = "/u/yoona/test/mds+rct" # hard-coded, Yoona's data location
+    #ice_data = "/u/sjeblee/research/data/ICE-India/Corpus/all-lower.txt"
+    ice_data = "/u/yoona/mds+rct/ice_all_lower.txt"
+    #medhelp_data = "/u/sjeblee/research/data/medhelp/all_medhelp_clean_lower.txt"
+    medhelp_data = "/u/yoona/mds+rct/all_medhelp_clean_lower.txt"
     suffix = ".narrsent"
     if stem:
         ice_data = "/u/sjeblee/research/data/ICE-India/Corpus/all-lower-stem.txt"
@@ -63,7 +67,8 @@ def run(infile, vec_size, name="narr+ice+medhelp", stem=False):
     outfile.close()
 
     # Combine all the text
-    filenames = [ice_data, medhelp_data, train_data]
+    #filenames = [ice_data, medhelp_data, train_data]
+    filenames = [train_data]
     #filenames = [medhelp_data, train_data]
     sentences = []
     outfile = open(text_data, "w")
@@ -87,7 +92,7 @@ def run(infile, vec_size, name="narr+ice+medhelp", stem=False):
     #vec_model = Word2Vec(sentences, size=int(vec_size), window=window_size, min_count=1, workers=num_threads, negative=0, sg=1)
     #vec_model = FastText(sentences, size=int(vec_size), window=window_size, min_count=1, word_ngrams=1, min_n=2, max_n=6, workers=num_threads, negative=0)
     #vec_model.save(vec_data)
-    
+       
     if not os.path.exists(vec_data):
         print "--------------------------------------------------------------------"
         process = subprocess.Popen(["time", bin_dir + "/word2vec", "-train", text_data, "-output", vec_data, "-cbow", "1", "-size", str(vec_size), "-window", str(window_size), "-negative", "0", "-hs", "1", "-min-count", "1", "-sample", "1e-3", "-threads", str(num_threads), "-binary", "0"], stdout=subprocess.PIPE)
@@ -104,7 +109,7 @@ def run(infile, vec_size, name="narr+ice+medhelp", stem=False):
     print "-------------------------------------------------------------------------"
     #echo -- distance...
     #$BIN_DIR/distance $VECTOR_DATA.bin
-
+   
     return vec_data
 
 def get(word, model):

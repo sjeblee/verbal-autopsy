@@ -18,6 +18,9 @@ import preprocessing
 import rebalance
 import word2vec
 
+# Flag for using symptoms only for training. No narrative
+symp_only = False
+
 def main():
     argparser = argparse.ArgumentParser()
     argparser.add_argument('--train', action="store", dest="trainfile")
@@ -50,7 +53,7 @@ def main():
     This is the function that is called from pipeline.py
 '''
 def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames="narr_count", arg_labelname="Final_Code", stem=False, lemma=False, arg_element="narrative", arg_vecfile=""):
-    print "extract_features from " + arg_train_in + " and " + arg_test_in + " : " + arg_element
+   # print "extract_features from " + arg_train_in + " and " + arg_test_in + " : " + arg_element
 
     # Timing
     starttime = time.time()
@@ -65,6 +68,12 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
 
     # Feature types
     global featurenames, rec_type, checklist, dem, kw_words, kw_bow, kw_tfidf, narr_bow, kw_count, kw_vec, kw_clusters, narr_count, narr_tfidf, narr_vec, narr_seq, narr_dem, event_vec, event_seq, lda, symp_train, symp_count
+
+    #Edit by Yoona
+    global narr_symp, symp_vec
+    narr_symp = "narr_symp"
+    symp_vec = "symp_vec"
+
     rec_type = "type"
     checklist = "checklist"
     dem = "dem"
@@ -86,6 +95,8 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
     lda = "lda"
     symp_train = "symp_train"
     symp_count = "symp_count"
+
+    # Add by yoona for training using "symp_narr"
     featurenames = arg_featurenames.split(',')
     print "Features: " + str(featurenames)
 
@@ -134,6 +145,10 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
     narratives = []
     keywords = []
 
+    # Edit by Yoona
+    symptoms = []
+    mult_features = []
+
     if event_vec in featurenames or event_seq in featurenames or symp_count in featurenames:
         element = "narr_symp"
     
@@ -154,9 +169,10 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
         if rec_type in featurenames:
             dict_keys.append("CL_" + rec_type)
         if checklist in featurenames:
-            dict_keys = dict_keys + ["CL_DeathAge", "CL_ageunit", "CL_DeceasedSex", "CL_Occupation", "CL_Marital", "CL_Hypertension", "CL_Heart", "CL_Stroke", "CL_Diabetes", "CL_TB", "CL_HIV", "CL_Cancer", "CL_Asthma","CL_InjuryHistory", "CL_SmokeD", "CL_AlcoholD", "CL_ApplytobaccoD"]
+            dict_keys = dict_keys + ["CL_DeathAge", "CL_Occupation", "CL_Marital", "CL_Hypertension", "CL_Heart", "CL_Stroke", "CL_Diabetes", "CL_TB", "CL_HIV", "CL_Cancer", "CL_Asthma","CL_InjuryHistory", "CL_SmokeD", "CL_AlcoholD", "CL_ApplytobaccoD"]
         elif dem in featurenames or narr_dem in featurenames:
-            dict_keys = dict_keys + ["CL_DeathAge", "CL_ageunit", "CL_DeceasedSex"]
+            #dict_keys = dict_keys + ["CL_DeathAge", "CL_ageunit", "CL_DeceasedSex"]
+	    dict_keys = dict_keys + ["CL_DeathAge", "CL_DeceasedSex"]
         elif kw_clusters in featurenames:
             dict_keys.append("keyword_clusters")
         print "dict_keys: " + str(dict_keys)
@@ -180,20 +196,26 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
             if key[0:3] == "CL_":
                 key = key[3:]
             item = child.find(key)
-            value = "0"
+            #value = "0"
+            value = 0
             if item != None:
                 value = item.text
             if key == "AlcoholD" or key == "ApplytobaccoD":
                 if value == 'N':
                     value = 9
+		# Edit by Yoona
+	    if value == 'NULL' or value == "Other":
+		value = 0
             features[orig_key] = value
+            #features[orig_key] = int(value)
             #if key == "MG_ID":
             #    print "extracting features from: " + value
             #print "-- key: " + orig_key + " value: " + value
 
         # KEYWORD features
         if kw_features:
-            keyword_string = get_keywords(child, 'keywords_spell')
+	    keyword_string = get_keywords(child, 'keyword_clusters_text')
+            #keyword_string = get_keywords(child, 'keywords_spell')
             # Remove punctuation and trailing spaces from keywords
             words = [s.strip().translate(string.maketrans("",""), string.punctuation) for s in keyword_string.split(',')]
             # Split keyword phrases into individual words
@@ -215,7 +237,8 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
         # NARRATIVE features
         if narr_features or ((not train) and (symp_train in featurenames)):
             narr_string = ""
-            item = child.find(element)
+            #item = child.find(element)
+            item = child.find("narrative")
             if item != None:
                 narr_string = data_util.stringify_children(item).encode('utf-8')
                 
@@ -237,15 +260,17 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
                 if narr_dem in featurenames:
                     age = features["CL_DeathAge"]
                     # Convert ageunit and gender to words
-                    ageunit = data_util.decode_ageunit(features["CL_ageunit"])
+                    #ageunit = data_util.decode_ageunit(features["CL_ageunit"])
                     gender = data_util.decode_gender(features["CL_DeceasedSex"])
-                    dem_prefix = " age " + str(age) + " " + ageunit + " " + str(gender) + " "
-                    print "narr_dem: " + dem_prefix
+                    #dem_prefix = " age " + str(age) + " " + ageunit + " " + str(gender) + " "
+                    dem_prefix = " age " + str(age) + " " + str(gender) + " "
+		    print "narr_dem: " + dem_prefix
                     narr_string = dem_prefix + narr_string
             narratives.append(narr_string.strip().lower())
             #print "Adding narr: " + narr_string.lower()
 
         # SYMPTOM features
+        '''
         elif train and (symp_train in featurenames):
             narr_string = ""
             item = child.find("narrative_symptoms")
@@ -256,11 +281,21 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
                     #narr_words = [w.strip() for w in narr_string.lower().translate(string.maketrans("",""), string.punctuation).split(' ')]
             narratives.append(narr_string.lower())
             print "Adding symp_narr: " + narr_string.lower()
+        '''
+        #SYMPTOM features (Edit by Yoona)
+        if narr_symp in element:
+            symp_string = ""
+            item = child.find(narr_symp) # Hard-coded. To be fixed 
+            if item != None:
+                item_text = item.text
+                #symp_string = " " + str(item_text) + " "
+		symp_string = str(item_text).lower().translate(string.maketrans("",""), string.punctuation)
+            symptoms.append(symp_string)
+        
 
         # Save features
         matrix.append(features)
 
-    # Construct the feature matrix
 
     # COUNT or TFIDF features
     if narr_count in featurenames or kw_count in featurenames or narr_tfidf in featurenames or kw_tfidf in featurenames or lda in featurenames or symp_train in featurenames or symp_count in featurenames:
@@ -276,31 +311,66 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
         if narr_count in featurenames or narr_tfidf in featurenames or kw_count in featurenames:
             count_feats = True
 
-        # Create count matrix
-        global count_vectorizer
-        if train:
-            print "training count_vectorizer"
-            count_vectorizer = sklearn.feature_extraction.text.CountVectorizer(ngram_range=(min_ngram,max_ngram),stop_words=stopwords)
-            count_vectorizer.fit(documents)
+        # Train CountVectorizer with symptoms and create count matrix.
+        if narr_symp in element:
+            global symp_count_vectorizer
+            if train:
+                symp_count_vectorizer =  sklearn.feature_extraction.text.CountVectorizer(ngram_range=(min_ngram,max_ngram),stop_words=stopwords)
+                symp_count_vectorizer.fit(symptoms)
+
+                temp_keys = symp_count_vectorizer.get_feature_names()
+                symptom_keys = []
+
+		# Append "symp_" to each symptom word to distinguish extracted symptoms from narratives. 
+                for key in temp_keys:
+                    symptom_keys.append("symp_" + key)
+                print("Change symptoms key with appropriate name")
+
+                if count_feats:
+                    dict_keys = dict_keys + symptom_keys
+            symp_count_matrix = symp_count_vectorizer.transform(symptoms)
+
             if count_feats:
-                dict_keys = dict_keys + count_vectorizer.get_feature_names()
-        print "transforming data with count_vectorizer"
-        count_matrix = count_vectorizer.transform(documents)
-        matrix_keys = count_vectorizer.get_feature_names()
+                for x in range(len(matrix)):
+                    feat = matrix[x]
+                    for i in range(len(symptom_keys)):
+                        key = symptom_keys[i]
+                        val = symp_count_matrix[x, i]
+                        feat[key] = val   
+                print("Add symptoms into dictionary as a key")
 
-        print "writing count matrix to file"
-        out_matrix = open(infile + ".countmatrix", "w")
-        out_matrix.write(str(count_matrix))
-        out_matrix.close()
+            out_matrix = open(infile + ".symp_countmatrix", "w")
+            out_matrix.write(str(symp_count_matrix))
+            out_matrix.close()
 
-        # Add count features to the dictionary
-        if count_feats:
-            for x in range(len(matrix)):
-                feat = matrix[x]
-                for i in range(len(matrix_keys)):
-                    key = matrix_keys[i]
-                    val = count_matrix[x,i]
-                    feat[key] = val
+	
+	if symp_only == False:
+            # Create count matrix (Narrative)
+            global count_vectorizer
+            if train:
+                print "training count_vectorizer"
+                count_vectorizer = sklearn.feature_extraction.text.CountVectorizer(ngram_range=(min_ngram,max_ngram),stop_words=stopwords)
+                count_vectorizer.fit(documents)
+	    
+                if count_feats:
+                    dict_keys = dict_keys + count_vectorizer.get_feature_names()
+            print "transforming data with count_vectorizer"
+            count_matrix = count_vectorizer.transform(documents)
+            matrix_keys = count_vectorizer.get_feature_names()
+
+            print "writing count matrix to file"
+            out_matrix = open(infile + ".countmatrix", "w")
+            out_matrix.write(str(count_matrix))
+            out_matrix.close()
+
+            # Add count features to the dictionary
+            if count_feats:
+                for x in range(len(matrix)):
+                    feat = matrix[x]
+                    for i in range(len(matrix_keys)):
+                        key = matrix_keys[i]
+                        val = count_matrix[x,i]
+                        feat[key] = val
 
         # Convert counts to TFIDF
         if (narr_tfidf in featurenames) or (kw_tfidf in featurenames):
@@ -371,11 +441,31 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
             feat_name = event_vec
         elif event_seq in featurenames:
             feat_name = event_seq
-        elif kw_vec in featurenames:
-            feat_name = kw_vec
-            text = keywords
+        #elif kw_vec in featurenames:
+        #    feat_name = kw_vec
+        #    text = keywords
+	if symp_only == False:
+            matrix, dict_keys = vector_features(feat_name, text, matrix, dict_keys, arg_vecfile)
 
-        matrix, dict_keys = vector_features(feat_name, text, matrix, dict_keys, arg_vecfile)
+        # WORD2VEC for narrative symptoms
+        if narr_symp in element:
+            feat_name = symp_vec
+            text = symptoms
+            matrix, dict_keys = vector_features(feat_name, text, matrix, dict_keys, arg_vecfile)
+	    print "Testing for dict_keys of vector: " + str(dict_keys)
+
+	if kw_vec in featurenames:
+	    feat_name = kw_vec
+	    text = keywords
+	    matrix, dict_keys = vector_features(feat_name, text, matrix, dict_keys, arg_vecfile)
+            # Concatenate narrative vectors and narrative_symptom vectors. 
+            #for x in range(len(matrix)):
+            #    feat = matrix[x]
+            #    symptom_vec = feat[symp_vec]
+            #    narrative_vec = feat[narr_vec]
+            #    concatenated_vec = narrative_vec + symptom_vec
+            #    feat[narr_vec] = concatenated_vec
+
 
     # narr_seq for RNN
     if narr_seq in featurenames:
@@ -417,7 +507,7 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
         # Remove dem features because we've already added them to the narrative
         dict_keys.remove("CL_DeceasedSex")
         dict_keys.remove("CL_DeathAge")
-        dict_keys.remove("CL_ageunit")
+        #dict_keys.remove("CL_ageunit")
     data_util.write_to_file(matrix, dict_keys, outfile)
 
 ''' Get vector features
@@ -432,6 +522,10 @@ def vector_features(feat_name, narratives, matrix, dict_keys, vecfile):
     # Convert words to vectors and add to matrix
     if feat_name == narr_vec:
         max_seq_len = 200
+
+    # Define max sequence length for symptoms
+    if feat_name == symp_vec:
+        max_seq_len = 100
     #if train:
     #max_seq_len = 0
     print "feat_name: " + feat_name
@@ -456,6 +550,14 @@ def vector_features(feat_name, narratives, matrix, dict_keys, vecfile):
                     #    word = "didn't"
                     vec = word2vec.get(word, vec_model)
                     vectors.append(vec)
+
+	# Symptoms separated by ' '
+	elif feat_name == symp_vec:
+	    vec = zero_vec
+	    for word in narr.split(' '):
+		if len(word) > 0:
+		    vec = word2vec.get(word,vec_model)
+		    vectors.append(vec)
         elif feat_name == event_seq:
             phrases = data_util.phrases_from_tags(narr, tags)
             print "phrases: " + str(len(phrases))

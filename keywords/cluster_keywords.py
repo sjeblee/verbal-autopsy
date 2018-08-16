@@ -195,6 +195,10 @@ def read_xml_file(filename, vec_model, dim):
     for child in root:
         node = child.find('MG_ID')
         rec_id = node.text
+	# Symptoms cluster, not keywords. Currently commenting it out due to bad performance
+	# kws = extract_features.get_keywords(child, "narr_symp").split(',')
+
+	# Keyword cluster
         kws = extract_features.get_keywords(child, "keywords_spell").split(',')
         for kw in kws:
             kw = kw.strip()
@@ -288,15 +292,21 @@ def write_clusters_to_xml(xmlfile, outfile, ids, cluster_pred, text_pred=None, k
             tr_node = etree.SubElement(child, 'textrank_keyphrases')
             tr_node.text = str(kw_textrank)
         keyword_text = ""
+	# Edit by Yoona. For keywords vector concatenation
+	# keyword_labels = ""
         if rec_id in id_dict:
             keywords = id_dict[rec_id]
             kw_text = text_dict[rec_id]
             for kw in keywords:
                 keyword_text = keyword_text + "," + str(kw)
+	    # Edit by Yoona for Keyword concatenation
+	    #for kwlabels in kw_text: 
+	    #	keyword_labels = keyword_labels + " " + str(kwlabels)
         newnode = etree.SubElement(child, kw_label)
         newnode.text = keyword_text.strip(',')
         newnode2 = etree.SubElement(child, kw_label + "_text")
         newnode2.text = str(kw_text)
+	#newnode2.text = str(keyword_labels)
     # Write tree to file
     tree.write(outfile)
 

@@ -180,6 +180,7 @@ def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, return_
     for w in windows:
         print "window: " + str(max_seq_len) + " x " + str(w)
         conv_layer = Conv1D(max_seq_len, w, input_shape=input_shape)
+	#conv_layer = Conv1D(10, w, input_shape=input_shape)
         conv = conv_layer(input1)
         max_pool_layer = GlobalMaxPooling1D()
         max_pool = max_pool_layer(conv)

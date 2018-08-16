@@ -18,7 +18,8 @@ import os
 import time
 
 import data_util
-import extract_features_temp as extract_features
+import extract_features
+#import extract_features_temp as extract_features
 import cluster_keywords
 import model_library
 import model_library_torch
