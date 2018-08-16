@@ -12,11 +12,12 @@ import numpy
 import os
 import string
 import time
-
+import re
 import data_util
 import preprocessing
 import rebalance
 import word2vec
+import codecs
 
 def main():
     argparser = argparse.ArgumentParser()
@@ -110,9 +111,9 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
 
     # Remove a small set of stopwords from the narrative
     if kw_features or narr_features:
-        with open("stopwords_small.txt", "r") as f:
+        with codecs.open("./hindiToDevanagari/stop_words.txt", "r") as f:
             for line in f:
-                stopwords.append(line.strip())                                    
+                stopwords.append(line.strip())
 
     global tfidfVectorizer
     global lda_model
@@ -136,7 +137,7 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
 
     if event_vec in featurenames or event_seq in featurenames or symp_count in featurenames:
         element = "narr_symp"
-    
+
     # Get the xml from file
     root = etree.parse(infile).getroot()
 
@@ -218,7 +219,7 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
             item = child.find(element)
             if item != None:
                 narr_string = data_util.stringify_children(item).encode('utf-8')
-                
+
                 if narr_string == "":
                     print "warning: empty narrative"
                 narr_words = [w.strip() for w in narr_string.lower().translate(string.maketrans("",""), string.punctuation).split(' ')]
@@ -424,7 +425,11 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
 '''
 def vector_features(feat_name, narratives, matrix, dict_keys, vecfile):
     print "vecfile: " + vecfile
-    vec_model, dim = word2vec.load(vecfile)
+    match = re.compile('[\"\_a-zA-Z0-9]+')
+    #vec_model, dim = word2vec.load(vecfile)
+    vec_model_en,dim = word2vec.load("./Hindi_VA/vectors/wiki.en300.vec")
+    vec_model_hi,dim=word2vec.load("./Hindi_VA/vectors/wiki.hi.vec")
+
     global max_seq_len
 
     max_seq_len = 30
@@ -454,7 +459,11 @@ def vector_features(feat_name, narratives, matrix, dict_keys, vecfile):
                 if len(word) > 0:
                     #if word == "didnt":
                     #    word = "didn't"
-                    vec = word2vec.get(word, vec_model)
+                    if match.match(word):
+                        word = word.strip('\"')
+                        vec = word2vec.get(word,vec_model_en)
+                    else:
+                        vec = word2vec.get(word.decode('utf-8'),vec_model_hi)
                     vectors.append(vec)
         elif feat_name == event_seq:
             phrases = data_util.phrases_from_tags(narr, tags)
