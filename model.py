@@ -54,6 +54,9 @@ numpy.set_printoptions(threshold=numpy.inf)
 # Use keras or pytorch
 use_torch = True
 
+# Output top K features
+output_topk_features = True
+
 def main():
     argparser = argparse.ArgumentParser()
     argparser.add_argument('--in', action="store", dest="infile")
@@ -106,7 +109,8 @@ def hyperopt(arg_model, arg_train_feats, arg_test_feats, arg_result_file, arg_pr
             'n_nodes':hp.uniform('n_nodes', 50, 300),
             'n_feats':hp.uniform('n_feats', 100, 400),
             'anova_name':hp.choice('anova_name', [('f_classif', 'f_classif'), ('chi2', 'chi2')]),
-	    'threshold':hp.uniform('threshold',0.05,0.3)
+	    'threshold':hp.choice('threshold',[0.0,0.05,0.1,0.15,0.2,0.25,3]),
+	    'num_epochs':hp.choice('num_epochs', [10,15,20,25,30])
         }
 
     if h_model == "cnn":
@@ -115,8 +119,10 @@ def hyperopt(arg_model, arg_train_feats, arg_test_feats, arg_result_file, arg_pr
 	activation = 'relu'
 	space = {
 	    #'activation':hp.choice('activation', [('relu','relu'), ('tanh','tank'),('sigmoid','sigmoid')]),
-	    'dropout':hp.uniform('dropout',0,0.5),
-	    'threshold':hp.uniform('threshold',0.05,0.3)
+	    'dropout':hp.uniform('dropout',0,0.01),
+	    'threshold':hp.choice('threshold',[0.0,0.05,0.1,0.15]),
+	    'kernel_sizes':hp.choice('kernel_sizes', [5,6,7,8]),
+	    'num_epochs':hp.choice('num_epochs', [10,15,20,25,30])
 	}
 
     elif h_model == "lstm":
@@ -161,7 +167,8 @@ def obj_nn(params):
     n_feats = int(params['n_feats'])
     anova_name = params['anova_name'][0]
     threshold = float(params['threshold'])
-    print "obj_nn: " + str(activation) + ", nodes:" + str(n_nodes) + ", feats:" + str(n_feats) + ", anova: " + str(anova_name) + ", threshold: " + str(threshold)
+    num_epochs = int(params['num_epochs'])
+    print "obj_nn: " + str(activation) + ", nodes:" + str(n_nodes) + ", feats:" + str(n_feats) + ", anova: " + str(anova_name) + ", threshold: " + str(threshold) + ", num_epochs:" + str(num_epochs)
 
     anova_function = None
     if anova_name == 'chi2':
@@ -187,7 +194,7 @@ def obj_nn(params):
 	model, X, Y = create_nn_model(X, Y, anova_function, n_feats, n_nodes, activation)
     else: # Use pytorch model
 	Y = to_categorical(Y)
-	model = model_library_torch.nn_model(X,Y,n_nodes,activation)
+	model = model_library_torch.nn_model(X,Y,n_nodes,activation, num_epochs=num_epochs)
     # Run test
     testids, testlabels, predictedlabels = test('nn', model, h_test,threshold=threshold)
     print "Real Labels shape: " + str(testlabels)
@@ -201,7 +208,9 @@ def obj_nn(params):
 def obj_cnn(params):
     dropout = float(params['dropout'])
     threshold = float(params['threshold'])
-    print "obj_cnn: " + "dropout = " + str(dropout) + ", threshold = " + str(threshold)
+    kernel_sizes = int(params['kernel_sizes'])
+    num_epochs = int(params['num_epochs'])
+    print "obj_cnn: " + "dropout = " + str(dropout) + ", threshold = " + str(threshold) + ", kernel_sizes = " + str(kernel_sizes) + ", num_epochs = " + str(num_epochs)
 
     global keys
     with open(h_train + ".keys", "r") as kfile:
@@ -220,7 +229,7 @@ def obj_cnn(params):
     if use_torch == False:
 	model, X, Y = model_library.cnn_model(X,Y)
     else:
-	model = model_library_torch.cnn_model(X,Y, dropout=dropout)
+	model = model_library_torch.cnn_model(X,Y, dropout=dropout, kernel_sizes=kernel_sizes, num_epochs=num_epochs)
 
     testids, testlabels, predictedlabels = test('cnn', model, h_test, threshold=threshold)
     print "Real Labels shape: " + str(testlabels)
@@ -444,6 +453,11 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     if ((not is_nn) or arg_model == "nn") and num_feats < x_feats:
         anova_filter, X = create_anova_filter(X, Y, anova_function, num_feats)
 
+    # Select k best features for each class
+    if output_topk_features == True:
+        if arg_model == "nn":
+	    select_top_k_features_per_class(X,Y,anova_function,arg_prefix, 100)
+
     global model
     model = None
     cnn_model = None
@@ -459,6 +473,29 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
 	    else:
 		model = load_model(modelfile)
             X = numpy.asarray(X)
+
+	# For CNN-RNN ensemble
+	elif arg_model == "cnn-rnn":
+	    cnn_modelfile = arg_prefix + "/" + arg_modelname + "_cnn.model"
+	    rnn_modelfile = arg_prefix + "/" + arg_modelname + "_rnn.model"
+	    if (os.path.exists(cnn_modelfile) and os.path.exists(rnn_modelfile)):
+		print "using pre-existing model at " + cnn_modelfile + " and " + rnn_modelfile
+		cnn_input_model = torch.load(cnn_modelfile)
+		rnn_model = torch.load(rnn_modelfile)
+		model = [cnn_input_model, rnn_model]
+		X = numpy.asarray(X)
+	    else:
+		print "creating a new cnn-rnn ensemble model"
+		if use_torch:
+                    Y = to_categorical(Y)
+                    cnn_input_model, rnn_model = model_library_torch.cnn_attnrnn(X,Y)
+                    model = [cnn_input_model, rnn_model]
+
+		    # Save both models
+		    torch.save(cnn_input_model,cnn_modelfile)
+                    torch.save(rnn_model, rnn_modelfile)
+                else:
+                    print "cnn-rnn model must use pytorch"
         else:
             print "creating a new neural network model"
             embedding_dim = 100
@@ -496,9 +533,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
                 num_nodes = 56
                 Y = to_categorical(Y)
                 model, X, Y = create_filter_rnn_model(X, Y, embedding_dim, num_nodes)
-
-            # Save keras the model, Currently commenting it since pytorch model does not have save function
-            
+	  
 	    print "saving the model..."
 
 	    if not use_torch: # Save Keras model
@@ -760,6 +795,8 @@ def test(model_type, model, testfile, anova_filter=None, hybrid=False, rec_type=
 		results = model_library_torch.test_nn(model,testX,threshold=threshold)
 	    elif model_type == "cnn":
 		results = model_library_torch.test_cnn(model,testX, testY,threshold=threshold)
+	    elif model_type == "cnn-rnn":
+		results = model_library_torch.test_cnn_attnrnn(model[0],model[1], testX, testY)
 	else: # Test using Keras model
 	    predictedY = model.predict(inputs)
 	    results = map_back(predictedY)
@@ -1265,16 +1302,45 @@ def split_feats(keys, labelname):
             vec_keys.append(key)
         elif key == labelname or key not in ignore_feats:
             point_keys.append(key)
-        # Edit by Yoona for hybrid of checklist and narrative and narrative symptoms
-        #elif key == "MG_ID" or key == labelname:
-        #    vec_keys.append(key)
-        #    point_keys.append(key)
-        #elif key not in ignore_feats:
-        #    point_keys.append(key)
 
     print "vec_keys: " + str(vec_keys)
     print "point_keys: " + str(point_keys)
     print("Keys printed")
     return vec_keys, point_keys
+
+#########################################################
+# Select K Best symptoms for each class
+# Create output files containing best k features for each class
+# Arguments
+# 	X		: list of features
+# 	Y		: ndarray after labelencoder transformation
+# 	function	: type of anova function (ex. f_classif, chi2)
+#	output_path	: path to the output file
+# 	k		: number of top-k features to be selected
+#
+#
+def select_top_k_features_per_class(X, Y, function, output_path, k = 100):
+    classes = labelencoder.classes_
+
+    for i in range(len(classes)):
+	output = open(output_path + "/top_" + str(k) + "_features_class_" + classes[i], 'w')
+	output.write("Class : " + str(classes[i]))
+	print "Class: " + str(classes[i])
+	this_Y = []
+	for j in range(len(Y)):
+	    if Y[j] == i:
+		binary = 1
+	    else:
+		binary = 0
+	    this_Y.append(binary)
+	anova_symp = SelectKBest(function, k)
+	anova_symp.fit(X,this_Y)
+	best_indices = anova_symp.get_support(True)
+	print "Best indices: " + str(best_indices)
+	for i in range(len(best_indices)):
+	    selected = str(keys[best_indices[i] + 2])
+	    print selected
+	    output.write("\n")
+	    output.write(selected)
 
 if __name__ == "__main__":main() 

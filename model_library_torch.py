@@ -1,5 +1,4 @@
-#!/usr/bin/python3
-# Neural network model functions in PyTorch
+
 # @author sjeblee@cs.toronto.edu
 
 import math
@@ -23,59 +22,64 @@ numpy.set_printoptions(threshold=numpy.inf)
 use_cuda = False
 #torch.cuda.set_device(2)
 
-# Set threshold for ill-defined class
-#threshold = 0.01
 
-# Convolutional Neural Network (5 convlutional layers with max pooling, followed by a fully connected network)
+######################################################################
+# Convolutional Neural Network 
+# ----------------------------
+#
+# 5 convlutional layers with max pooling, followed by a fully connected network
+# Arguments:
+#	embed_dim	: dimension of a word vector
+#	class_num	: number of classes
+#	kernel_num	: number of channels produced by the convolutions
+#	kernel_sizes	: size of convolving kernels
+#	dropout		: dropout to prevent overfitting
+#	ensemble	: if true, used as input of RNNClassifier
+#			  if false, used independently and make prediction
+#	hidden_size	: number of nodes in hidden layers
+#
+#
 class CNN_Text(nn.Module):
 
-     def __init__(self, embed_dim, class_num, kernel_num=200, kernel_sizes='12345', dropout=0.1):
+     def __init__(self, embed_dim, class_num, kernel_num=200, kernel_sizes=5, dropout=0.0, ensemble=False, hidden_size = 100):
           super(CNN_Text, self).__init__()
           D = embed_dim
           C = class_num
           Ci = 1
           Co = kernel_num
           Ks = kernel_sizes
+	  self.ensemble = ensemble
 
-          self.conv11 = nn.Conv2d(Ci, Co, (1, D))
+	  self.conv11 = nn.Conv2d(Ci, Co, (1, D))
           self.conv12 = nn.Conv2d(Ci, Co, (2, D))
           self.conv13 = nn.Conv2d(Ci, Co, (3, D))
           self.conv14 = nn.Conv2d(Ci, Co, (4, D))
 	  self.conv15 = nn.Conv2d(Ci, Co, (5, D))
 
-	  # Uncomment the following lines if need more convolutional layers with different filter sizes.
-	  #self.conv16 = nn.Conv2d(Ci, Co, (6, D))
-	  #self.conv17 = nn.Conv2d(Ci, Co, (7, D))
-	  #self.conv18 = nn.Conv2d(Ci, Co, (8, D))
-
           self.dropout = nn.Dropout(dropout)
-          self.fc1 = nn.Linear(len(Ks)*Co, C)
-
+	  self.fc1 = nn.Linear(Ks*Co, C) # Use this layer when train with only CNN model, i.e. No ensemble 
+	  
      def conv_and_pool(self, x, conv):
           x = F.relu(conv(x)).squeeze(3)  # (N, Co, W)
           x = F.max_pool1d(x, x.size(2)).squeeze(2)
           return x
+	  
 
      def forward(self, x):
-          x = x.unsqueeze(1)  # (N, Ci, W, D)
-          #x = [F.relu(conv(x)).squeeze(3) for conv in self.convs1]  # [(N, Co, W), ...]*len(Ks)
-          #x = [F.max_pool1d(i, i.size(2)).squeeze(2) for i in x]  # [(N, Co), ...]*len(Ks)
-          #x = torch.cat(x, 1)
-
-          x1 = self.conv_and_pool(x,self.conv11) #(N,Co)
+          x = x.unsqueeze(1)  # (N, Ci, W, D)] 
+	  x1 = self.conv_and_pool(x,self.conv11) #(N,Co)
           x2 = self.conv_and_pool(x,self.conv12) #(N,Co)
           x3 = self.conv_and_pool(x,self.conv13) #(N,Co)
           x4 = self.conv_and_pool(x,self.conv14) #(N,Co)
 	  x5 = self.conv_and_pool(x,self.conv15) #(N,Co)
+ 	  x = torch.cat((x1, x2, x3, x4, x5), 1)
 
-	  # Uncomment the following lines if need more convolutional layers with different filter sizes. 
-	  #x6 = self.conv_and_pool(x,self.conv16)
-	  #x7 = self.conv_and_pool(x,self.conv17)
-	  #x8 = self.conv_and_pool(x,self.conv18)
-          x = torch.cat((x1, x2, x3, x4, x5), 1) # (N,len(Ks)*Co), This line must be adjusted if using more/less convolutional layers 
+          x = self.dropout(x)  # (N, len(Ks)*Co)
 
-          x = self.dropout(x)  # (N, len(Ks)*Co) 
-          logit = self.fc1(x)  # (N, C)
+	  if self.ensemble == False: # Train CNN with no ensemble  
+              logit = self.fc1(x)  # (N, C)
+	  else: # Train CNN with ensemble. Output of CNN will be input of another model
+	      logit = x
           return logit
 
 # Neural Network Model (1 hidden layer)
@@ -237,7 +241,6 @@ class AttnDecoderRNN(nn.Module):
         embedded = input.view(1, 1, -1)
         #print "embedded: " + str(embedded.size())
         embedded = self.dropout(embedded)
-
         attn_weights = F.softmax(self.attn(torch.cat((embedded[0], hidden[0]), 1)), dim=1)
         #print "attn_weights: " + str(attn_weights.size())
         attn_applied = torch.bmm(attn_weights.unsqueeze(0), encoder_outputs.unsqueeze(0))
@@ -251,11 +254,194 @@ class AttnDecoderRNN(nn.Module):
         return output, hidden, attn_weights
 
     def initHidden(self):
-        result = Variable(torch.zeros(1, 1, self.hidden_size))
+        result = Variable(torch.zeros(1, 1, self.hidden_size).long())
         if use_cuda:
             return result.cuda()
         else:
             return result
+
+######################################################################
+# RNN Classifier
+# --------------
+#
+# GRU followed by classification. It takes output of CNN_Text as input 
+# to this model. 
+# 
+# Arguments:
+#	input_size	: size of input dimension
+#	hidden_size	: size of hidden dimenssion
+#	output_size	: number of classes for classification
+#	n_layers	: number of layers in GRU
+#	bidirectional	: if True, two way GRU. If false, one way GRU
+#
+#
+class RNNClassifier(nn.Module):
+
+    def __init__(self, input_size, hidden_size, output_size, n_layers=1, bidirectional=False):
+        super(RNNClassifier, self).__init__()
+        self.hidden_size = hidden_size
+        self.n_layers = n_layers
+        self.n_directions = int(bidirectional) + 1
+
+	self.gru = nn.GRU(input_size, hidden_size, n_layers, bidirectional=bidirectional)
+        self.fc = nn.Linear(hidden_size, output_size)
+
+    def forward(self, input, seq_lengths):
+        
+	print "Size of RNN input: " + str(input.size())
+        # batch size set to 1. Take one data at a time. 
+	batch_size = 1
+
+        # Make a hidden
+        hidden = self._init_hidden(batch_size)
+
+        # No embedding necessary since it takes output from CNN
+	embedded = input.view(1,batch_size, -1)
+
+	output, hidden = self.gru(embedded, hidden)
+        
+	# Use hidden layer as an input to the final layer
+        fc_output = self.fc(hidden[-1])
+        return fc_output
+
+    def _init_hidden(self, batch_size):
+        hidden = Variable(torch.zeros(self.n_layers * self.n_directions,
+                             batch_size, self.hidden_size))
+	if use_cuda:
+	    return hidden.cuda()
+	else:
+	    return hidden    
+
+
+###########################################################
+# Train CNN-RNN Classifier
+# ------------------
+#
+# Train CNN_Text & RNNClassifier ensemble model
+#
+# Arguments:
+#	X		: a list of numpy array
+#	Y		: one-hot encoded labels
+#	num_epochs 	: number of epochs
+#	loss_func	: choice of loss function
+#	dropout		: dropout rate in CNN_Text
+#	kernel_size	: kernel size in CNN_Text
+#
+# Return:
+#	Trained CNN, RNN model
+#
+#
+def cnn_attnrnn(X,Y, num_epochs=10, loss_func='categorical_crossentropy',dropout=0.0, kernel_sizes=5):
+    st = time.time()
+    Xarray = numpy.asarray(X).astype('float')
+    Yarray = Y.astype('int')
+    print("X numpy shape: ", str(Xarray.shape), ", Y numpy shape: ", str(Yarray.shape))
+
+    # Params
+    X_len = Xarray.shape[0]
+    dim = Xarray.shape[-1]
+    num_labels = Yarray.shape[-1]
+    num_epochs = num_epochs
+    steps = 0
+    batch_size = 100
+    num_batches = math.ceil(X_len/batch_size)
+    learning_rate = 0.001
+
+    kernel_num = 200
+    cnn = CNN_Text(dim, num_labels, kernel_num=kernel_num, dropout=dropout, kernel_sizes=kernel_sizes, ensemble = True)
+    rnn = RNNClassifier(kernel_num * kernel_sizes, 100, num_labels)
+   
+    # If use cuda......
+    if use_cuda:
+	cnn = cnn.cuda()
+	rnn = rnn.cuda()
+    start = time.time()
+    
+    cnn_optimizer = torch.optim.Adam(cnn.parameters(), lr=learning_rate)
+    rnn_optimizer = torch.optim.Adam(rnn.parameters(), lr=learning_rate)
+
+    steps = 0
+    cnn.train()
+    for epoch in range(num_epochs):
+	print("epoch", str(epoch))
+	i = 0
+	numpy.random.seed(seed=1)
+	permutation = torch.from_numpy(numpy.random.permutation(X_len)).long()
+	Xiter = Xarray[permutation]
+	Yiter = Yarray[permutation]
+
+	while i+batch_size < X_len:
+	    batchX = Xiter[i:i+batch_size]
+	    batchY = Yiter[i:i+batch_size]
+	    Xtensor = torch.from_numpy(batchX).float()
+	    Ytensor = torch.from_numpy(batchY).long()
+	    feature = Variable(Xtensor)
+	    target = Variable(Ytensor)
+
+	    # Define optimizers
+	    cnn_optimizer.zero_grad()
+	    rnn_optimizer.zero_grad()
+
+	    # Train CNN_Text
+	    cnn_output = cnn(feature)
+    	    print "CNN trained"	
+	    print "CNN output size: " + str(cnn_output.size())
+
+	    # Train RNNClassifier one-by-one
+	    for j in range(batch_size):
+		if i + j < X_len:
+		    rnn_output = rnn(cnn_output[j],1)
+		    loss = F.cross_entropy(rnn_output, torch.argmax(target[j]).reshape((1,)))
+	    print "RNN trained"
+	    
+	    loss.backward()
+	    cnn_optimizer.step()
+	    rnn_optimizer.step()
+
+	    steps +=1
+	    i = i + batch_size
+
+	# Print epoch time
+	ct = time.time() - st
+	unit = "s"
+	if ct > 60:
+	    ct = ct/60
+	    unit = "m"
+	print("time so far: ", str(ct), unit)
+    return cnn, rnn
+	
+###########################################################
+# Test CNN-RNN Classifier
+# ------------------------
+#
+# Arguments:
+#	cnn_model	: Trained CNN_Text model
+#	rnn_model	: Trained RNN Classifier model
+#	testX		: a list or numpy array
+#	testids		: a list of numpy array
+#	labelencoder	: trained labelencoder
+#	
+# Return:
+#	label prediction
+#
+#
+def test_cnn_attnrnn(cnn_model, rnn_model, testX, testids, labelencoder=None, collapse=False):
+    y_pred = []
+    for x in range(len(testX)):
+	input_row = testX[x]
+
+	icd = None
+	if icd is None:
+	    input_tensor = torch.from_numpy(numpy.asarray([input_row]).astype('float')).float()
+	    if use_cuda:
+		input_tensor = input_tensor.contiguous().cudata()
+	    cnn_output = cnn_model(Variable(input_tensor))
+	    icd_var = rnn_model(cnn_output,1)
+	    icd_code = torch.max(icd_var, 1)[1].data[0]
+
+	y_pred.append(icd_code)
+
+    return y_pred
 
 
 ######################################################################
@@ -278,7 +464,7 @@ def nn_model(X, Y, num_nodes, act, num_epochs=10):
 	X_len = Xarray.shape[0]
 	dim = Xarray.shape[-1]
 	num_labels = Yarray.shape[-1]
-	num_epochs = 10
+	num_epochs = num_epochs
 	steps = 0
 	best_acc = 0
 	last_step = 0
@@ -339,7 +525,7 @@ def test_nn(net, testX, threshold=0.01):
     softmax = nn.Softmax(dim=1)
     logsoftmax = nn.LogSoftmax(dim=1)
     testX = testX.astype('float')
-    pred = []
+    pred = [] # Original prediction without using threshold for ill-defined.
     new_pred = [] # New prediction by assigning to UNKNOWN class if below the threshold
     probs = [] # Probabilities, the softmax output of the final layer
 
@@ -439,7 +625,7 @@ def rnn_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', dropout=0
     Does NOT support joint training yet
     returns: the CNN model
 '''
-def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, loss_func='categorical_crossentropy',dropout=0.0):
+def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, loss_func='categorical_crossentropy',dropout=0.0, kernel_sizes=5):
     # Train the CNN, return the model
     st = time.time()
     Xarray = numpy.asarray(X).astype('float')
@@ -450,7 +636,7 @@ def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, loss_fu
     X_len = Xarray.shape[0]
     dim = Xarray.shape[-1]
     num_labels = Yarray.shape[-1]
-    num_epochs = 10
+    num_epochs = num_epochs
     steps = 0
     best_acc = 0
     last_step = 0
@@ -459,7 +645,7 @@ def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, loss_fu
     num_batches = math.ceil(X_len/batch_size)
     learning_rate = 0.001
 
-    cnn = CNN_Text(dim, num_labels,dropout=dropout)
+    cnn = CNN_Text(dim, num_labels,dropout=dropout, kernel_sizes=kernel_sizes)
     if use_cuda:
 	cnn = cnn.cuda()
 
@@ -507,13 +693,13 @@ def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, loss_fu
     return cnn
 
 def test_cnn(model, testX, testids, probfile='/u/yoona/data/torch/probs_win200_epo10', labelencoder=None, collapse=False, threshold=0.1):
-    y_pred = []
+    y_pred = [] # Original prediction if threshold is not in used for ill-defined.
     y_pred_softmax = []
     y_pred_logsoftmax = []
     softmax = nn.Softmax(dim=1)
     logsoftmax = nn.LogSoftmax(dim=1)
 
-    new_y_pred = []
+    new_y_pred = [] # class prediction if threshold for ill-difined is used.
     if probfile is not None:
         probs = []
 

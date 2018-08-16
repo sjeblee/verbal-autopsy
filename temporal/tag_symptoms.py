@@ -28,23 +28,33 @@ global symp_narr_tag
 symp_narr_tag = "narr_symp"
 symp_tagger_tag = "symp_tagger"
 
+global use_standarized, use_negex, use_symptom1, use_symptom2
+# Standarize symptoms or not. When True, unstandarized symptoms will be converted to standarized symptoms.
+# Set it to False, since standarized symptoms produce lower accuracies. 
+use_standarized = False
+
+# Find negation of symptoms. If negation is found, attaching "no" in front of extracted symptoms. 
+# Set if to False, since adding negation produces lower accuracies. 
+use_negex = False
+
+# Use first symptom file (ex. SYMP.csv)
+use_symptom1 = False
+# Use second symptom file (ex. CHV_concepts_terms_flatfile_20110204.tsv)
+use_symptom2 = False
+# Use physiscian-generated keywords for symptom extraction.
+use_keywords = True
+
 def main():
     argparser = argparse.ArgumentParser()
     argparser.add_argument('--in', action="store", dest="infile")
     argparser.add_argument('--out', action="store", dest="outfile")
     argparser.add_argument('--train', action="store", dest="trainfile")
     argparser.add_argument('--tagger', action="store", dest="tagger")
-
-    # Add an argument for tagging symptoms. 
-    #argparser.add_argument('--symptoms', action="store", dest="symptomfile")
     args = argparser.parse_args()
 
     if not (args.infile and args.outfile):
         print "usage: ./tag_symptoms.py --in [file.xml] --out [outfile.xml] --train [trainfile.xml] --tagger [tagger] --symptoms [symptomfile.csv]"
         print "tagger options: keyword_match, crf, medttkm, tag_symptoms"
-        #if tagger == "tag_symptoms":
-        #    if not (args.symptomfile):
-        #        print "Must provide the file path to [symptomfile.csv]"
         exit()
 
 
@@ -234,55 +244,83 @@ def medttk(tree):
             print "med_narr: " + med_narr
     return tree
 
+
+
+####################################################################################
+# Symptom Extraction
+# ------------------
+#
+# Extract the words describing symptoms from the narrative and create a new element,
+# "narr_symp" in xml tree. Extracted symptoms are appended side by side with a blank
+# space in between. 
+#
+# tree: data xml file
+# arg_sympfile: path to CSV file
+# arg_chvfile: path to CHV file
+# return: data xml file with "narr_symp" added
+# Flags:
+#	use_symptom1 => Set TRUE to use words in CSV file
+#	use_symptom2 => Set TRUE to use words in CHV file
+#	use_keywords => Set TRUE to use words from physician-generated keywords
+#	use_negex    => Set TRUE to use negex (i.e. Find negation and append "no")
+# 
+#
 def tag_symptoms(tree,arg_sympfile,arg_chvfile):
-   
-    starttag = '<SYMPTOM>'
-    endtag = '</SYMPTOM>'
-    
+  
+    symptoms = []
+    dict_symp = {} # For standarized symptoms. Training with standarized symptoms perform worse.     
 
     # Open SYMP.csv file
-    #csvfile_path = symptomfile
-    csvfile_path = arg_sympfile 
-    mycsv = csv.reader(open(csvfile_path))
+    if use_symptom1 == True:
+        csvfile_path = arg_sympfile 
+        mycsv = csv.reader(open(csvfile_path))
 
-    # Uncomment this to create temp file which contain only the narrative of each data
-    #dirpath = os.path.dirname(csvfile_path)
-    #narr_temp = dirpath + "/temp.txt"
+	for row in mycsv:
+	    if row[1] not in symptoms:
+		symptoms.append(row[1])
+		print(row[1])
 
-    # Open tsv file. Comment this if you don't want to add symptoms listed in chv file. 
-    chv_tsvfile_path = arg_chvfile
-    chv = csv.reader(open(chv_tsvfile_path), delimiter = '\t')
+    # Open tsv file.
+    if use_symptom2 == True:
+        chv_tsvfile_path = arg_chvfile
+        chv = csv.reader(open(chv_tsvfile_path), delimiter = '\t')
 
-    symptoms = []
-    dict_symp = {} # For standarized symptoms. Training with standarized symptoms perform worse.
+	for row in chv:
+	    symp_word = row[1]
+	    if symp_word not in symptoms:
+		symptoms.append(symp_word)
+		print(symp_word)
 
+		# For standarized symptoms, replace "<" & ">" to ","
+                # Creaete a dictionary (Key: unstandarized -  Value: standarized)
+                if use_standarized == True:
+                    stand_word = row[2]
+                    if "<" in stand_word:
+                        stand_word = stand_word.replace("<","")
+                    if ">" in stand_word:
+                        stand_word = stand_word.replace(">","")
+                    dict_symp[symp_word] = stand_word
 
-    # Loop over the rows in SYMP.csv file and get the list of symptoms
-    for row in mycsv:
-        if row[1] not in symptoms:
-            symptoms.append(row[1])
-            print(row[1])
+    # Collect physican-generated keywords and append to the symptom list. 
+    if use_keywords == True:
+	print "Keyword Extraction"
+	symptoms = collect_keywords(tree,symptoms)
+	print(symptoms)
 
-    # Loop over the rows in CHV file and get the list of symptoms. 
-    # Comment this if you don't want to add symptoms listed in chv file. 
-    for row in chv:
-        if row[1] not in symptoms:
-            symptoms.append(row[1])
-	    print(row[1])
-	    # For standarized symptoms, replace "<" & ">" to ","
-	    '''
-	    stand_word = row[2]
-	    if "<" in stand_word:
-	    	stand_word = stand_word.replace("<","")
-	    if ">" in stand_word:
-		stand_word = stand_word.replace(">","")
-            dict_symp[row[1]] = stand_word
-	    '''
+    print "Total count of symptoms : " + str(len(symptoms))
+	
+    # Create temp file which contain only the narrative of each data. Just for checking how narrative is written
+    create_tempfile = False
+    if create_tempfile == True:
+	dirpath = os.path.dirname(csvfile_path)
+	narr_temp = dirpath + "/temp.txt"
+	    
     # Negex preparation : Set rules for finding negation
-    rfile = open(r"/u/yoona/ypark_branch/verbal-autopsy/negex.python/negex_triggers.txt")
-    irules = sortRules(rfile.readlines())
+    if use_negex == True:
+        rfile = open(r"/u/yoona/ypark_branch/verbal-autopsy/negex.python/negex_triggers.txt") # path to negex
+        irules = sortRules(rfile.readlines())
 
-    # Loop over 
+    # Find maximum word count in the symptom list. 
     max_word_count = count_max_len_symptoms(symptoms)
 
     root = tree.getroot()
@@ -294,113 +332,86 @@ def tag_symptoms(tree,arg_sympfile,arg_chvfile):
         if node != None:
             narr = node.text.encode('utf-8')
 	    narr = narr.lower()
-            # Remove punctuation
-            #narr_words = [w.strip() for w in narr.lower().translate(string.maketrans("",""), string.punctuation).split(' ')]
-            #narr = " ".join(narr_words)
 	    
 	    # For standrized symptoms. Currently not in used since training with standarized symptoms perform worse. 
-	    '''
-	    standarized = []
-	    keys = dict_symp.keys()
-	    for symp in symptoms:
-		if symp in narr:
-			if symp in keys:
-				symp = dict_symp[symp]
-			if symp not in standarized:
-				standarized.append(symp)
-	    for symp in standarized:
-		narr_symp = narr_symp + ", " + symp
-		
-            '''
-	    '''
-	    # For non-standarized symptoms.
-	    phrases = []
-	    non_standarized = []
-	    for symp in symptoms:
-		start_index = narr.find(symp)
-		if (start_index != -1) and (symp not in non_standarized):
-		    match = [symp, start_index, start_index+len(symp)]
-		    non_standarized.append(symp)
-		    phrases.append(match)
-
-	    
-	    '''
-	    ngrams = get_substrings_with_limit(narr, max_word_count)
-	    ngrams = filter(None, ngrams)
-            # Find all phrases that contains words in the list of symptoms. 
-            possible_phrases = find_possible_phrases(ngrams, symptoms, narr)
+	    if use_standarized == True:
+	        standarized = []
+	        keys = dict_symp.keys()
+	        for symp in symptoms:
+		    if symp in narr:
+			    if symp in keys:
+			    	    symp = dict_symp[symp]
+			    if symp not in standarized:
+				    standarized.append(symp)
+	        for symp in standarized:
+		    narr_symp = narr_symp + ", " + symp
+	    else: # For Non-standarized symptoms
+		ngrams = get_substrings_with_limit(narr, max_word_count)
+	        ngrams = filter(None, ngrams)
+                # Find all phrases that contains words in the list of symptoms. 
+                possible_phrases = find_possible_phrases(ngrams, symptoms, narr)
 	
-	    
-            # Remove duplicates in possible phrases
-            clean_possible_phrases = remove_duplicates(possible_phrases)
-	    '''
-            narr_symp = ""
-	    keys = dict_symp.keys()
-            for phrase in clean_possible_phrases:
-		phrase_text = phrase[0]
-                if phrase_text in keys:
-                    phrase_text = dict_symp[phrase_text]
-                narr_symp = narr_symp + " " + phrase_text
-	    '''
+                # Remove duplicates in possible phrases
+                clean_possible_phrases = remove_duplicates(possible_phrases)
             
-            # Sort possible phrases by start index
-            sorted_phrases = sorted(clean_possible_phrases, key=lambda tup: tup[1])
+                # Sort possible phrases by start index
+                sorted_phrases = sorted(clean_possible_phrases, key=lambda tup: tup[1])
             
-            lastindex = 0
-            to_be_tagged_phrases = []
-            i = 0
-            while i < len(sorted_phrases):
-                phrase = sorted_phrases[i]
-                start = phrase[1]
-                end = phrase[2]
-                if i == 0:
-                    to_be_tagged_phrases.append(phrase)
-                    lastindex = end
-                else:
-                    if end > lastindex:
+                lastindex = 0
+                to_be_tagged_phrases = []
+                i = 0
+                while i < len(sorted_phrases):
+                    phrase = sorted_phrases[i]
+                    start = phrase[1]
+                    end = phrase[2]
+                    if i == 0:
                         to_be_tagged_phrases.append(phrase)
                         lastindex = end
-                i = i + 1
+                    else:
+                        if end > lastindex:
+                            to_be_tagged_phrases.append(phrase)
+                            lastindex = end
+                    i = i + 1
 
-            lastindex = 0
-            narr_symp = ""
-            narr_fixed = ""
+                lastindex = 0
+                narr_symp = ""
+                narr_fixed = ""
 
-            for phrase in to_be_tagged_phrases:
-                phr = phrase[0]
-                start = phrase[1]
-                end = phrase[2]
-                if start > lastindex:
-                    narr_fixed = narr_fixed + narr[lastindex:start]
-                narr_fixed = narr_fixed + starttag + " " + narr[start:end] + " " + endtag
+                for phrase in to_be_tagged_phrases:
+                    phr = phrase[0]
+                    start = phrase[1]
+                    end = phrase[2]
+                    if start > lastindex:
+                        narr_fixed = narr_fixed + narr[lastindex:start]
+                    narr_fixed = narr_fixed + starttag + " " + narr[start:end] + " " + endtag
 
-		# Check negation of symptoms
-		#symp_tagger = negTagger(narr[0:start], [narr[start:end]], rules=irules, negP=False)
-		#symp_negated = symp_tagger.getNegationFlag()
-		#if symp_negated == "affirmed":
-		narr_symp = narr_symp + narr[start:end] + " "
-		#else: #negated
-		#    narr_symp = narr_symp + "no " + narr[start:end] + " "
+		    # Check negation of symptomsa
+		    if use_negex == True:
+		        symp_tagger = negTagger(narr[0:start], [narr[start:end]], rules=irules, negP=False)
+		        symp_negated = symp_tagger.getNegationFlag()
+		        if symp_negated == "affirmed":
+			    narr_symp = narr_symp + narr[start:end] + " "
+		        else: #negated
+		            narr_symp = narr_symp + "no " + narr[start:end] + " "
+		    else: # Not using negation
+			narr_symp = narr_symp + narr[start:end] + " "
 		
-                lastindex = end
+                    lastindex = end
 
-            if lastindex < len(narr):
-                narr_fixed = narr_fixed + narr[lastindex:]
+                if lastindex < len(narr):
+                    narr_fixed = narr_fixed + narr[lastindex:]
             
-        #if node == None:
-            #node = etree.SubElement(child, "narrative")
-            #node.text = narr_fixed.decode('utf-8').strip()
         node = etree.SubElement(child, symp_narr_tag)
         node.text = narr_symp.decode('utf-8').strip()
 
-        '''
+        if create_tempfile == True:
             temp = open(narr_temp, "w")
             temp.write("<TEXT>")
             print "narr: " + narr_fixed
             temp.write(narr_fixed)
             temp.write("</TEXT>\n")
             temp.close()
-        '''
+        
     return tree
 
 
@@ -463,6 +474,10 @@ def ispunc(input_string, start, end):
             return False
     return True
 
+
+################################################################
+# Below functions are the helper functions used in tag_symptoms
+
 ''' Find the symptom with the maximum word count. 
     It is to limit the length of the substring generated from narratives. 
     For time efficiency.
@@ -493,6 +508,7 @@ def get_substrings_with_limit(input_string, max_word_count):
 
 
 ''' Find all the phrases that contain words describing symptoms. 
+    Helper function for tag_symptoms
 '''
 def find_possible_phrases(ngrams, symptoms, narr):
 
@@ -522,8 +538,21 @@ def find_possible_phrases(ngrams, symptoms, narr):
 
     return possible_phrases
 
+''' Collect keywords from keyword elements in xml and append to the list of symptoms
+    Helper function for tag_symptoms
+    Return: a list of symptoms
+'''
+def collect_keywords(tree,symptoms):
+    root = tree.getroot()
+    for child in root:
+        kws = extract_features.get_keywords(child, "keywords_spell").split(',')
+	for kw in kws:
+	    symptoms.append(kw)
+    return symptoms
+
 
 ''' Remove duplicates in possible phrases
+    Helper function for tag_symptoms
 '''
 def remove_duplicates(phrases):
 
@@ -535,7 +564,9 @@ def remove_duplicates(phrases):
 
     return clean_possible_phrases
 
-''' Check whether the input string ends with punctuation. 
+''' Check whether the input string ends with punctuation.
+    Helper function for tag_symptoms 
+    Return: True if ends with punctuation, else False
 '''
 def is_end_index_punc(input_string):
     punc = ' :;,./?'
