@@ -181,7 +181,7 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
     else:
         os.mkdir(datapath)
 
-    #create_datasets = False
+    create_datasets = False
     # TODO: If dirs exist already, don't recreate the datasets, just re-run the models that don't have output
     if create_datasets:
         main_files = []
@@ -300,7 +300,7 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
                 outfile2.close()
 
     # Run models
-    for z in range(9, 10):
+    for z in range(10):
         trainname = arg_train + "_" + str(z)
         if joint_training:
             trainname = 'all'
