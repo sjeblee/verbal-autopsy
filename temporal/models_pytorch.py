@@ -366,8 +366,8 @@ def rnn_model(X, Y, num_nodes, activation='relu', modelname='gru', dropout=0.1, 
                             #print("true_index", str(true_index.size()))
                             true_labels[y] = true_index[0]
                         true_var = Variable(true_labels)
-                        #print("outputs:", str(outputs.size()))
-                        #print("true_var:", str(true_var.size()))
+                        print("outputs:", str(outputs.size()))
+                        print("true_var:", str(true_var.size()))
                         loss = criterion(outputs, true_var)
                         loss.backward()
                         optimizer.step()

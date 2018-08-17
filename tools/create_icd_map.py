@@ -41,25 +41,28 @@ def main():
                         for k in range(startindex, endindex1+1):
                             code1 = letter + str(k).zfill(2)
                             icdmap[code1] = cat
+                            print "added " + code1 + "," + cat
                         letter = endletter
                         startindex = 0
                     for k in range(startindex, endindex+1):
                         code2 = letter + str(k).zfill(2)
                         icdmap[code2] = cat
+                        print "added " + code2 + "," + cat
                 else:
                     icdmap[code] = cat
+                    print "added " + code + "," + cat
 
-    out_codex = open('icd_map_codex.csv', 'w')
+    out_codex = open('icd_map_ccodex.csv', 'w')
     for code in icdmap:
         out_codex.write(code + ',' + icdmap[code] + '\n')
     out_codex.close()
 
-    out_codex2 = open('icd_map_codex2.csv', 'w')
+    out_codex2 = open('icd_map_ccodex2.csv', 'w')
     for code in icdmap:
         out_codex2.write(code + ',' + icdmap[code][:2] + '\n')
     out_codex2.close()
 
-    out_codex4 = open('icd_map_codex4.csv', 'w')
+    out_codex4 = open('icd_map_ccodex4.csv', 'w')
     for code in icdmap:
         out_codex4.write(code + ',' + icdmap[code][0] + '\n')
     out_codex4.close()

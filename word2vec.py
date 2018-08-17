@@ -92,7 +92,8 @@ def run(infile, vec_size, name="narr+ice+medhelp", stem=False):
     #vec_model = Word2Vec(sentences, size=int(vec_size), window=window_size, min_count=1, workers=num_threads, negative=0, sg=1)
     #vec_model = FastText(sentences, size=int(vec_size), window=window_size, min_count=1, word_ngrams=1, min_n=2, max_n=6, workers=num_threads, negative=0)
     #vec_model.save(vec_data)
-       
+    #vec_model.wv.save_word2vec_format(vec_data + ".vec")
+
     if not os.path.exists(vec_data):
         print "--------------------------------------------------------------------"
         process = subprocess.Popen(["time", bin_dir + "/word2vec", "-train", text_data, "-output", vec_data, "-cbow", "1", "-size", str(vec_size), "-window", str(window_size), "-negative", "0", "-hs", "1", "-min-count", "1", "-sample", "1e-3", "-threads", str(num_threads), "-binary", "0"], stdout=subprocess.PIPE)
