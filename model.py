@@ -450,13 +450,16 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     if arg_anova == "chi2":
         anova_function = chi2
     print "anova_function: " + arg_anova
-    if ((not is_nn) or arg_model == "nn") and num_feats < x_feats:
-        anova_filter, X = create_anova_filter(X, Y, anova_function, num_feats)
-    
-    # Select k best features for each class
+
+    # Seleck k best features for each class
     if output_topk_features == True:
         if arg_model == "nn":
-	    select_top_k_features_per_class(X,Y,anova_function,arg_prefix, 100)
+            select_top_k_features_per_class(X,Y,anova_function,arg_prefix, 100)
+    
+    num_feats = 84
+    # Select best features for all data
+    if ((not is_nn) or arg_model == "nn") and num_feats < x_feats:
+        anova_filter, X = create_anova_filter(X, Y, anova_function,arg_prefix, num_feats)
 
     global model
     model = None
@@ -1115,18 +1118,21 @@ def attention(inputs, time_steps, input_dim):
 
     #return attention_vector
 
-def create_anova_filter(X, Y, function, num_feats):
+def create_anova_filter(X, Y, function, output_path, num_feats):
     global anova_filter
     anova_filter = SelectKBest(function, k=num_feats)
     anova_filter.fit(X, Y)
     X = anova_filter.transform(X)
-    print "Size of X " + str(len(X[1]))
     selected = anova_filter.get_support(True)
     print "Best indices: " + str(selected)
+
+    # Sort selected indices in terms of scores. Descending order. 
     scores = anova_filter.scores_
+    sorted_idx = numpy.argsort(scores)[::-1][:num_feats]
+
     print "features selected: "
-    output = open("/u/yoona/selected_symp.txt", "w")
-    for i in selected:
+    output = open(output_path + "/top_" + str(num_feats) + "_features.txt", "w")
+    for i in sorted_idx:
         output.write(keys[i+2] + " ")
         output.write(str(scores[i]))
         output.write("\n")
