@@ -452,7 +452,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     print "anova_function: " + arg_anova
     if ((not is_nn) or arg_model == "nn") and num_feats < x_feats:
         anova_filter, X = create_anova_filter(X, Y, anova_function, num_feats)
-
+    
     # Select k best features for each class
     if output_topk_features == True:
         if arg_model == "nn":
@@ -1120,10 +1120,17 @@ def create_anova_filter(X, Y, function, num_feats):
     anova_filter = SelectKBest(function, k=num_feats)
     anova_filter.fit(X, Y)
     X = anova_filter.transform(X)
+    print "Size of X " + str(len(X[1]))
     selected = anova_filter.get_support(True)
+    print "Best indices: " + str(selected)
+    scores = anova_filter.scores_
     print "features selected: "
-    #for i in selected:
-    #    print "\t" + keys[i+2]
+    output = open("/u/yoona/selected_symp.txt", "w")
+    for i in selected:
+        output.write(keys[i+2] + " ")
+        output.write(str(scores[i]))
+        output.write("\n")
+        print "\t" + keys[i+2]
     return anova_filter, X
 
 '''
@@ -1295,7 +1302,7 @@ def map_back(results):
     return output
 
 def split_feats(keys, labelname):
-    ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4"] # symp_vec added by Yoona
+    ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4"] 
     vec_keys = [] # vector/matrix features for CNN and RNN models
     point_keys = [] # traditional features for other models
     for key in keys:
@@ -1334,14 +1341,19 @@ def select_top_k_features_per_class(X, Y, function, output_path, k = 100):
 	    else:
 		binary = 0
 	    this_Y.append(binary)
-	anova_symp = SelectKBest(function, k)
+	anova_symp = SelectKBest(function, 'all')
 	anova_symp.fit(X,this_Y)
 	best_indices = anova_symp.get_support(True)
-	print "Best indices: " + str(best_indices)
-	for i in range(len(best_indices)):
-	    selected = str(keys[best_indices[i] + 2])
-	    print selected
+        scores = anova_symp.scores_
+        output.write("The sorted indices:")
+        sorted_idx = numpy.argsort(scores)[::-1][:k]
+        output.write(str(sorted_idx))
+
+	for i in range(len(sorted_idx)):
+	    selected = str(keys[sorted_idx[i] + 2])
 	    output.write("\n")
-	    output.write(selected)
+	    output.write(selected + " ")
+            output.write(str(scores[sorted_idx[i]]))
+        output.close()
 
 if __name__ == "__main__":main() 

@@ -53,13 +53,13 @@ class CNN_Text(nn.Module):
 	  self.ensemble = ensemble
 
 	  self.conv11 = nn.Conv2d(Ci, Co, (1, D))
-          self.conv12 = nn.Conv2d(Ci, Co, (2, D))
-          self.conv13 = nn.Conv2d(Ci, Co, (3, D))
-          self.conv14 = nn.Conv2d(Ci, Co, (4, D))
-	  self.conv15 = nn.Conv2d(Ci, Co, (5, D))
+          #self.conv12 = nn.Conv2d(Ci, Co, (2, D))
+          #self.conv13 = nn.Conv2d(Ci, Co, (3, D))
+          #self.conv14 = nn.Conv2d(Ci, Co, (4, D))
+	  #self.conv15 = nn.Conv2d(Ci, Co, (5, D))
 
           self.dropout = nn.Dropout(dropout)
-	  self.fc1 = nn.Linear(Ks*Co, C) # Use this layer when train with only CNN model, i.e. No ensemble 
+	  self.fc1 = nn.Linear(Co, C) # Use this layer when train with only CNN model, i.e. No ensemble 
 	  
      def conv_and_pool(self, x, conv):
           x = F.relu(conv(x)).squeeze(3)  # (N, Co, W)
@@ -70,12 +70,12 @@ class CNN_Text(nn.Module):
      def forward(self, x):
           x = x.unsqueeze(1)  # (N, Ci, W, D)] 
 	  x1 = self.conv_and_pool(x,self.conv11) #(N,Co)
-          x2 = self.conv_and_pool(x,self.conv12) #(N,Co)
-          x3 = self.conv_and_pool(x,self.conv13) #(N,Co)
-          x4 = self.conv_and_pool(x,self.conv14) #(N,Co)
-	  x5 = self.conv_and_pool(x,self.conv15) #(N,Co)
- 	  x = torch.cat((x1, x2, x3, x4, x5), 1)
-
+          #x2 = self.conv_and_pool(x,self.conv12) #(N,Co)
+          #x3 = self.conv_and_pool(x,self.conv13) #(N,Co)
+          #x4 = self.conv_and_pool(x,self.conv14) #(N,Co)
+	  #x5 = self.conv_and_pool(x,self.conv15) #(N,Co)
+ 	  #x = torch.cat((x1, x2, x3, x4, x5), 1)
+          x = x1
           x = self.dropout(x)  # (N, len(Ks)*Co)
 
 	  if self.ensemble == False: # Train CNN with no ensemble  
@@ -303,7 +303,8 @@ class RNNClassifier(nn.Module):
 	output, hidden = self.gru(embedded, hidden)
         
 	# Use hidden layer as an input to the final layer
-        fc_output = self.fc(hidden[-1])
+        #fc_output = self.fc(hidden[-1])
+        fc_output = F.log_softmax(self.fc(output[0]), dim=1)
         return fc_output
 
     def _init_hidden(self, batch_size):
@@ -345,11 +346,12 @@ def cnn_attnrnn(X,Y, num_epochs=10, loss_func='categorical_crossentropy',dropout
     num_labels = Yarray.shape[-1]
     num_epochs = num_epochs
     steps = 0
-    batch_size = 100
+    batch_size = 1
     num_batches = math.ceil(X_len/batch_size)
     learning_rate = 0.001
 
     kernel_num = 200
+    kernel_sizes = 1
     cnn = CNN_Text(dim, num_labels, kernel_num=kernel_num, dropout=dropout, kernel_sizes=kernel_sizes, ensemble = True)
     rnn = RNNClassifier(kernel_num * kernel_sizes, 100, num_labels)
    
