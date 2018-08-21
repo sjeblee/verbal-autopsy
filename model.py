@@ -456,7 +456,6 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
         if arg_model == "nn":
             select_top_k_features_per_class(X,Y,anova_function,arg_prefix, 100)
     
-    num_feats = 84
     # Select best features for all data
     if ((not is_nn) or arg_model == "nn") and num_feats < x_feats:
         anova_filter, X = create_anova_filter(X, Y, anova_function,arg_prefix, num_feats)
