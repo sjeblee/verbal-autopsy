@@ -530,6 +530,30 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
         #element = "narr_symp"
         element.append("narr_symp")
 
+    if "textrank" in pre:
+        print "Extract keywords using textrank"
+        textrankname = "textrank"
+        tagger_name = "textrank"
+        
+        trainsp = dataloc + "/train_" + trainname + "_" + textrankname + ".xml"
+        devsp = ""
+        if arg_dev:
+            devsp = dataloc + "/dev_" + devname + "_" + textrankname + ".xml"
+        else:
+            devsp = dataloc + "/test_" + devname + "_" + textrankname + ".xml"
+        if not os.path.exists(trainsp):
+            print "Keyword extraction using textrank on train data..."
+            tag_symptoms.run(trainset, trainsp, tagger_name)
+        if not os.path.exists(devsp):
+            print "Keyword extraction using textrank on test data..."
+            tag_symptoms.run(devset, devsp, tagger_name)
+
+        trainset = trainsp
+        devset = devsp
+        devname = devname + "_" + textrankname
+        trainname = trainname + "_" + textrankname
+        element.append("narr_textrank")
+
     if "kwc" in pre:
         numc = "300"
         kwname = "kwkm" + str(numc)
