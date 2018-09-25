@@ -10,7 +10,7 @@ import random_assign
 
 def main():
     argparser = argparse.ArgumentParser()
-    #argparser.add_argument('-i', '--in', action="store", dest="infile")
+    argparser.add_argument('-i', '--in', action="store", dest="infile")
     argparser.add_argument('-t', '--type', action="store", dest="type")
     argparser.add_argument('-n', '--num', action="store", dest="num")
     args = argparser.parse_args()
@@ -21,30 +21,39 @@ def main():
 
     run(args.type, args.num)
 
-def run(arg_type, arg_num):
+def run(arg_type, arg_num, arg_infile):
     arg_num = int(arg_num)
     print str(arg_num) + " iterations: " + arg_type
-    adult_map = ['1','3','4','5','6','7','8','9','10','11','13','14','15','16','17']
-    child_map = ['1','3','4','5','6','7','8','9','10','11','12','13','14','15','16']
-    neonate_map = ['1','3','5','6','8','11','13','14','15']
-    adult_num = 9215
-    child_num = 1721
-    neonate_num = 465
 
-    cat_map = adult_map
-    adult_prior = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-    child_prior = adult_prior
-    neonate_prior = [1, 1, 1, 1, 1, 1, 1, 1, 1]
-    prior = adult_prior
-    num = adult_num
-    if arg_type == 'child':
-        prior = child_prior
-        cat_map = child_map
-        num = child_num
-    elif arg_type == 'neonate':
-        prior = neonate_prior
-        cat_map = neonate_map
-        num = neonate_num
+    all_labels = model.get_labels(arg_infile, 'cat_who')
+    num = len(all_labels)/10 # size of the test set
+    cat_map = list(set(all_labels))
+    num_classes = len(labels)
+    print "num classes: " + str(num_classes)
+    print "classes: " + str(cat_map)
+    prior = [1] * num_classes
+    
+    #adult_map = ['1','3','4','5','6','7','8','9','10','11','13','14','15','16','17']
+    #child_map = ['1','3','4','5','6','7','8','9','10','11','12','13','14','15','16']
+    #neonate_map = ['1','3','5','6','8','11','13','14','15']
+    #adult_num = 9215
+    #child_num = 1721
+    #neonate_num = 465
+
+    #cat_map = adult_map
+    #adult_prior = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    #child_prior = adult_prior
+    #neonate_prior = [1, 1, 1, 1, 1, 1, 1, 1, 1]
+    #prior = adult_prior
+    #num = adult_num
+    #if arg_type == 'child':
+    #    prior = child_prior
+    #    cat_map = child_map
+    #    num = child_num
+    #elif arg_type == 'neonate':
+    #    prior = neonate_prior
+    #    cat_map = neonate_map
+    #    num = neonate_num
 
     #records = get_recs(arg_infile)
 
@@ -60,9 +69,9 @@ def run(arg_type, arg_num):
             cat = cat_map[x]
             for y in range(gen_num):
                 gen_labels.append(cat)
-        correct_labels = random_assign.map_forward(gen_labels, arg_type)
+        correct_labels = random_assign.map_forward(gen_labels, cat_map)
         rand_labels = numpy.random.randint(0, len(prior), num)
-        pred_labels = random_assign.map_back(rand_labels, arg_type)
+        pred_labels = random_assign.map_back(rand_labels, cat_map)
             #print "gen_labels: " + str(gen_labels)
             #print "pred_labels: " + str(pred_labels)
             # Calculate CSMF accuracy of pred_labels and gen_labels

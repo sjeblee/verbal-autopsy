@@ -160,7 +160,7 @@ def create_graph(xml_node, relation_set='exact', return_event_map=False, find_mo
         #    time2_id = tlink.attrib['relatedToTimeID']
         #    id1, id2, rel_type = tutil.flip_relations(time_id, event_id, rel_type)
         graph.add_edge(id1, id2, label=rel_type, priority=0)
-        
+
         # Add time value to the event
         e = event_map[event_id]
         if id2 == event_id:
@@ -221,7 +221,7 @@ def create_graph(xml_node, relation_set='exact', return_event_map=False, find_mo
                         if graph.get_edge_data(prev, event2_id) == 'CONTAINS' and prev in timex_map:
                             if event_map[event_id].end == 'UNK':
                                 event_map[event_id].end = tutil.time_value(timex_map[prev])
-                
+
         # Add event relations based on start and end times
         for eid in event_map.keys():
             for eid2 in event_map.keys():
@@ -426,6 +426,7 @@ def add_edge(graph, node1, node2, rel, priority=2):
         if debug: print("added relation to graph:", rel, str(node1), "|", str(node2))
         pass
 
+
 ''' Add time information to an event object
     event: Event object
     time: xml element representing a TIMEX
@@ -504,6 +505,7 @@ def check_edges(node1, node2, graph):
             return False
     return True
 
+
 ''' Combine two nodes
 '''
 def combine_nodes(digraph, node1, node2):
@@ -511,6 +513,7 @@ def combine_nodes(digraph, node1, node2):
     for eid in node_to_ids[node2]:
         update_node(digraph, eid, node1)
     digraph.remove_node(node2)
+
 
 ''' Check if the edges of two nodes conflict
 '''
@@ -530,6 +533,7 @@ def do_edges_conflict(graph, node1, node2):
                 if graph.edges[prevnode, node1]['label'] != graph.edges[prevnode, node2]['label']:
                     return True
     return False
+
 
 ''' Resolve cycles by dropping overlap links
 '''

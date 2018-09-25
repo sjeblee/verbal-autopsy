@@ -40,6 +40,7 @@ for e in tree.iter("hindi_narrative","cghr_cat"):
         
     if e.tag == 'cghr_cat':
         data[e.text].append(value)
+print('seq_length', str(seq_length))
 
 
 # for k,v in data.iteritems():

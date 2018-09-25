@@ -128,6 +128,11 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
     #        for line in f:
     #            stopwords.append(line.strip())
 
+    if kw_features or narr_features:
+        with codecs.open("./stopwords_small.txt", "r") as f:
+            for line in f:
+                stopwords.append(line.strip())
+
     global tfidfVectorizer
     global lda_model
 
@@ -565,7 +570,11 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
 '''
 def vector_features(feat_name, narratives, matrix, dict_keys, vecfile):
     print "vecfile: " + vecfile
+<<<<<<< Updated upstream
     #match = re.compile('[\"\_a-zA-Z0-9]+')
+=======
+    match = re.compile('[\"\_a-zA-Z0-9]+')
+>>>>>>> Stashed changes
     vec_model, dim = word2vec.load(vecfile)
     #vec_model_en,dim = word2vec.load("./Hindi_VA/vectors/wiki.en300.vec")
     #vec_model_hi,dim=word2vec.load("./Hindi_VA/vectors/wiki.hi.vec")
@@ -605,8 +614,10 @@ def vector_features(feat_name, narratives, matrix, dict_keys, vecfile):
             vec = zero_vec
             for word in narr.split(' '):
                 if len(word) > 0:
+                    vec = word2vec.get(word, vec_model)
                     #if word == "didnt":
                     #    word = "didn't"
+<<<<<<< Updated upstream
                     vec = word2vec.get(word,vec_model)
                     '''
                     if match.match(word):
@@ -615,6 +626,13 @@ def vector_features(feat_name, narratives, matrix, dict_keys, vecfile):
                     else:
                         vec = word2vec.get(word.decode('utf-8'),vec_model_hi)
                     '''
+=======
+                    #if match.match(word):
+                    #    word = word.strip('\"')
+                    #    vec = word2vec.get(word,vec_model_en)
+                    #else:
+                    #    vec = word2vec.get(word.decode('utf-8'),vec_model_hi)
+>>>>>>> Stashed changes
                     vectors.append(vec)
 
 	# Symptoms separated by ' '

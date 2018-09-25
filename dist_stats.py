@@ -34,7 +34,7 @@ def main():
         if icd_codes.has_key(icd):
             count = icd_codes[icd]
         icd_codes[icd] = count+1
-        node = child.find("ICD_cat")
+        node = child.find("cat_who")
         icdcat = node.text
         count = 0
         if icd_cats.has_key(icdcat):
@@ -53,9 +53,9 @@ def main():
         
     # write the stats to file
     output = open(args.outfile, "w")
-    output.write("icd_code,num_records\n")
-    for key in icd_codes.keys():
-        output.write(key + "," + str(icd_codes[key]) + "\n")
+    #output.write("icd_code,num_records\n")
+    #for key in icd_codes.keys():
+    #    output.write(key + "," + str(icd_codes[key]) + "\n")
     output.write("\nicd_cat,num_records,avg_narr_length\n")
     for key in icd_cats.keys():
         words = narr_length[key]

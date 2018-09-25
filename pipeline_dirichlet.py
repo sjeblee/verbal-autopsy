@@ -175,13 +175,13 @@ def crossval(arg_modelname, arg_models, arg_train, arg_features, arg_featurename
         os.mkdir(datapath)
 
     # DIRICHLET setup
-    num_runs = 100
-    #cat_list = ['1','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17']
-    #prior = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-    #if arg_dataset == "neonate":
-    print "using neonatal categories"
-    cat_list = ['N1', 'N2', 'N3', 'N4', 'N5']
-    prior = [1, 1, 1, 1, 1]
+    num_runs = 11
+    cat_list = ['1','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17']
+    prior = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    if arg_dataset == "neonate":
+        print "using neonatal categories"
+        cat_list = ['N1', 'N2', 'N3', 'N4', 'N5']
+        prior = [1, 1, 1, 1, 1]
     dirichlets = dirichlet(prior, num_runs)
 
     data = []

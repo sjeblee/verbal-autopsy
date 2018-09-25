@@ -13,6 +13,8 @@ from sklearn.feature_selection import SelectKBest, f_classif
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.pipeline import make_pipeline
 
+import model as modelpy
+
 labelencoder = None
 
 def main():
@@ -55,7 +57,8 @@ def run(arg_model, arg_train, arg_test, arg_results, arg_labels):
         
     global labelencoder
     labelencoder = preprocessing.LabelEncoder() # Transforms ICD codes to numbers
-    Y = preprocess(arg_train, trainids, trainlabels, X, Y, True)
+    test_labs = modelpy.get_labels(arg_test, arg_labels)
+    Y = preprocess(arg_train, trainids, trainlabels, X, Y, True, extra_labels=test_labs)
     print "X: " + str(len(X)) + "\nY: " + str(len(Y))
 
     # Train model
@@ -124,7 +127,7 @@ def run(arg_model, arg_train, arg_test, arg_results, arg_labels):
         output.write(str(out) + "\n")
     output.close()
 
-def preprocess(filename, ids, labels, x, y, trainlabels=False):
+def preprocess(filename, ids, labels, x, y, trainlabels=False, extra_labels=[]):
     global labelencoder
 
     #TEMP
@@ -171,7 +174,7 @@ def preprocess(filename, ids, labels, x, y, trainlabels=False):
 
     # Convert ICD codes to numerical labels
     if trainlabels:
-        labelencoder.fit(labels)
+        labelencoder.fit(labels + extra_labels)
         #print "encoded labels: " + str(labelencoder.classes_)
     y = labelencoder.transform(labels)
     # Normalize features to 0 to 1

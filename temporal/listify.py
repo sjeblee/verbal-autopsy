@@ -58,7 +58,6 @@ def get_lists(filename, outfile, relation_set='exact'):
         list_node = child.find(list_name)
         #print("node is None:", str(node is None))
         try:
-            #node = etree.fromstring(etree.tostring(node).decode('utf8'))
             node = etree.fromstring('<narr_timeml_simple>' + data_util3.stringify_children(node).encode('utf8').decode('utf8') + '</narr_timeml_simple>')
         except etree.XMLSyntaxError as e:
             dropped += 1
@@ -117,7 +116,6 @@ def listify(xml_node, relation_set='exact'):
 
 def print_event(item):
     print(str(item))
-    #print(item.eid, ':', item.element.text, ' | start:', item.start, 'end:', item.end)
 
 def timeline_to_string(timeline):
     string = ""
@@ -138,6 +136,7 @@ def timeline_to_xml(timeline, xml_parent):
             event_node.attrib['overlap_time'] = item.overlap
             xml_parent.append(event_node)
 
+
 ''' Make sure all the original relations have been preserved in the final list
 '''
 def verify_list(timeline, tlinks, event_map, timex_map, id_to_bin):
@@ -145,6 +144,7 @@ def verify_list(timeline, tlinks, event_map, timex_map, id_to_bin):
 
     verify_links(tlinks, id_to_bin)
     verify_time_info(tlinks, event_map, timex_map)
+
 
 def verify_links(tlinks, id_to_bin):
     # Verify that all pairwise relations are still valid
@@ -162,6 +162,7 @@ def verify_links(tlinks, id_to_bin):
             elif rel_type == 'OVERLAP':
                 if not (id_to_bin[eid1] == id_to_bin[eid2]):
                     print('VERIFY FAILED:', eid1, 'should overlap', eid2)
+
 
 def verify_time_info(tlinks, event_map, timex_map):
     before_unk = ['BEFORE', 'UNK']
@@ -195,4 +196,4 @@ def verify_time_info(tlinks, event_map, timex_map):
                 # TODO
 
 
-if __name__ == "__main__":main()
+if __name__ == "__main__": main()

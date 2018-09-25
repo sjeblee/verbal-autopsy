@@ -4,10 +4,11 @@
 
 from lxml import etree
 import argparse
+import ast
 
 def main():
     argparser = argparse.ArgumentParser()
-    argparser.add_argument('--records', action="store", dest="infile")
+    argparser.add_argument('--in', action="store", dest="infile")
     argparser.add_argument('--ids', action="store", dest="idfile")
     argparser.add_argument('--weights', action="store", dest="weightfile")
     argparser.add_argument('--out', action="store", dest="outfile")
@@ -15,7 +16,7 @@ def main():
     args = argparser.parse_args()
 
     if not (args.infile and args.outfile):
-        print "usage: ./getnarrs.py --in [file.xml] --out [outfile.txt]"
+        print "usage: ./visualize_attention_weights.py --in [file.xml] --out [outfile.csv] --ids [file.ids] --weights [file.weights]"
         exit()
 
     # Get the xml from file
@@ -32,11 +33,15 @@ def main():
         if node != None:
             narr = node.text.encode('utf-8')
         narratives[rec_id] = narr
+    print "got narrs: " + str(len(narratives.keys()))
 
     id_text = open(args.idfile, 'r').read()
-    ids = eval(id_text)
+    ids = ast.literal_eval(id_text)
+    print "got ids: " + str(len(ids))
 
-    weights = eval(open(args.weightfile, 'r').read())
+    weight_text = open(args.weightfile, 'r').read()
+    weights = ast.literal_eval(weight_text)
+    print "got weights: " + str(len(weights))
     output = []
     
     for x in range(len(ids)):

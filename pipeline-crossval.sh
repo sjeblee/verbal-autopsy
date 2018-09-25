@@ -1,15 +1,15 @@
 #!/bin/bash
 # Script to run all the steps of the Verbal Autopsy pipeline
 
-name="crossval_cghr"
+name="crossval_kw"
 modelname="cnn"
-prep="spell"
-feats="narr_vec"
-fname="narrv_gensim_100"
+prep="none"
+feats="narr_vec,lda"
+fname="narrv_100_lda"
 labels="cghr_cat"
 dataset="mds+rct"
-trainset="neonate"
-devset="neonate"
+trainset="adult"
+devset="adult"
 vecfile="/u/sjeblee/research/va/data/datasets/mds+rct/ice+medhelp+all_adult_child.vectors.100"
 mkdir -p ../../data/$name
 
@@ -27,6 +27,6 @@ mkdir -p ../../data/$name
 #python pipeline.py --name $name --model "nn" --dataset $dataset --modelname ${name}_${trainset}_${fname} --train $trainset --dev $devset --features "type,narr_count" --featurename $fname --preprocess "spell,medttk" | tee ../../data/${name}/out-$devset-$fname-nn.txt
 
 # CROSSVAL
-python pipeline_new.py --name $name --dataset $dataset --train $trainset --features $feats --featurename $fname --ex "crossval" --model $modelname --preprocess $prep --labels $labels --vectors $vecfile | tee ../../data/${name}/out-$devset-$fname.txt
+python pipeline.py --name $name --dataset $dataset --train $trainset --features $feats --featurename $fname --ex "crossval" --model $modelname --preprocess $prep --labels $labels | tee /nbb/sjeblee/va/data/${name}/out-$devset-$fname.txt
 
 echo "Done"

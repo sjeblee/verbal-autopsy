@@ -15,6 +15,9 @@ def main():
     argparser.add_argument('--in', action="store", dest="infile")
     argparser.add_argument('--out', action="store", dest="outfile")
     argparser.add_argument('--rank', action="store", dest="rank")
+    argparser.add_argument('--dist', action="store_true", dest="dist")
+    argparser.add_argument('--top', action="store_true", dest="top")
+    argparser.set_defaults(dist=False, top=False)
     args = argparser.parse_args()
 
     if not (args.infile and args.outfile):
@@ -25,16 +28,16 @@ def main():
     if args.rank:
         rank = args.rank
 
-    run(args.infile, args.outfile, rank)
+    run(args.infile, args.outfile, rank, args.dist, args.top)
 
-def run(arg_infile, arg_outfile, arg_rank=1):
+def run(arg_infile, arg_outfile, arg_rank=1, arg_dist=False, arg_top=False):
     labels_correct = {}
     labels_pred = {}
     correct = []
     predicted = []
     k = arg_rank     # Cat is considered correct if it's in the top k predicted categories
 
-    # Compute True Positive(TP), False Negative(FN), and False Positive(FP) 
+    # Compute True Positive(TP), False Negative(FN), and False Positive(FP)
     # TP, FN, and FP are used for calculatinging precision, recall, and F1 scoree for each class
     true_pos = {}
     false_pos = {}
@@ -44,10 +47,14 @@ def run(arg_infile, arg_outfile, arg_rank=1):
     with open(arg_infile, 'r') as f:
         for line in f:
             res = eval(line)
-            pred = res['Predicted_ICD']
+            pred = str(res['Predicted_ICD'])
+            cor = str(res['Correct_ICD'])
+            if arg_top:
+                pred = pred[0:2]
+                cor = cor[0:2]
             predicted.append(pred)
-            cor = res['Correct_ICD']
             correct.append(cor)
+            print('pred:', pred, 'cor:', cor)
 
             if labels_correct.has_key(cor):
                 labels_correct[cor] = labels_correct[cor] + 1
@@ -73,33 +80,34 @@ def run(arg_infile, arg_outfile, arg_rank=1):
         if pred == cor:
             tp = tp +1
 
-	    # Computer True Positive for each class
-	    if true_pos.has_key(cor):
-		true_pos[cor] = true_pos[cor] + 1
-	    else:
-		true_pos[cor] = 1
+            # Compute True Positive for each class
+            if true_pos.has_key(cor):
+                true_pos[cor] = true_pos[cor] + 1
+            else:
+                true_pos[cor] = 1
         else:
             fn = fn +1
 
-	    # Computer False Positive and False Negative for each class
-	    if false_pos.has_key(pred):
-		false_pos[pred] = false_pos[pred] + 1
-	    else:
-		false_pos[pred] = 1
+            # Computer False Positive and False Negative for each class
+            if false_pos.has_key(pred):
+                false_pos[pred] = false_pos[pred] + 1
+            else:
+                false_pos[pred] = 1
 
-	    if false_neg.has_key(cor):
-		false_neg[cor] = false_neg[cor] + 1
-	    else:
-		false_neg[cor] = 1
+            if false_neg.has_key(cor):
+                false_neg[cor] = false_neg[cor] + 1
+            else:
+                false_neg[cor] = 1
 
     for key in true_pos.keys():
-	print "True positive for class " + str(key) + " is " + str(true_pos[key])
+        print "True positive for class " + str(key) + " is " + str(true_pos[key])
 
     for key in false_pos.keys():
-	print "False positive for class " + str(key) + " is " + str(false_pos[key])
+        print "False positive for class " + str(key) + " is " + str(false_pos[key])
 
     for key in false_neg.keys():
-	print "False negative for class " + str(key) + " is " + str(false_neg[key])
+        print "False negative for class " + str(key) + " is " + str(false_neg[key])
+
     # Calculate CSMF accuracy
     csmf_pred = {}
     csmf_corr = {}
@@ -148,40 +156,39 @@ def run(arg_infile, arg_outfile, arg_rank=1):
     r_scores = metrics.recall_score(correct, predicted, average=None)
     f1_scores = metrics.f1_score(correct, predicted, average=None)
 
-    # Print precision,recall,f1-score per class. 
+    # Print precision,recall,f1-score per class.
     for key in keys:
-	#temp_precision = metrics.precision_score(correct, predicted, labels = key, average='weighted')
-	#temp_recall = metrics.recall_score(correct, predicted, labels = key, average='weighted')
-	#temp_f1 = metrics.f1_score(correct, predicted, labels = key, average='weighted')
-	this_tp = true_pos[key] if true_pos.has_key(key) else 0
-	this_fp = false_pos[key] if false_pos.has_key(key) else 0
-	this_fn = false_neg[key] if false_neg.has_key(key) else 0
-	if (this_tp + this_fp != 0):
-	    this_precision = this_tp / (this_tp + this_fp)
-	else:
-	    this_precision = 0
+        #temp_precision = metrics.precision_score(correct, predicted, labels = key, average='weighted')
+        #temp_recall = metrics.recall_score(correct, predicted, labels = key, average='weighted')
+        #temp_f1 = metrics.f1_score(correct, predicted, labels = key, average='weighted')
+        this_tp = true_pos[key] if true_pos.has_key(key) else 0
+        this_fp = false_pos[key] if false_pos.has_key(key) else 0
+        this_fn = false_neg[key] if false_neg.has_key(key) else 0
+        if (this_tp + this_fp != 0):
+            this_precision = this_tp / (this_tp + this_fp)
+        else:
+            this_precision = 0
 
-	if (this_tp + this_fn != 0):
-	    this_recall = this_tp / (this_tp + this_fn)
-	else:
-	    this_recall = 0
+        if (this_tp + this_fn != 0):
+            this_recall = this_tp / (this_tp + this_fn)
+        else:
+            this_recall = 0
 
-	if (this_precision + this_recall != 0):
-	    this_f1 = 2 * this_precision * this_recall / (this_precision + this_recall)
-	else:
-	    this_f1 = 0	
+        if (this_precision + this_recall != 0):
+            this_f1 = 2 * this_precision * this_recall / (this_precision + this_recall)
+        else:
+            this_f1 = 0
 
-	print "----------------------------------------------------------"
-	print "Accuracy for class " + str(key) + ":"
-	print "		Precision : " + str(this_precision)	
-	print "		Recall : " + str(this_recall)
-	print "		F1 : " + str(this_f1)
-	print "		Total Correct : " + str(labels_correct[key])
-	print "		Total Predict : " + str(labels_pred[key])
-	print "		True Positive : " + str(this_tp)
-	print "		False Positive : " + str(this_fp)
-	print "		False Negative : " + str(this_fn) 
-	
+        print "----------------------------------------------------------"
+        print "Accuracy for class " + str(key) + ":"
+        print "		Precision : " + str(this_precision)
+        print "		Recall : " + str(this_recall)
+        print "		F1 : " + str(this_f1)
+        print "		Total Correct : " + str(labels_correct[key])
+        print "		Total Predict : " + str(labels_pred[key])
+        print "		True Positive : " + str(this_tp)
+        print "		False Positive : " + str(this_fp)
+        print "		False Negative : " + str(this_fn)
 
     # PCCC
     pccc = ((tp/n) - (k/num_classes)) / (1 - (k/num_classes))
@@ -219,7 +226,7 @@ def run(arg_infile, arg_outfile, arg_rank=1):
 
     print "KL divergence forward: " + str(kl_divergence_f) + "\n"
     print "KL divergence reverse: " + str(kl_divergence_r) + "\n"
-        
+
     # write the stats to file
     output = open(arg_outfile, "w")
     output.write("precision," + str(precision) + "\nrecall," + str(recall) + "\nf1," + str(f1) + "\npccc," + str(pccc) + "\ncsmf_accuracy," + str(csmf_accuracy) + "\n")

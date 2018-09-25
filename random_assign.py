@@ -97,26 +97,26 @@ def preprocess(filename):
     #print "preprocessing took " + str(endtime - starttime) + " s"
     return ids, labels
 
-def map_forward(labels, rec_type):
+def map_forward(labels, label_map):
     new_labels = []
-    label_map = adult_map
-    if rec_type == "child":
-        label_map = child_map
-    elif rec_type == "neonate":
-        label_map = neonate_map
+    #label_map = adult_map
+    #if rec_type == "child":
+    #    label_map = child_map
+    #elif rec_type == "neonate":
+     #   label_map = neonate_map
     for y in labels:
         l = label_map.index(y)
         new_labels.append(l)
     return new_labels
 
-def map_back(results, rec_type):
+def map_back(results, label_map):
     #print "map_back: " + rec_type + " " + str(len(results))
     new_labels = []
-    label_map = adult_map
-    if rec_type == "child":
-        label_map = child_map
-    elif rec_type == "neonate":
-        label_map = neonate_map
+    #label_map = adult_map
+    #if rec_type == "child":
+    #    label_map = child_map
+    #elif rec_type == "neonate":
+    #    label_map = neonate_map
     #print "label_map: " + str(label_map)
     for y in results:
         #print "mapping result: " + str(y)

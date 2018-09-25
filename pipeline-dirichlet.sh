@@ -1,15 +1,15 @@
 #!/bin/bash
 # Script to run all the steps of the Verbal Autopsy pipeline
 
-name="dirichlet_neo"
+name="dirichlet_adult"
 modelname="nn"
 prep="spell"
 feats="type,narr_count"
 fname="narrc"
-labels="ICD_cat_neo"
+labels="ICD_cat"
 dataset="mds+rct_small"
-trainset="neonate"
-devset="neonate"
+trainset="adult"
+devset="adult"
 mkdir -p ../../data/$name
 
 # DEV

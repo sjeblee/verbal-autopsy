@@ -3,11 +3,10 @@
 # Identify and label symptom phrases in narrative
 
 import sys
-#sys.path.append('/u/sjeblee/research/va/git/verbal-autopsy')
-sys.path.append('/u/yoona/ypark_branch/verbal-autopsy')
-sys.path.append('/u/yoona/ypark_branch/verbal-autopsy/negex.python')
-sys.path.append('/u/yoona/ypark_branch/TextRank')
-sys.path.append('/u/yoona/ypark_branch/textrank')
+#sys.path.append('/u/yoona/ypark_branch/textrank')
+sys.path.append('/u/sjeblee/research/va/git/verbal-autopsy')
+sys.path.append('/u/sjeblee/research/git/negex/negex.python')
+
 from negex import *
 import textrank
 

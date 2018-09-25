@@ -20,7 +20,7 @@ import pickle
 numpy.set_printoptions(threshold=numpy.inf)
 use_cuda = torch.cuda.is_available()
 if use_cuda:
-    torch.cuda.set_device(0)
+    torch.cuda.set_device(1)
 
 use_cuda = False
 
@@ -557,8 +557,8 @@ def test_nn(net, testX, threshold=0.01):
 
 	outputs_ls = logsoftmax(outputs)
 	outputs_softmax = softmax(outputs)
-	predicted = torch.max(outputs_ls, 1)[1]
-	probabilities = torch.max(outputs_softmax, 1)[0]
+	predicted = torch.max(outputs_ls, 1)[1].data
+	probabilities = torch.max(outputs_softmax, 1)[0].data
         pred = pred + predicted.tolist()
 	
 	# Get the probabilities, if the highest probability is less than the threshold, assign it to the ill-defined class.
@@ -727,25 +727,25 @@ def test_cnn(model, testX, testids, probfile='/u/yoona/data/torch/probs_win200_e
             icd_code = torch.max(icd_vec, 1)[1].data[0]
            
 	    # Assign to ill-defined class if the maximum probabilities is less than a threshold.
-	    icd_prob = torch.max(icd_vec_softmax,1)[0]
-	    if icd_prob < threshold:
-		new_y_pred.append(9)
-	    else:
-		new_y_pred.append(icd_code)
+	    #icd_prob = torch.max(icd_vec_softmax,1)[0]
+	    #if icd_prob < threshold:
+            #    new_y_pred.append(9)
+	    #else:
+	    #    new_y_pred.append(icd_code)
 	
             # Save the probabilties
-            if probfile is not None:
-                probs.append(icd_prob)
+            #if probfile is not None:
+            #    probs.append(icd_prob)
 
         y_pred.append(icd_code)
 
-    if probfile is not None:
-        pickle.dump(probs, open(probfile, "wb"))
+    #if probfile is not None:
+    #    pickle.dump(probs, open(probfile, "wb"))
 
-    print "Probabilities: " + str(probs)
+    #print "Probabilities: " + str(probs)
 
-    #return y_pred  # Uncomment this line if threshold is not in used. 
-    return new_y_pred  # Comment this line out if threshold is not in used. 
+    return y_pred  # Uncomment this line if threshold is not in used. 
+    #return new_y_pred  # Comment this line out if threshold is not in used. 
 
 
 def train_encoder_decoder(input_variable, target_variable, encoder, decoder, encoder_optimizer, decoder_optimizer, loss_func, max_length):

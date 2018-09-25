@@ -419,11 +419,13 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
 
     # Load the features
     if hybrid:
+        print "hybrid features"
         Y = preprocess(arg_train_feats, trainids, trainlabels, X, Y, vec_keys, trainlabels=True)
         preprocess(arg_train_feats, [], [], X2, [], point_keys, trainlabels=True)
     else:
-	print("Keys tested")
-        Y = preprocess(arg_train_feats, trainids, trainlabels, X, Y, keys, trainlabels=True, Y2_labels='keyword_clusters')
+        test_labs = get_labels(arg_test_feats, arg_labelname)
+        Y = preprocess(arg_train_feats, trainids, trainlabels, X, Y, keys, trainlabels=True, extra_labels=test_labs)
+        #Y = preprocess(arg_train_feats, trainids, trainlabels, X, Y, keys, trainlabels=True, Y2_labels='keyword_clusters')
     print "X: " + str(len(X)) + " Y: " + str(len(Y))
     print "X2: " + str(len(X2))
     x_feats = numpy.asarray(X).shape[-1]
@@ -1147,7 +1149,7 @@ def create_anova_filter(X, Y, function, output_path, num_feats):
     feats: a list of the names of the features to extract
     trainlabels: True if this is the trainset, we need to train the label embedding
 '''
-def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=False, Y2_labels=None):
+def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=False, Y2_labels=None, extra_labels=[]):
     global labelencoder, labelencoder_adult, labelencoder_child, labelencoder_neonate
     #ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4","symp_vec"]
     ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4"]
@@ -1282,7 +1284,7 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
         print "using neonate labelencoder"
         labenc = labelencoder_neonate
     if trainlabels:
-        labenc.fit(labels)
+        labenc.fit(labels + extra_labels)
     print(labels)
     y = labenc.transform(labels)
 
@@ -1320,6 +1322,17 @@ def split_feats(keys, labelname):
     print "point_keys: " + str(point_keys)
     print("Keys printed")
     return vec_keys, point_keys
+
+
+''' Get just the labels from the feature file
+'''
+def get_labels(filename, labelname):
+    labels = []
+    with open(filename, 'r') as f:
+        for line in f:
+            vector = eval(line)
+            labels.append(vector[labelname])
+    return labels
 
 #########################################################
 # Select K Best symptoms for each class

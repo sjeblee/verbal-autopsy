@@ -29,7 +29,8 @@ from sklearn.feature_selection import SelectKBest, f_classif, chi2
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.pipeline import make_pipeline
 
-import attention_utils
+#import attention_utils
+import model as model_new
 import rebalance
 
 labelencoder = None
@@ -331,7 +332,8 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
         Y = preprocess(arg_train_feats, trainids, trainlabels, X, Y, vec_keys, True)
         preprocess(arg_train_feats, [], [], X2, [], point_keys, True)
     else:
-        Y = preprocess(arg_train_feats, trainids, trainlabels, X, Y, keys, True)
+        test_labs = model_new.get_labels(arg_test_feats, arg_labelname)
+        Y = preprocess(arg_train_feats, trainids, trainlabels, X, Y, keys, True, extra_labels=test_labs)
     print "X: " + str(len(X)) + " Y: " + str(len(Y))
     print "X2: " + str(len(X2))
 
@@ -350,7 +352,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     anova_function = f_classif
     if arg_anova == "chi2":
         anova_function = chi2
-    print "anova_function: " + arg_anova
+    print "anova_function: " + arg_anova + ", num_feats: " + str(num_feats)
     if not is_nn:
         anova_filter, X = create_anova_filter(X, Y, anova_function, num_feats)
 
@@ -651,7 +653,7 @@ def create_anova_filter(X, Y, function, num_feats):
     feats: a list of the names of the features to extract
     trainlabels: True if this is the trainset, we need to train the label embedding
 '''
-def preprocess(filename, ids, labels, x, y, feats, trainlabels=False):
+def preprocess(filename, ids, labels, x, y, feats, trainlabels=False, extra_labels=[]):
     global labelencoder
     ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4"]
 
@@ -709,7 +711,7 @@ def preprocess(filename, ids, labels, x, y, feats, trainlabels=False):
 
     # Convert ICD codes to numerical labels
     if trainlabels:
-        labelencoder.fit(labels)
+        labelencoder.fit(labels+extra_labels)
     y = labelencoder.transform(labels)
 
     # Normalize features to 0 to 1 (if not word vectors)
