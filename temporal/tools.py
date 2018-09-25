@@ -1,15 +1,30 @@
 #!/usr/bin/python3
 # Temporal data tools
 
+import os
+import re
 import subprocess
+
+from copy import deepcopy
 from itertools import chain
 from lxml.etree import tostring
 from lxml import etree
+from xml.sax.saxutils import unescape
 
+inline_narr_name = 'narr_timeml_crf'
+
+''' Unescape arrows in an xml file
+'''
 def fix_arrows(filename):
     subprocess.call(["sed", "-i", "-e", 's/&lt;/</g', filename])
     subprocess.call(["sed", "-i", "-e", 's/&gt;/>/g', filename])
     subprocess.call(["sed", "-i", "-e", 's/  / /g', filename])
+
+
+def escape(text):
+    text = re.sub('<', '&lt;', text)
+    text = re.sub('>', '&gt;', text)
+    return text
 
 
 ''' Get content of a tree node as a string
@@ -32,7 +47,7 @@ def stringify_children(node):
     return ''.join(filter(None, parts))
 
 
-''' Do we need this?
+''' Convert separate xml tags to inline xml tags
 '''
 def to_inline(infile, outfile):
     tree = etree.parse(infile)
@@ -41,35 +56,54 @@ def to_inline(infile, outfile):
     for child in treeroot:
         docid = child.find("record_id").text
         print(docid)
-        dct = ""
+        #dct = ""
         narr_node = child.find("narrative")
         tag_node = child.find("narr_timeml_simple")
         if narr_node is not None:
             narr = narr_node.text
-        tags = etree.tostring(tag_node, encoding='utf-8').decode('utf-8')
+        tags = tag_node #etree.tostring(tag_node, encoding='utf-8').decode('utf-8')
         tagged_text = insert_tags(narr, tags)
-    print("TODO")
+        inline_node = etree.SubElement(child, inline_narr_name)
+        inline_node.text = tagged_text
 
     tree.write(outfile)
 
+
+'''  Insert xml tags into text based on spans
+'''
 def insert_tags(text, tags):
-    return text
+    lastindex = 0
+    new_text = ""
+    for tag in tags:
+        if tag.tag == 'TLINK':
+            new_text = new_text + etree.tostring(tag, encoding='utf8').decode('utf-8')
+        else:
+            print(etree.tostring(tag, encoding='utf8').decode('utf-8'))
+            span = tag.attrib['span'].split(',')
+            start = int(span[0])
+            end = int(span[1])
+            new_text = new_text + text[lastindex:start] + etree.tostring(tag, encoding='utf8').decode('utf-8')
+            lastindex = end
+    return new_text
+
 
 ''' Convert inline xml to separate xml files
 '''
-def to_dir(filename, dirname):
-    print("writing eval files...")
-    if not os.path.exists(eval_dir):
-        os.mkdir(eval_dir)
+def to_dir(filename, dirname, node_name):
+    print('to_dir:', filename, dirname)
+    if not os.path.exists(dirname):
+        os.mkdir(dirname)
 
-    treeroot = etree.parse(output_file).getroot()
+    treeroot = etree.parse(filename).getroot()
 
     for child in treeroot:
         docid = child.find("record_id").text
         print(docid)
         dct = ""
-        narr_node = child.find("narr_timeml_crf")
+        timex_node = etree.Element('TIMEX3')
+        narr_node = child.find(node_name)
         if narr_node is not None:
+            # Use first identified TIMEX3 as the DCT - TODO: is there a better way to do this?
             orig_node = narr_node.find("TIMEX3")
             timex_node = deepcopy(orig_node)
             timex_node.set("type", "DATE")
@@ -84,7 +118,7 @@ def to_dir(filename, dirname):
             dct = unescape(etree.tostring(timex_node, encoding='utf-8', with_tail=False).decode('utf-8'))
             print(dct)
             narr_node.remove(orig_node)
-            narr_text = unescape(tools.stringify_children(narr_node))
+            narr_text = unescape(stringify_children(narr_node))
             if narr_text[0:4] == "None":
                 narr_text = narr_text[4:]
             narr = tail + narr_text
@@ -92,7 +126,8 @@ def to_dir(filename, dirname):
             print("narr_text:", narr)
 
         else:
-            print("narr is None!")
+            print("ERROR: narr is None! Look for: ", node_name)
+            #print("in child node:", etree.tostring(child))
             narr = ""
         # Create output tree
         root = etree.XML('<?xml version="1.0"?><TimeML xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://timeml.org/timeMLdocs/TimeML_1.2.1.xsd"></TimeML>')
@@ -104,13 +139,14 @@ def to_dir(filename, dirname):
         dct_node.append(timex_node)
         text_node = etree.SubElement(root, "TEXT")
         text_node.text = narr
-        filename = eval_dir + "/" + docid + ".tml"
+        filename = os.path.join(dirname, docid + ".tml")
         tree.write(filename, encoding='utf-8')
 
         # Fix arrows
-        tools.fix_arrows(filename)
+        #fix_arrows(filename)
+
         # Unsplit punctuation
-        tools.unsplit_punc(filename)
+        unsplit_punc(filename)
 
 def unsplit_punc(filename):
     subprocess.call(["sed", "-i", "-e", 's/ ,/,/g', filename])

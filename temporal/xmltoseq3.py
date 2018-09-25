@@ -5,8 +5,10 @@
 import sys
 sys.path.append('/u/sjeblee/research/va/git/verbal-autopsy')
 import data_util3 as data_util
+import tools
 
 from lxml import etree
+#from xml.sax.saxutils import escape
 import argparse
 import re
 
@@ -252,6 +254,8 @@ def seq_to_xml(seqs, filename="", tag=symp_narr_tag, elementname="Record"):
                 seq = seqs[rec_id]
             narr_node = etree.SubElement(child, tag)
             narr_node.text = to_xml(seq)
+            narrative = child.find('narrative')
+            narrative.text = tools.escape(narrative.text) # Escape the narrative text
             if debug: print("output:", len(narr_node.text))
     else:
         root = etree.Element("root")

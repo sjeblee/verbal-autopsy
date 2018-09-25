@@ -29,7 +29,8 @@ debug = False
 id_name = "record_id"
 max_seq_len = 100
 #vecfile = "/u/sjeblee/research/va/data/datasets/mds+rct/narr+ice+medhelp.vectors.100"
-vecfile = "/u/sjeblee/research/vectors/GoogleNews-vectors-negative300.bin"
+#vecfile = "/u/sjeblee/research/vectors/GoogleNews-vectors-negative300.bin"
+vecfile = "/u/sjeblee/research/vectors/wikipedia-pubmed-and-PMC-w2v.bin"
 
 def main():
     argparser = argparse.ArgumentParser()
@@ -38,7 +39,7 @@ def main():
     argparser.add_argument('--test', action="store", dest="testfile")
     argparser.add_argument('--out', action="store", dest="outfile")
     argparser.add_argument('--model', action="store", dest="model")
-    argparser.add_argument('--inline', action="store_true", dest="inline")
+    argparser.add_argument('--inline', action="store_true", dest="inline") # Use inline for TempEval dataset
     argparser.set_defaults(inline=False)
     argparser.set_defaults(devfile="")
     args = argparser.parse_args()
@@ -197,7 +198,7 @@ def run(trainfile, testfile, outfile="", modelname="crf", arg_inline=False, devf
             subprocess.call(["sed", "-i", "-e", 's/&lt;/</g', outfile])
             subprocess.call(["sed", "-i", "-e", 's/&gt;/>/g', outfile])
 
-        # TODO: run appropriate evaluation script
+    # TODO: run appropriate evaluation script
 
 
 def train_crf(trainx, trainy):

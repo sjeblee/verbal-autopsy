@@ -4,7 +4,7 @@
 import sys
 sys.path.append('..')
 sys.path.append('/u/sjeblee/research/git/anaforatools')
-import anafora
+from anafora import timeml, evaluate
 import tools
 
 import argparse
@@ -22,29 +22,34 @@ anafora_dir = '/nbb/sjeblee/thyme/output/system_anafora'
 tag_name = 'narr_timeml_crf'
 
 def main():
+    print("main")
     argparser = argparse.ArgumentParser()
     argparser.add_argument('-i', '--in', action="store", dest="infile")
     argparser.add_argument('-o', '--out', action="store", dest="outdir")
     argparser.add_argument('-t', '--test', action="store", dest="testdir")
     args = argparser.parse_args()
 
-    if not (args.infile and args.testdir and args.outdir):
-        print("usage: ./thyme_eval.py --in [file_timeml.xml] --out [folder]")
+    if not (args.infile and args.outdir):
+        print("usage: ./eval_thyme.py --in [file_timeml.xml] --out [folder]")
         exit()
 
-        # TODO: convert output tags to inline and split into individual files
-        tempfile = args.infile + ".inline"
-        tools.to_inline(args.infile, tempfile)
-        tools.to_dir(tempfile, args.outdir)
+    # Convert output tags to inline and split into individual files
+    print("Converting output file...")
+    tempfile = args.infile
+    #tempfile = args.infile + ".inline"
+    #tools.to_inline(args.infile, tempfile)
+    tools.to_dir(tempfile, args.outdir, tag_name)
 
-        # Convert reference format to anafora (only need to do this once)
-        thyme_dir = thyme_path + '/test_ref'
-        tools.to_dir(thyme_xml, thyme_dir)
-        anafora.timeml._timeml_dir_to_anafora_dir(thyme_dir, thyme_ref)
+    # Convert reference format to anafora (only need to do this once)
+    print("Converting ref dir...")
+    thyme_dir = thyme_path + '/test_ref'
+    tools.to_dir(thyme_xml, thyme_dir, 'narr_timeml_simple')
+    timeml._timeml_dir_to_anafora_dir(thyme_dir, thyme_ref)
 
-        # Run evaluation
-        anafora.timeml._timeml_dir_to_anafora_dir(args.outdir, anafora_dir)
-        anafora.evaluate.main(["--reference", args.testdir, "--predicted", anafora_dir, "--verbose"])
+    # Run evaluation
+    print("Running anafora eval script...")
+    timeml._timeml_dir_to_anafora_dir(args.outdir, anafora_dir)
+    evaluate.main(["--reference", args.testdir, "--predicted", anafora_dir, "--verbose"])
 
 
 def write_eval_files(output_file, eval_dir):
@@ -101,3 +106,6 @@ def write_eval_files(output_file, eval_dir):
         tools.fix_arrows(filename)
         # Unsplit punctuation
         tools.unsplit_punc(filename)
+
+
+if __name__ == "__main__":main()
