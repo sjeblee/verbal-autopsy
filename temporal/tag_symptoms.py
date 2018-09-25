@@ -6,7 +6,10 @@ import sys
 #sys.path.append('/u/sjeblee/research/va/git/verbal-autopsy')
 sys.path.append('/u/yoona/ypark_branch/verbal-autopsy')
 sys.path.append('/u/yoona/ypark_branch/verbal-autopsy/negex.python')
+sys.path.append('/u/yoona/ypark_branch/TextRank')
+sys.path.append('/u/yoona/ypark_branch/textrank')
 from negex import *
+import textrank
 
 from lxml import etree
 import argparse
@@ -43,6 +46,8 @@ use_symptom1 = False
 use_symptom2 = False
 # Use physiscian-generated keywords for symptom extraction.
 use_keywords = True
+# Extract  keywords using TextRank
+use_textrank = True
 
 def main():
     argparser = argparse.ArgumentParser()
@@ -75,6 +80,8 @@ def run(infile, outfile, tagger="keyword_match", arg_sympfile=None, arg_chvfile=
             tree = seq2seq(tree)
         elif tagger == "tag_symptoms":
             tree = tag_symptoms(tree, arg_sympfile, arg_chvfile)
+        elif tagger == "textrank":
+            tree = tag_keywords(tree)
 
         tree.write(outfile)
         data_util.fix_escaped_chars(outfile)
@@ -415,6 +422,30 @@ def tag_symptoms(tree,arg_sympfile,arg_chvfile):
             temp.close()
         
     return tree
+
+# Extract keywords using textrank. 
+def tag_keywords(tree):
+    print(dir(textrank))
+    textrank.setup_environment()
+    
+    root = tree.getroot()
+    for child in root:
+        node = child.find("narrative")
+        narr = ""
+        narr_keywords = ""
+        if node != None:
+            narr = node.text.encode('utf-8')
+            narr = narr.lower()
+
+            keywords = textrank.extract_key_phrases(narr)
+            for kw in keywords:
+                narr_keywords = narr_keywords + kw + " "
+
+        node = etree.SubElement(child, "textrank_kws")
+        node.text = narr_keywords.decode('utf-8').strip()
+
+    return tree
+
 
 
 def start_tag_with_atts(item):

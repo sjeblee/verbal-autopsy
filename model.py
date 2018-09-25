@@ -48,7 +48,7 @@ labelencoder = None
 labelencoder_adult = None
 labelencoder_child = None
 labelencoder_neonate = None
-vec_types = ["narr_vec", "narr_seq", "event_vec", "event_seq", "symp_vec", "kw_vec"]
+vec_types = ["narr_vec", "narr_seq", "event_vec", "event_seq", "symp_vec", "kw_vec", "textrank_vec"]
 numpy.set_printoptions(threshold=numpy.inf)
 
 # Use keras or pytorch
@@ -450,13 +450,15 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     if arg_anova == "chi2":
         anova_function = chi2
     print "anova_function: " + arg_anova
-    if ((not is_nn) or arg_model == "nn") and num_feats < x_feats:
-        anova_filter, X = create_anova_filter(X, Y, anova_function, num_feats)
 
-    # Select k best features for each class
+    # Seleck k best features for each class
     if output_topk_features == True:
         if arg_model == "nn":
-	    select_top_k_features_per_class(X,Y,anova_function,arg_prefix, 100)
+            select_top_k_features_per_class(X,Y,anova_function,arg_prefix, 100)
+    
+    # Select best features for all data
+    if ((not is_nn) or arg_model == "nn") and num_feats < x_feats:
+        anova_filter, X = create_anova_filter(X, Y, anova_function,arg_prefix, num_feats)
 
     global model
     model = None
@@ -1115,15 +1117,25 @@ def attention(inputs, time_steps, input_dim):
 
     #return attention_vector
 
-def create_anova_filter(X, Y, function, num_feats):
+def create_anova_filter(X, Y, function, output_path, num_feats):
     global anova_filter
     anova_filter = SelectKBest(function, k=num_feats)
     anova_filter.fit(X, Y)
     X = anova_filter.transform(X)
     selected = anova_filter.get_support(True)
+    print "Best indices: " + str(selected)
+
+    # Sort selected indices in terms of scores. Descending order. 
+    scores = anova_filter.scores_
+    sorted_idx = numpy.argsort(scores)[::-1][:num_feats]
+
     print "features selected: "
-    #for i in selected:
-    #    print "\t" + keys[i+2]
+    output = open(output_path + "/top_" + str(num_feats) + "_features.txt", "w")
+    for i in sorted_idx:
+        output.write(keys[i+2] + " ")
+        output.write(str(scores[i]))
+        output.write("\n")
+        print "\t" + keys[i+2]
     return anova_filter, X
 
 '''
@@ -1295,7 +1307,7 @@ def map_back(results):
     return output
 
 def split_feats(keys, labelname):
-    ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4"] # symp_vec added by Yoona
+    ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4"] 
     vec_keys = [] # vector/matrix features for CNN and RNN models
     point_keys = [] # traditional features for other models
     for key in keys:
@@ -1334,14 +1346,19 @@ def select_top_k_features_per_class(X, Y, function, output_path, k = 100):
 	    else:
 		binary = 0
 	    this_Y.append(binary)
-	anova_symp = SelectKBest(function, k)
+	anova_symp = SelectKBest(function, 'all')
 	anova_symp.fit(X,this_Y)
 	best_indices = anova_symp.get_support(True)
-	print "Best indices: " + str(best_indices)
-	for i in range(len(best_indices)):
-	    selected = str(keys[best_indices[i] + 2])
-	    print selected
+        scores = anova_symp.scores_
+        output.write("The sorted indices:")
+        sorted_idx = numpy.argsort(scores)[::-1][:k]
+        output.write(str(sorted_idx))
+
+	for i in range(len(sorted_idx)):
+	    selected = str(keys[sorted_idx[i] + 2])
 	    output.write("\n")
-	    output.write(selected)
+	    output.write(selected + " ")
+            output.write(str(scores[sorted_idx[i]]))
+        output.close()
 
 if __name__ == "__main__":main() 
