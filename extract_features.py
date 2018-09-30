@@ -570,11 +570,7 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
 '''
 def vector_features(feat_name, narratives, matrix, dict_keys, vecfile):
     print "vecfile: " + vecfile
-<<<<<<< Updated upstream
-    #match = re.compile('[\"\_a-zA-Z0-9]+')
-=======
     match = re.compile('[\"\_a-zA-Z0-9]+')
->>>>>>> Stashed changes
     vec_model, dim = word2vec.load(vecfile)
     #vec_model_en,dim = word2vec.load("./Hindi_VA/vectors/wiki.en300.vec")
     #vec_model_hi,dim=word2vec.load("./Hindi_VA/vectors/wiki.hi.vec")
@@ -617,7 +613,7 @@ def vector_features(feat_name, narratives, matrix, dict_keys, vecfile):
                     vec = word2vec.get(word, vec_model)
                     #if word == "didnt":
                     #    word = "didn't"
-<<<<<<< Updated upstream
+
                     vec = word2vec.get(word,vec_model)
                     '''
                     if match.match(word):
@@ -626,13 +622,6 @@ def vector_features(feat_name, narratives, matrix, dict_keys, vecfile):
                     else:
                         vec = word2vec.get(word.decode('utf-8'),vec_model_hi)
                     '''
-=======
-                    #if match.match(word):
-                    #    word = word.strip('\"')
-                    #    vec = word2vec.get(word,vec_model_en)
-                    #else:
-                    #    vec = word2vec.get(word.decode('utf-8'),vec_model_hi)
->>>>>>> Stashed changes
                     vectors.append(vec)
 
 	# Symptoms separated by ' '
