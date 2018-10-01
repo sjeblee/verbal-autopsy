@@ -1162,7 +1162,7 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
     vec_feats = False
     Y_arrays = []
     labels2 = []
-    extra_labels = False
+    use_extra_labels = False
 
     # Edit by Yoona for narrative symptoms
     #symptoms_keys = []
@@ -1294,7 +1294,7 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
     endtime = time.time()
     mins = float(endtime-starttime)/60
     print "preprocessing took " + str(mins) + " mins"
-    if extra_labels:
+    if use_extra_labels:
         print "returning extra labels"
         return [y, labels2]
     else:
