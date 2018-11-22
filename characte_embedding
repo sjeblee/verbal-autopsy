@@ -27,7 +27,7 @@ import math
 data={}
 seq_length = 0
 all_categories = []
-tree = etree.parse('/u/yanzhaod/data/va/mds+rct/train_adult_cat.xml')
+tree = etree.parse('../data/mds+rct/train_adult_cat.xml')
 for e in tree.iter("cghr_cat"):
         if e.text not in data:
              data[e.text]=[]

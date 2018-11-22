@@ -454,9 +454,9 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     print "anova_function: " + arg_anova
 
     # Seleck k best features for each class
-    if output_topk_features == True:
-        if arg_model == "nn":
-            select_top_k_features_per_class(X,Y,anova_function,arg_prefix, 100)
+ #   if output_topk_features == True:
+  #      if arg_model == "nn":
+   #         select_top_k_features_per_class(X,Y,anova_function,arg_prefix, 100)
     
     # Select best features for all data
     if ((not is_nn) or arg_model == "nn") and num_feats < x_feats:
@@ -544,8 +544,8 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
 	        model.save(modelfile)
 	        plotname = modelfile + ".png"
 	        plot_model(model, to_file=plotname)
-	    else: # Save Pytorch model
-	        torch.save(model, modelfile)
+	    #else: # Save Pytorch model
+	       # torch.save(model, modelfile)
     # Other models
     else:
          if arg_model == "svm":

@@ -2,18 +2,18 @@
 # Script to run all the steps of the Verbal Autopsy pipeline
 
 # Directories for data input and output: SET THESE
-prefix="/u/sjeblee/research/va/data"   # File output prefix
-dataloc="/u/sjeblee/research/va/data/datasets"  # Location of data files (i.e. parent of mds+rct folder
+prefix="/u/yanzhaod/research/output"   # File output prefix
+dataloc="/u/yanzhaod/data/va"  # Location of data files (i.e. parent of mds+rct folder
 
-name="gru_adult_who"   # Give the output folder a name, will be created in $prefix
+name="gru_neonate_who_02"   # Give the output folder a name, will be created in $prefix
 modelname="gru"        # Model type: one of: nn cnn svm rnn gru
 prep="spell"          # Preprocessings: any comma-separated list of: none spell stem, kwc
 feats="narr_vec"    # Features, comma-separated list of: narr_count narr_vec narr_symp dem narr_tfidf lda
-fname="narrv_100"         # Give the featureset a name
-labels="cat_who"     # ICD categories to use (leave this as cghr_cat)
-dataset="mds+rct_who"     # Dataset to use (leave this as mds+rct)
-trainset="adult"      # Training data to use: all adult child neonate
-devset="adult"        # Testing data to use: all adult child neonate
+fname="narrv_08"         # Give the featureset a name
+labels="cghr_cat"     # ICD categories to use (leave this as cghr_cat)
+dataset="mds+rct"     # Dataset to use (leave this as mds+rct)
+trainset="neonate"      # Training data to use: all adult child neonate
+devset="neonate"        # Testing data to use: all adult child neonate
 vecfile="$dataloc/mds+rct/narr+ice+medhelp.vectors.100" # Vectors for narr_vec features
 sympfile="/u/yoona/symptom_files/SYMP.csv" # Symptom file for symptom extraction
 chvfile="/u/yoona/symptom_files/CHV_concepts_terms_flatfile_20110204.tsv" # CHV file for symptom extraction
