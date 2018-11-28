@@ -11,10 +11,15 @@ import numpy
 import operator
 import subprocess
 
-def clean_file(filename):
+def clean_file(filename, outfile):
     # remove blank lines | remove extra spaces| remove leading and trailing spaces  | fix utf-8 chars
     command = r"sed '/^\s*$/d' $file | sed -e 's/  */ /g' | sed -e 's/^ //g' | sed -e 's/ $//g' | sed -e 's/&amp;/and/g' | sed -e 's/&#13;/ /g' | sed -e 's/&#8217;/\'/g' | sed -e 's/&#8221;/\"/g' | sed -e 's/&#8220;/\"/g' | sed -e 's/&#65533;//g' | sed -e 's/&#175\7;//g'| sed -e 's/&#1770;/\'/g'"
-    # TODO
+    ps = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
+    output = ps.communicate()[0]
+    out = open(outfile, 'w')
+    out.write(str(output))
+    out.close()
+
 
 ''' Convert arrows in text to non-arrows (for xml processing)
     filename: the file to fix (file will be overwritten)
@@ -26,7 +31,7 @@ def fix_arrows(filename):
     ps = subprocess.Popen(sed_command, shell=True, stdout=subprocess.PIPE)
     output = ps.communicate()[0]
     out = open(filename, 'w')
-    out.write(output)
+    out.write(str(output))
     out.close()
 
 def decode_ageunit(unit):
@@ -79,6 +84,7 @@ def fix_escaped_chars(filename):
     subprocess.call(["sed", "-i", "-e", "s/&#8217;/'/g", filename])
     subprocess.call(["sed", "-i", "-e", "s/&#8211;/,/g", filename])
 
+
 ''' Remove blank lines, convert \n to space, remove double spaces, insert a line break before each record
     filename: the file to fix (file will be overwritten)
     rec_type: the type of record: adult, child, or neonate
@@ -99,8 +105,9 @@ def fix_line_breaks(filename, rec_type):
     ps = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
     output = ps.communicate()[0]
     out = open(filename, 'w')
-    out.write(output)
+    out.write(str(output))
     out.close()
+
 
 ''' Read an icd category mapping from a csv file into a python dictionary
     filename: the name of the csv file (lines formatted as code,cat)
@@ -113,6 +120,7 @@ def get_icd_map(filename):
             parts = line.split(',')
             icd_map[parts[0]] = parts[1]
     return icd_map
+
 
 def load_word2vec(vecfile):
     # Create word2vec mapping
@@ -133,6 +141,7 @@ def load_word2vec(vecfile):
                 word2vec[word] = vec
                 dim = len(vec)
     return word2vec, dim
+
 
 ''' Labels must be integers or the empty string!
     labels: [num_samples, seq_len]
@@ -175,6 +184,7 @@ def decode_multi_hot(labels):
         decoded_labels.append(label_seq.strip(','))
     return decoded_labels
 
+
 ''' labels: [num_samples, num_clusters]
     returns: a list of multi-hot vectors
 '''
@@ -189,6 +199,7 @@ def map_to_multi_hot(labels, threshold=0.1):
                 label_seq[x] = 1
         decoded_labels.append(label_seq)
     return decoded_labels
+
 
 def remove_no_narrs(infile, outfile):
     # Get the xml from file
@@ -210,6 +221,7 @@ def remove_no_narrs(infile, outfile):
     print("Removed ", str(count), " missing or empty narratives")
     tree.write(outfile)
 
+
 def score_majority_class(true_labs):
     pred_labs = []
     majority_lab = None
@@ -226,6 +238,7 @@ def score_majority_class(true_labs):
     recall = metrics.recall_score(true_labs, pred_labs, average="weighted")
     f1 = metrics.f1_score(true_labs, pred_labs, average="weighted")
     return precision, recall, f1
+
 
 ''' Scores vector labels with binary values
     returns: avg precision, recall, f1 of 1 labels (not 0s)
@@ -286,6 +299,7 @@ def score_vec_labels(true_labs, pred_labs):
         micro_f1 = 2*(micro_p*micro_r)/(micro_p+micro_r)
     return precision, recall, f1, micro_p, micro_r, micro_f1
 
+
 ''' Get content of a tree node as a string
     node: etree.Element
 '''
@@ -296,6 +310,7 @@ def stringify_children(node):
         if type(parts[x]) != str:
             parts[x] = str(parts[x])
     return ''.join(filter(None, parts))
+
 
 ''' Get contents of tags as a list of strings
     text: the xml-tagged text to process
@@ -340,6 +355,7 @@ def text_from_tags(text, tags):
                 newtext = newtext + ' ' + child.text
     return newtext
 
+
 ''' matrix: a list of dictionaries
     dict_keys: a list of the dictionary keys
     outfile: the file to write to
@@ -359,11 +375,13 @@ def write_to_file(matrix, dict_keys, outfile):
     key_output.close()
     return dict_keys
 
+
 def xml_to_txt(filename):
     name = filename.split(".")[0]
     sed_command = r"sed '$d' < " + filename + r" | sed '1d' > " + name + ".txt"
     ps = subprocess.Popen(sed_command, shell=True, stdout=subprocess.PIPE)
     ps.communicate()
+
 
 def zero_vec(dim):
     vec = []

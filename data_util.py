@@ -111,7 +111,7 @@ def get_icd_map(filename):
         for line in f:
             line = line.strip()
             parts = line.split(',')
-            icd_map[parts[0]] = parts[1]
+            icd_map[parts[0].upper()] = parts[1]
     return icd_map
 
 def load_word2vec(vecfile):
