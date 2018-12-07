@@ -76,9 +76,14 @@ narr: the text-only narrative
 ann: just the xml tags
 split_sents: NOT IMPLEMENTED YET
 '''
-def ann_to_seq(narr, ann, split_sents):
+def ann_to_seq(narr, ann, split_sents, ncrf=True):
     ann_element = etree.fromstring("<root>" + ann.decode('utf8') + "</root>")
-    narr_ref = narr.replace('\n', ' ') # Replace newlines with spaces so words get separated
+    if ncrf:
+        narr_ref = narr.replace('\n', '$')
+        if split_sents:
+            narr_ref = re.sub("\.  ", ". $", narr_ref)
+    else:
+        narr_ref = narr.replace('\n', ' ') # Replace newlines with spaces so words get separated
     tags = []
     seqs = [] # a list of tuples (word, label)
     for child in ann_element:
@@ -87,9 +92,12 @@ def ann_to_seq(narr, ann, split_sents):
             #print "element: " + etree.tostring(child).decode('utf8')
     #print "tags: " + str(len(tags))
     # Sort tags by span start
-    tags.sort(key=lambda x:x.start)
+    tags.sort(key=lambda x: x.start)
     index = 0
     for tag in tags:
+        if tag.start < index:
+            print("WARNING: dropping overlapping reference tag")
+            continue
         if tag.start > index:
             text = narr_ref[index:tag.start]
             index = tag.start
@@ -105,13 +113,15 @@ def ann_to_seq(narr, ann, split_sents):
             elif label == BT:
                 label = IT
         index = tag.end
+
     # Add the tail of the narrative
     if index < len(narr):
         text = narr_ref[index:]
         get_seqs(text, O, seqs)
 
     # Split sentences
-    if split_sents:
+    if split_sents and not ncrf:
+        print("split_sents")
         narr = re.sub("\.  ", ". \n", narr) # Add line breaks after sentence breaks
         narr_splits = narr.splitlines()
         #print "split_sents: " + str(len(narr_splits))
@@ -138,7 +148,7 @@ def get_seqs(text, label, seqs):
         seqs.append((word, O))
 
 def split_words(text):
-    return re.findall(r"[\w']+|[.,!?;=/\-\[\]]", text.strip())
+    return re.findall(r"[\w']+|[.,!?;$=/\-\[\]]", text.strip())
 
 
 '''
@@ -166,6 +176,13 @@ def xml_to_seq(text):
         chunk = chunks[x].strip()
         if len(chunk) > 0:
             if debug: print("chunk: ", chunk)
+
+            # Escape brackets for the NCRF model
+            if chunk == "[":
+                chunk = "LB"
+            elif chunk == "]":
+                chunk = "RB"
+
             # Handle EVENTs
             if in_event:
                 if chunk == event_end:
@@ -310,6 +327,8 @@ def to_xml(seq):
     in_elem = False
     elem_text = ""
     text = re.sub('LINEBREAK', '\n', text.strip())
+    #text = re.sub('LB', '[', text)
+    #text = re.sub('RB', ']', text)
 
     # Fix lines
     lines = []

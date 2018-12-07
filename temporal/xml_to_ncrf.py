@@ -35,27 +35,36 @@ def main():
         extract_features(args.infile, args.outfile)
 
 
-def extract_features(infile, outfile):
-    seq_ids, seqs = model_seq.get_seqs(infile, split_sents=False, inline=True, add_spaces=True)
+def extract_features(infile, outfile, arg_inline=True):
+    seq_ids, seqs = model_seq.get_seqs(infile, split_sents=False, inline=arg_inline, add_spaces=True)
     # seqs: list of lists of tuples of (word, label)
     outdata = open(outfile, 'w')
     outids = open(outfile + ".ids", 'w')
     outorig = open(outfile + ".orig", 'w')
     for x in range(len(seqs)):
-        seq = seqs[x]
+        pair = seqs[x]
+        #seq = seqs[x]
         seqid = seq_ids[x]
-        for pair in seq:
-            word = pair[0].strip()
-            feats = word_feats(word)
-            outorig.write(word + " " + map_label(pair[1]) + "\n")
-            if word != 'LINEBREAK':
-                word = word.lower()
-            outdata.write(word + " " + feats + ' ' + map_label(pair[1]) + "\n")
-            outids.write(seqid + "\n")
-            if word == 'LINEBREAK':
-                outdata.write('\n')
-                outids.write('\n')
-                outorig.write('\n')
+        #for pair in seq:
+        print('pair:', pair)
+        word = pair[0].strip()
+        feats = word_feats(word)
+        if word == "$":
+            word = "LINEBREAK"
+        outorig.write(word + " " + map_label(pair[1]) + "\n")
+        # Escape brackets for the NCRF model
+        if word == "[":
+            word = "LB"
+        elif word == "]":
+            word = "RB"
+        if word not in ['LINEBREAK', 'LB', 'RB']:
+            word = word.lower()
+        outdata.write(word + " " + feats + ' ' + map_label(pair[1]) + "\n")
+        outids.write(seqid + "\n")
+        if word == 'LINEBREAK':
+            outdata.write('\n')
+            outids.write('\n')
+            outorig.write('\n')
     outdata.close()
     outids.close()
 
@@ -95,22 +104,25 @@ def ncrf_to_xml(infile, outfile, testfile):
     textlines = ftext.readlines()
 
     # Remove lines with hashes
+    #print("original textlines:", len(textlines))
     regex = re.compile(r'^# [0-9]')
     textlines = list(filter(lambda i: not regex.search(i), textlines))
-    textlines = list(filter(lambda i: len(i.strip())>0, textlines)) # Remove blank lines
-
+    #print("textlines no hash:", len(textlines))
     idlines = fids.readlines()
-    idlines = list(filter(lambda i: len(i.strip())>0, idlines))
-
     origlines = forig.readlines()
+    print("textlines:", len(textlines), "orig:", len(origlines), "ids:", len(idlines))
+    textlines = list(filter(lambda i: len(i.strip())>0, textlines)) # Remove blank lines
     origlines = list(filter(lambda i: len(i.strip())>0, origlines))
+    idlines = list(filter(lambda i: len(i.strip())>0, idlines))
     ftext.close()
     fids.close()
     forig.close()
 
     id_to_seq = {}
 
-    print("textlines:", len(textlines), "ids:", len(idlines), "orig:", len(origlines))
+    print("textlines:", len(textlines), "orig:", len(origlines), "ids:", len(idlines))
+    #for x in range(0, 10):
+    #    print(textlines[x].strip(), "\t|", origlines[x].strip(), "\t|", idlines[x].strip())
     assert(len(textlines) == len(idlines) == len(origlines))
     for x in range(len(textlines)):
         id = idlines[x].strip()
@@ -125,10 +137,18 @@ def ncrf_to_xml(infile, outfile, testfile):
             if id not in id_to_seq:
                 id_to_seq[id] = []
             word = text[0]
+            if word == 'LB':
+                word = '['
+            elif word == 'RB':
+                word = ']'
             # Get word from origlines and make sure it matches the current output line
             orig_word = orig.split(' ')[0]
-            #print("orig:", orig_word, "word:", word)
+            print("orig:", orig_word, "word:", word)
             assert(orig_word.lower() == word.lower())
+            #if orig_word == 'LB':
+            #    orig_word = '['
+            #elif orig_word == 'RB':
+            #    orig_word = ']'
             tag = unmap_label(text[1])
             id_to_seq[id].append((orig_word, tag))
 
@@ -136,4 +156,4 @@ def ncrf_to_xml(infile, outfile, testfile):
     tree.write(outfile)
 
 
-if __name__ == "__main__":main()
+if __name__ == "__main__": main()

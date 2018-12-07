@@ -17,39 +17,43 @@ thyme_path = '/u/sjeblee/research/data/thyme'
 thyme_text = thyme_path + '/text/test'
 thyme_ref = thyme_path + '/anafora/test'
 thyme_xml = thyme_path + '/test_dctrel.xml'
-anafora_dir = '/nbb/sjeblee/thyme/output/system_anafora'
+#anafora_dir = '/nbb/sjeblee/thyme/output/system_anafora'
 
-tag_name = 'narr_timeml_crf'
+tag_name = 'narr_timeml_ncrf'
 
 def main():
     print("main")
     argparser = argparse.ArgumentParser()
     argparser.add_argument('-i', '--in', action="store", dest="infile")
     argparser.add_argument('-o', '--out', action="store", dest="outdir")
-    argparser.add_argument('-t', '--test', action="store", dest="testdir")
+    #argparser.add_argument('-t', '--test', action="store", dest="testdir")
     args = argparser.parse_args()
 
     if not (args.infile and args.outdir):
         print("usage: ./eval_thyme.py --in [file_timeml.xml] --out [folder]")
         exit()
 
-    # Convert output tags to inline and split into individual files
-    print("Converting output file...")
-    tempfile = args.infile
-    #tempfile = args.infile + ".inline"
-    #tools.to_inline(args.infile, tempfile)
-    tools.to_dir(tempfile, args.outdir, tag_name)
-
     # Convert reference format to anafora (only need to do this once)
-    print("Converting ref dir...")
-    thyme_dir = thyme_path + '/test_ref'
-    tools.to_dir(thyme_xml, thyme_dir, 'narr_timeml_simple')
-    timeml._timeml_dir_to_anafora_dir(thyme_dir, thyme_ref)
+    #print("Converting ref dir...")
+    #thyme_dir = thyme_path + '/test_ref_sample'
+    #tempfile = thyme_xml + ".inline"
+    #ref_name = 'narr_timeml_gold'
+    # tools.to_inline(thyme_xml, tempfile, ref_name)
+    #tools.to_dir(tempfile, thyme_dir, ref_name)
+    #timeml._timeml_dir_to_anafora_dir(thyme_dir, thyme_ref)
+
+    # Convert output tags to inline and split into individual files
+    anafora_dir = args.outdir + ".anafora"
+    print("Converting output file...")
+    tempfile = args.infile + ".fixed"
+    # tools.to_inline(args.infile, tempfile)
+    tools.adjust_spans(args.infile, tempfile, ref_dir=thyme_text)
+    tools.to_dir(tempfile, args.outdir, tag_name)
+    timeml._timeml_dir_to_anafora_dir(args.outdir, anafora_dir)
 
     # Run evaluation
     print("Running anafora eval script...")
-    timeml._timeml_dir_to_anafora_dir(args.outdir, anafora_dir)
-    evaluate.main(["--reference", args.testdir, "--predicted", anafora_dir, "--verbose"])
+    evaluate.main(["--reference", thyme_ref, "--predicted", anafora_dir, "--include", "TIMEX3", "EVENT", "--verbose", "--no-props"])
 
 
 def write_eval_files(output_file, eval_dir):
@@ -84,7 +88,7 @@ def write_eval_files(output_file, eval_dir):
                 narr_text = narr_text[4:]
             narr = tail + narr_text
 
-            print("narr_text:", narr)
+            #print("narr_text:", narr)
 
         else:
             print("narr is None!")
@@ -108,4 +112,4 @@ def write_eval_files(output_file, eval_dir):
         tools.unsplit_punc(filename)
 
 
-if __name__ == "__main__":main()
+if __name__ == "__main__": main()

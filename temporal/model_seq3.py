@@ -25,12 +25,14 @@ import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 global labelencoder, onehotencoder, label_set, max_seq_len, num_labels
-debug = False
+debug = True
 id_name = "record_id"
 max_seq_len = 100
+use_ncrf = False
 #vecfile = "/u/sjeblee/research/va/data/datasets/mds+rct/narr+ice+medhelp.vectors.100"
 #vecfile = "/u/sjeblee/research/vectors/GoogleNews-vectors-negative300.bin"
 vecfile = "/u/sjeblee/research/vectors/wikipedia-pubmed-and-PMC-w2v.bin"
+
 
 def main():
     argparser = argparse.ArgumentParser()
@@ -59,22 +61,27 @@ def main():
 
 def run(trainfile, testfile, outfile="", modelname="crf", arg_inline=False, devfile=""):
     if modelname == 'ncrf':
+        global use_ncrf
+        use_ncrf = True
         if devfile == "":
             print("WARNING: missing devfile argument")
         if outfile == "":
             print("WARNING: missing outfile argument")
         # Convert data to ncrf format
         ncrf_path = '/u/sjeblee/research/git/NCRFpp'
+        data_name = 'thyme'
+        ncrf_dir = '/u/sjeblee/research/git/NCRFpp/thyme_data'
         if 'TempEval' in trainfile:
             ncrf_dir = '/u/sjeblee/research/git/NCRFpp/tempeval_data'
-        elif 'thyme' in trainfile:
-            ncrf_dir = '/u/sjeblee/research/git/NCRFpp/thyme_data'
+            data_name = 'tempeval'
+        #elif 'thyme' in trainfile:
+        #    ncrf_dir = '/u/sjeblee/research/git/NCRFpp/thyme_data'
         train_ncrf = ncrf_dir + '/train.bio'
         dev_ncrf = ncrf_dir + '/dev.bio'
         test_ncrf = ncrf_dir + '/test.bio'
-        #xml_to_ncrf.extract_features(trainfile, train_ncrf)
-        #xml_to_ncrf.extract_features(devfile, dev_ncrf)
-        #xml_to_ncrf.extract_features(testfile, test_ncrf)
+        #xml_to_ncrf.extract_features(trainfile, train_ncrf, arg_inline)
+        #xml_to_ncrf.extract_features(devfile, dev_ncrf, arg_inline)
+        #xml_to_ncrf.extract_features(testfile, test_ncrf, arg_inline)
     else:
         # Extract sequences with labels
         train_ids, train_seqs = get_seqs(trainfile, split_sents=True, inline=arg_inline, add_spaces=True)
@@ -124,8 +131,8 @@ def run(trainfile, testfile, outfile="", modelname="crf", arg_inline=False, devf
 
     elif modelname == 'ncrf':
         # Run NCRF model
-        subprocess.call(["python", "main.py", "--config", "tempeval.train.config"], cwd=ncrf_path)
-        subprocess.call(["python", "main.py", "--config", "tempeval.decode.config"], cwd=ncrf_path)
+        subprocess.call(["python", "main.py", "--config", data_name + ".train.config"], cwd=ncrf_path)
+        subprocess.call(["python", "main.py", "--config", data_name + ".decode.config"], cwd=ncrf_path)
         xml_to_ncrf.ncrf_to_xml(ncrf_dir, outfile, testfile)
 
     elif modelname == 'gru':
@@ -549,13 +556,16 @@ def get_seqs(filename, split_sents=False, inline=True, add_spaces=False):
                 seqs.append(narr_seq)
                 seq_ids.append(rec_id)
     else:
+        # TEMP
+        use_ncrf = True
+        split_sents = True
+        print("split_sents: ", str(split_sents))
         for x in range(len(narrs)):
             narr = narrs[x]
             ann = anns[x]
             rec_id = ids[x]
-            #print("split_sents: ", str(split_sents))
-            ann_seqs = xmltoseq.ann_to_seq(narr, ann, split_sents)
-            #print("seqs: ", str(len(ann_seqs)))
+            ann_seqs = xmltoseq.ann_to_seq(narr, ann, split_sents, use_ncrf)
+            print("seqs: ", str(len(ann_seqs)))
             for s in ann_seqs:
                 seqs.append(s)
                 seq_ids.append(rec_id)
