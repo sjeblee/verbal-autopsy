@@ -19,18 +19,17 @@ thyme_ref = thyme_path + '/anafora/test'
 thyme_xml = thyme_path + '/test_dctrel.xml'
 #anafora_dir = '/nbb/sjeblee/thyme/output/system_anafora'
 
-tag_name = 'narr_timeml_ncrf'
-
 def main():
     print("main")
     argparser = argparse.ArgumentParser()
     argparser.add_argument('-i', '--in', action="store", dest="infile")
     argparser.add_argument('-o', '--out', action="store", dest="outdir")
+    argparser.add_argument('--label', action="store", dest="label")
     #argparser.add_argument('-t', '--test', action="store", dest="testdir")
     args = argparser.parse_args()
 
-    if not (args.infile and args.outdir):
-        print("usage: ./eval_thyme.py --in [file_timeml.xml] --out [folder]")
+    if not (args.infile and args.outdir and args.label):
+        print("usage: ./eval_thyme.py --in [file_timeml.xml] --out [folder] --label [narr_model]")
         exit()
 
     # Convert reference format to anafora (only need to do this once)
@@ -38,7 +37,7 @@ def main():
     #thyme_dir = thyme_path + '/test_ref_sample'
     #tempfile = thyme_xml + ".inline"
     #ref_name = 'narr_timeml_gold'
-    # tools.to_inline(thyme_xml, tempfile, ref_name)
+    #tools.to_inline(thyme_xml, tempfile, ref_name)
     #tools.to_dir(tempfile, thyme_dir, ref_name)
     #timeml._timeml_dir_to_anafora_dir(thyme_dir, thyme_ref)
 
@@ -47,13 +46,13 @@ def main():
     print("Converting output file...")
     tempfile = args.infile + ".fixed"
     # tools.to_inline(args.infile, tempfile)
-    tools.adjust_spans(args.infile, tempfile, ref_dir=thyme_text)
-    tools.to_dir(tempfile, args.outdir, tag_name)
+    tools.adjust_spans(args.infile, tempfile, args.label, ref_dir=thyme_text)
+    tools.to_dir(tempfile, args.outdir, args.label)
     timeml._timeml_dir_to_anafora_dir(args.outdir, anafora_dir)
 
     # Run evaluation
     print("Running anafora eval script...")
-    evaluate.main(["--reference", thyme_ref, "--predicted", anafora_dir, "--include", "TIMEX3", "EVENT", "--verbose", "--no-props"])
+    evaluate.main(["--reference", thyme_ref, "--predicted", anafora_dir, "--include", "TIMEX3", "EVENT", "--verbose", "--overlap", "--no-props"])
 
 
 def write_eval_files(output_file, eval_dir):

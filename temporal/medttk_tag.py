@@ -27,15 +27,15 @@ def run(infile, outfile):
     element_name = "narr_medttk"
 
     print "processing file: " + str(infile)
-    
+
     # Get the xml from file
     tree = etree.parse(infile)
     root = tree.getroot()
-    
+
     for child in root:
         node = child.find("narrative")
         narr = ""
-        if node != None:
+        if node is not None:
             narr = node.text.encode('utf-8')
         if len(narr) > 0:
             temp = open(text_infile, "w")
@@ -68,9 +68,9 @@ def run(infile, outfile):
             newnode.text = med_narr
             print "med_narr: " + med_narr
             child.append(newnode)
-        
+
     # write the stats to file
     tree.write(outfile)
-    
+
 
 if __name__ == "__main__":main()

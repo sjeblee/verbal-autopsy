@@ -24,11 +24,11 @@ def run(infile, outfile):
     # Get the xml from file
     tree = etree.parse(infile)
     root = tree.getroot()
-    
+
     for child in root:
         node = child.find("narrative")
         narr = ""
-        if node != None:
+        if node is not None:
             narr = node.text.encode('utf-8')
         if len(narr) > 0:
             temp = open("/u/sjeblee/temp.txt", "w")
@@ -48,7 +48,7 @@ def run(infile, outfile):
                 text1 = text1 + line
             newnode.text = text1
             child.append(newnode)
-        
+
     # write the stats to file
     tree.write(outfile)
     subprocess.call(["sed", "-i", "-e", 's/&lt;/ </g', outfile])
@@ -60,4 +60,5 @@ def run(infile, outfile):
     subprocess.call(["sed", "-i", "-e", "s/&#8217;/'/g", outfile])
     subprocess.call(["sed", "-i", "-e", "s/&#8211;/,/g", outfile])
 
-if __name__ == "__main__":main()
+
+if __name__ == "__main__": main()

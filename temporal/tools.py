@@ -12,12 +12,12 @@ from lxml.etree import tostring
 from lxml import etree
 from xml.sax.saxutils import unescape
 
-inline_narr_name = 'narr_timeml_ncrf'
+#inline_narr_name = 'narr_ctakes'
 debug = True
 
-def adjust_spans(inline_xml, outfile, ref_dir=None):
+def adjust_spans(inline_xml, outfile, inline_narr_name, ref_dir=None):
     print('adjust_spans')
-    #fix_arrows_only(inline_xml)
+    fix_arrows_only(inline_xml)
     inline_tree = etree.parse(inline_xml)
 
     for child in inline_tree.getroot():
@@ -102,15 +102,33 @@ def fix_narr_spans(narr, ref_narr):
             # Close tags before inserting missing chars
             if char == '<' and narr[index+1] == '/': # Ignore tags
                 if debug: print('ignoring end tag')
+                char_buffer = ''
                 while not char == '>':
-                    new_narr = new_narr + char
+                    char_buffer = char_buffer + char
+                    #new_narr = new_narr + char
                     index += 1
                     char = narr[index]
                     if debug: print('ignoring [', index, ']', char)
                 # Add the close >
-                new_narr = new_narr + char
+                char_buffer = char_buffer + char
                 if debug: print('closed [', index, ']', char)
                 index +=1
+                if 'TimeML' not in char_buffer:
+                    # Delete trailing spaces from inside the tags
+                    save_char = ''
+                    while new_narr[-1] in insert_chars:
+                        save_char = save_char + new_narr[-1]
+                        new_narr = new_narr[0:-1]
+                        if debug: print('moved trailing char')
+                    new_narr = new_narr + char_buffer + save_char
+                else:
+                    if debug: print('Dropped TimeML tag')
+
+                # Check for the end of the pred narr
+                if index >= len(narr) or char_buffer == '</TimeML>':
+                    new_narr = new_narr + ref_narr[ref_index:]
+                    return new_narr
+
                 char = narr[index]
 
             elif ref_char in insert_chars:
@@ -140,15 +158,26 @@ def fix_narr_spans(narr, ref_narr):
             # Add open tags
             elif char == '<': # Ignore tags
                 if debug: print('ignoring start tag')
+                char_buffer = ''
                 while not char == '>':
-                    new_narr = new_narr + char
+                    char_buffer = char_buffer + char
                     index += 1
                     char = narr[index]
                     if debug: print('ignoring [', index, ']', char)
                 # Add the close >
-                new_narr = new_narr + char
+                char_buffer = char_buffer + char
                 if debug: print('closed [', index, ']', char)
                 index +=1
+                if 'TimeML' not in char_buffer:
+                    new_narr = new_narr + char_buffer
+                else:
+                    if debug: print('Dropped TimeML tag')
+
+                # Check for the end of the pred narr
+                if index >= len(narr):
+                    new_narr = new_narr + ref_narr[ref_index:]
+                    return new_narr
+
                 char = narr[index]
 
             else:
@@ -222,7 +251,7 @@ def stringify_children(node):
 
 ''' Convert separate xml tags to inline xml tags
 '''
-def to_inline(infile, outfile, narr_name=inline_narr_name):
+def to_inline(infile, outfile, narr_name='narr_timeml_crf'):
     tree = etree.parse(infile)
     treeroot = tree.getroot()
 
@@ -306,9 +335,15 @@ def to_dir(filename, dirname, node_name):
 
             # Remove empty event nodes
             for event_tag in narr_node.findall('EVENT'):
+                #del event_tag.attrib['span'] # TEMP for ctakes
+                #del event_tag.attrib['start'] # TEMP for ctakes
                 if event_tag.text is None:
                     narr_node.remove(event_tag)
                     print('WARNING: Removed empty EVENT', event_tag.attrib['eid'], 'in', docid)
+            # TEMP for ctakes
+            #for time_tag in narr_node.findall('TIMEX3'):
+            #    del event_tag.attrib['span'] # TEMP for ctakes
+            #    del event_tag.attrib['start']
 
             narr_text = unescape(stringify_children(narr_node))
             if narr_text[0:4] == "None":
