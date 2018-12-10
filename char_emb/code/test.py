@@ -37,61 +37,33 @@ import numpy as np
 data={}         
 all_categories = []
 input_train = '/u/yanzhaod/data/va/mds+rct/train_child_cat.xml'
-out_model_filename = "./output/model_child_gru2.pt"
-out_text_filename = "output/out_gru_test.txt"
+out_model_filename = "./output/model_child_gru_test_64.pt"
+out_text_filename = "output/out_child_gru_test_64.txt"
+out_results_filename = 'output/out_child_gru_test_results.txt'
 tree = etree.parse(input_train)
 for e in tree.iter("cghr_cat"):
         text = e.text.lower()
         if text not in data:
              data[text]=[]
              all_categories.append(text)
-count = 0
-narr = True
+             
 
-#sometimes like in "MG_ID" = c1247, there is no narratives
-l = []
-ID = 'null'
-counter = 200
-LAST = False
-for e in tree.iter("narrative","cghr_cat"):
-    if LAST == False:
-        LAST = e.tag
-    else:
-        if LAST == e.tag and e.tag == 'cghr_cat':
-            continue   #ignore the case where cghr_cat appears two times
-        if LAST != e.tag:  #desired case
-            LAST = e.tag
-    if e.tag == "narrative":
-        value= e.text.lower()
-        count += 1
-    if e.tag == 'cghr_cat':
-        data[e.text].append(value)
-        
-
-# l = []
-# LAST = False
-# for e in tree.iter("MG_ID","narrative","cghr_cat"):
-#     if not LAST:
-#         LAST = e.tag
-#     else:
-        if LAST == "MG_ID":
-#             DESIRED = "narrative"
-#         elif LAST == "narrative":
-            DESIRED = "cghr_cat"
-#         elif LAST == "cghr_cat":
-#             DESIRED = "MG_ID"
-    
-    
-
-
-
-print('number of narratives: %d' %count)
-
+root = tree.getroot()
+for child in root:
+    MG_ID = child.find('MG_ID')
+    narrative = child.find('narrative')
+    cghr_cat = child.find('cghr_cat')
+    try:
+        data[cghr_cat.text].append((MG_ID.text,narrative.text.lower()))
+    except AttributeError:
+        continue
+# for e in child.iter("MG_ID","narrative","cghr_cat"):
+#     print(e
 print("keys of data:")
-print(data.keys())
-# print("one value of data:")
-# example_key = data.keys()[0]
-# print(data[example_key])
+print(data.keys()[0])
+print("values of data:")
+print(data.values()[0][0])       
+
 
 n_categories= len(all_categories)
 
@@ -104,7 +76,8 @@ print("size of the narratives: %d" %n_iters)
 
 all_text = ''
 for v in data.itervalues():
-    all_text = all_text + u"-".join(v)
+    l = [v[i][1] for i in range(len(v))]
+    all_text = all_text + u"-".join(l)
 
 vocab = set(all_text)
 print("vocab: " +str(vocab))
@@ -125,15 +98,14 @@ def lineToTensor(narrative):
     for li, letter in enumerate(narrative):
         tensor[li][0] = letterToIndex(letter)
     return tensor
-
 #
 print("a sample tensor of letter 'a':")
 print(letterToTensor('a'))
-narr = data['1'][0]
+narr = data[data.keys()[0]][1][1]
+print(data[data.keys()[0]][1])
 print("the size of a sample input (narr): ")
 input = lineToTensor(narr)
 print(input.size())
-
 
 # In[79]:
 
@@ -194,7 +166,7 @@ def randomChoice(l):
 
 def randomTrainingExample():
     category = randomChoice(all_categories)
-    line = randomChoice(data[category])
+    line = randomChoice(data[category][1])
     category_tensor = torch.tensor([all_categories.index(category)], dtype=torch.long)
     line_tensor = lineToTensor(line)
     return category, line, category_tensor, line_tensor
@@ -261,14 +233,15 @@ def train_iter():
     start = time.time()
     iter = 0
     #for iter in range(1, n_iters + 1):
+
     for e in range(epochs):
         for k,v in data.iteritems():
             for i in range(len(v)):
                 iter += 1
-                category, line, category_tensor, line_tensor = getTensors(k,v[i])
+                category, line, category_tensor, line_tensor = getTensors(k,v[i][1])
                 output, loss = train(category_tensor, line_tensor)
                 current_loss += loss
-                
+
                 guess, guess_i = categoryFromOutput(output)
                 #print('guess: %s;   category:  %s' %(guess, category))    
                 # Print iter number, loss, name and guess
@@ -287,6 +260,7 @@ def train_iter():
 
 
 def testTrainSet(model):
+    result = []
     cat_pred,cat_true = [],[]
     iter = 0
     print_every = 100
@@ -296,31 +270,23 @@ def testTrainSet(model):
             iter += 1
             if iter % print_every == 0:
                 print(iter,timeSince(start))
-            category, line, category_tensor, line_tensor = getTensors(k,v[i])
+            category, line, category_tensor, line_tensor = getTensors(k,v[i][1])
+            MG_ID = v[i][0]
             output,hidden = gru(line_tensor,None)
             guess, guess_i = categoryFromOutput(output)
-            cat_pred.append(guess)
-            cat_true.append(category)
-            print(guess,category)
-    f1score = f1_score(cat_true,cat_pred,average="weighted")
-    print(f1score)
-    writeToFile("f1score: " + str(f1score),out_text_filename)
+            result.append({'Correct_ICD':category,'Predicted_ICD':guess,'MG_ID':MG_ID})
+            #print(guess,category)
+    #f1score = f1_score(cat_true,cat_pred,average="weighted")
+    #print(f1score)
+    #writeToFile("f1score: " + str(f1score),out_text_filename)
+    for i in range(len(result)):
+        result[i] = str(result[i])
+    writeToFile('\n'.join(result),out_results_filename)
+    
     return
-# In[117]:
-
 if __name__ == '__main__':
-    root = tree.getroot()
-    for child in root:
-        print(child.find('MG_IzsD')==None)
-        # for e in child.iter("MG_ID","narrative","cghr_cat"):
-        #     print(e
-
-
-        
     
-    
-    
-    #model = train_iter()
+    model = train_iter()
     #model = torch.load(out_model_filename)
 
-    #testTrainSet(model)
+    testTrainSet(model)
