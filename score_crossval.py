@@ -13,7 +13,7 @@ def main():
     argparser = argparse.ArgumentParser()
     argparser.add_argument('--in', action="store", dest="infile")
     argparser.add_argument('--out', action="store", dest="outfile")
-    argparser.add_argument('--models', action="store",dest="models")
+    argparser.add_argument('--models', action="store", dest="models")
     args = argparser.parse_args()
 
     if not (args.infile and args.outfile):
@@ -134,7 +134,7 @@ def run(arg_infile, arg_outfile, arg_models):
     #    for x in range(0,5):
     #        output.write(str(final_stdevs[model]['all'][x]) + ",")
     #    output.write("\n")
-   
+
     output.close()
 
 def get_scores(filename):

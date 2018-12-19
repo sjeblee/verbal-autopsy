@@ -160,7 +160,7 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
     # Keywords from textrank
     tr_keywords = []
 
-    if event_vec in featurenames or event_seq in featurenames or symp_count in featurenames:
+    if event_vec in featurenames or event_seq in featurenames or symp_count in featurenames or symp_vec in featurenames:
         element = "narr_symp"
 
     # Get the xml from file

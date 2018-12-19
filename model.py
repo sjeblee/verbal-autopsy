@@ -52,7 +52,7 @@ vec_types = ["narr_vec", "narr_seq", "event_vec", "event_seq", "symp_vec", "kw_v
 numpy.set_printoptions(threshold=numpy.inf)
 
 # Use keras or pytorch
-use_torch = True
+use_torch = False
 
 # Output top K features
 output_topk_features = True
@@ -529,8 +529,9 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
                 model, X, Y = model_library.rnn_cnn_model(X, Y, num_nodes, arg_activation, arg_model, X2=X2)
             elif arg_model == "cnn":
                 Y = to_categorical(Y)
+                print("use_torch:", use_torch)
 		if use_torch:
-		    model = model_library_torch.cnn_model(X,Y)
+                    model = model_library_torch.cnn_model(X,Y)
 		else:
                     model, X, Y = model_library.cnn_model(X, Y, X2=X2)
             elif arg_model == "filternn":

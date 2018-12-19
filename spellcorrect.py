@@ -50,6 +50,9 @@ def run(infile, outfile, arg_lm=False, fix_keywords=True):
         if node != None:
             narr = node.text
 
+        if narr is None or len(narr) > 0:
+            continue
+
         # If the whole narrative is uppercase, lowercase it
         if narr.isupper():
             narr = narr.lower()

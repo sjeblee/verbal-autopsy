@@ -28,16 +28,16 @@ def main():
 
 def run(infile, vec_size, name="narr+ice+medhelp", stem=False):
 
-    #bin_dir = "/u/sjeblee/tools/word2vec/word2vec/bin"
-    bin_dir = "/u/yoona/word2vec/bin"
+    bin_dir = "/u/sjeblee/tools/word2vec/word2vec/bin"
+    #bin_dir = "/u/yoona/word2vec/bin"
 
     # Input data
-    #data_dir = "/u/sjeblee/research/va/data/datasets/mds+rct"
-    data_dir = "/u/yoona/test/mds+rct" # hard-coded, Yoona's data location
-    #ice_data = "/u/sjeblee/research/data/ICE-India/Corpus/all-lower.txt"
-    ice_data = "/u/yoona/mds+rct/ice_all_lower.txt"
-    #medhelp_data = "/u/sjeblee/research/data/medhelp/all_medhelp_clean_lower.txt"
-    medhelp_data = "/u/yoona/mds+rct/all_medhelp_clean_lower.txt"
+    data_dir = "/u/sjeblee/research/va/data/datasets/mds+rct/crossval_sets"
+    #data_dir = "/u/yoona/test/mds+rct" # hard-coded, Yoona's data location
+    ice_data = "/u/sjeblee/research/data/ICE-India/Corpus/all-lower.txt"
+    #ice_data = "/u/yoona/mds+rct/ice_all_lower.txt"
+    medhelp_data = "/u/sjeblee/research/data/medhelp/all_medhelp_clean_lower.txt"
+    #medhelp_data = "/u/yoona/mds+rct/all_medhelp_clean_lower.txt"
     suffix = ".narrsent"
     if stem:
         ice_data = "/u/sjeblee/research/data/ICE-India/Corpus/all-lower-stem.txt"
