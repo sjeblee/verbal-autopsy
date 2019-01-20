@@ -4,7 +4,6 @@
 from __future__ import division
 
 import argparse
-#import statistics
 import sys
 from statsmodels.stats.contingency_tables import mcnemar
 

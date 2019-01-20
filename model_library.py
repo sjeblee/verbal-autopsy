@@ -48,7 +48,7 @@ def nn_model(X, Y, num_nodes, act, num_epochs=10):
                     #Activation(activation),
                     Dense(Y.shape[1]),
                     Activation('softmax'),])
-        
+
     nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
     nn.fit(X, Y, epochs=num_epochs)
     nn.summary()
@@ -121,7 +121,7 @@ def rnn_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', dropout=0
             if hybrid:
                 trainX2 = numpy.asarray(pretrainX2[k])
                 pretrain_input_arrays.append(trainX2)
-                                        
+
             prediction = Dense(trainY.shape[1], activation='softmax')(last_out)
             pre_nn = Model(inputs=inputs, outputs=prediction)
             pre_nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
@@ -160,7 +160,7 @@ def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, return_
 
     # Keras functional API with attention
     # Input layers
-    input_shape = (max_seq_len, embedding_size) 
+    input_shape = (max_seq_len, embedding_size)
     input1 = Input(shape=input_shape)
     inputs.append(input1)
     if len(X2) > 0:
@@ -180,7 +180,7 @@ def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, return_
     for w in windows:
         print "window: " + str(max_seq_len) + " x " + str(w)
         conv_layer = Conv1D(max_seq_len, w, input_shape=input_shape)
-	#conv_layer = Conv1D(10, w, input_shape=input_shape)
+	    #conv_layer = Conv1D(10, w, input_shape=input_shape)
         conv = conv_layer(input1)
         max_pool_layer = GlobalMaxPooling1D()
         max_pool = max_pool_layer(conv)
@@ -248,7 +248,7 @@ def rnn_keyword_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', d
     input_shape = (max_seq_len, embedding_size)
     input1 = Input(shape=input_shape)
     inputs.append(input1)
-    
+
     # Keyword CNN
     conv_outputs = []
     for w in windows:
@@ -605,7 +605,7 @@ def create_filter_rnn_model(X, Y, embedding_size, num_nodes, activation='tanh', 
     #permute1 = Permute((2,1))
     #permuted_weights = permute1(norm_weights)
     #print "permute1 output_shape: " + str(permute1.output_shape)
-    
+
     repeat = TimeDistributed(RepeatVector(embedding_size))
     repeated_weights = repeat(weights)
 
@@ -614,7 +614,7 @@ def create_filter_rnn_model(X, Y, embedding_size, num_nodes, activation='tanh', 
     final_weights = Reshape(input_shape)(repeated_weights)
     #TODO: mutiply layer - need to convert 1d weight to embedding_size vector?
     filter_out = multiply([input1, final_weights])
-    #filter_out = merge([input1, norm_weights], mode=scalarMult, output_shape=input_shape) 
+    #filter_out = merge([input1, norm_weights], mode=scalarMult, output_shape=input_shape)
     #TODO: masking layer???
     #Masking(mask_value) # but want <= mask_value, not just ==
     # TODO: save the weights for each word so we can look at them
@@ -642,8 +642,8 @@ def create_filter_rnn_model(X, Y, embedding_size, num_nodes, activation='tanh', 
     outfile = open(filename, 'w')
     outfile.write(str(train_weights))
     outfile.close()
-    
-    return nn, X, Y    
+
+    return nn, X, Y
 
 def scalarMult(layersList):
     vector = layersList[0]

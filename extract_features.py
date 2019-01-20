@@ -296,13 +296,13 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
         #SYMPTOM features (Edit by Yoona)
         if narr_symp in element:
             symp_string = ""
-            item = child.find(narr_symp) # Hard-coded. To be fixed 
+            item = child.find(narr_symp) # Hard-coded. To be fixed
             if item != None:
                 item_text = item.text
                 #symp_string = " " + str(item_text) + " "
 		symp_string = str(item_text).lower().translate(string.maketrans("",""), string.punctuation)
             symptoms.append(symp_string)
-        
+
 
         # Keyword features extracted using textrank
         if narr_textrank in element:
@@ -340,7 +340,7 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
                 temp_keys = symp_count_vectorizer.get_feature_names()
                 symptom_keys = []
 
-		# Append "symp_" to each symptom word to distinguish extracted symptoms from narratives. 
+		# Append "symp_" to each symptom word to distinguish extracted symptoms from narratives.
                 for key in temp_keys:
                     symptom_keys.append("symp_" + key)
                 print("Change symptoms key with appropriate name")
@@ -355,13 +355,13 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
                     for i in range(len(symptom_keys)):
                         key = symptom_keys[i]
                         val = symp_count_matrix[x, i]
-                        feat[key] = val   
+                        feat[key] = val
                 print("Add symptoms into dictionary as a key")
 
             out_matrix = open(infile + ".symp_countmatrix", "w")
             out_matrix.write(str(symp_count_matrix))
             out_matrix.close()
-    
+
         # Train CountVectorizer with keywords extracted using textrank
         if narr_textrank in element:
             global textrank_count_vectorizer
@@ -400,7 +400,7 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
                 print "training count_vectorizer"
                 count_vectorizer = sklearn.feature_extraction.text.CountVectorizer(ngram_range=(min_ngram,max_ngram),stop_words=stopwords)
                 count_vectorizer.fit(documents)
-	    
+
                 if count_feats:
                     dict_keys = dict_keys + count_vectorizer.get_feature_names()
             print "transforming data with count_vectorizer"
@@ -514,7 +514,7 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
 	    feat_name = kw_vec
 	    text = keywords
 	    matrix, dict_keys = vector_features(feat_name, text, matrix, dict_keys, arg_vecfile)
-            # Concatenate narrative vectors and narrative_symptom vectors. 
+            # Concatenate narrative vectors and narrative_symptom vectors.
             #for x in range(len(matrix)):
             #    feat = matrix[x]
             #    symptom_vec = feat[symp_vec]
@@ -632,7 +632,7 @@ def vector_features(feat_name, narratives, matrix, dict_keys, vecfile):
 		    vec = word2vec.get(word,vec_model)
 		    vectors.append(vec)
 
-        # Textrank keywords converted to vector 
+        # Textrank keywords converted to vector
         elif feat_name == textrank_vec:
             vec = zero_vec
             for word in narr.split(' '):
