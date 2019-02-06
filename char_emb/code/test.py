@@ -33,7 +33,7 @@ from random import shuffle
 #out_results_filename -> (string) the output file for buiding the confusion matrix 
 #n_hidden -> (int) hidden size of the neural net, usually 64 or 128
 #emb_size -> (int) embedding size
-
+#learning_rate -> (float) learning rate
 #**********************Variables************************
 #data  ->   (dictionary), key=(string) cghr category; value=(tuple) ((string) MG_ID, (string)narrative text) 
 #vocab  ->  (string list), contains each of the letters
@@ -41,19 +41,25 @@ from random import shuffle
 ###########################################################
 
 # In[3]:
-cuda = torch.device("cuda:1")
+cuda = torch.device("cuda:0")
 data={}         
 all_categories = []
-input_train = '/u/yanzhaod/data/va/mds+rct/train_child_cat.xml'
-out_model_filename = "./output/model_child_gru_64.pt"
-out_text_filename = "output/out_child_gru_test_64.txt"
-out_results_filename = 'output/out_child_results.txt'
+input_train = '/u/yanzhaod/data/va/mds+rct/train_adult_cat.xml'
+#input_test = '/u/yanzhaod/data/va/mds+rct/test_child_cat_spell.xml'
+input_test = '/u/yanzhaod/data/va/mds+rct/test_adult_cat.xml'
+out_model_filename = "./output/model_adult_gru_128.pt"
+out_text_filename = "output/out_adult_test_128.txt"
+out_results_filename = 'output/out_adult_results.txt'
 
 # Hidden size
 n_hidden = 128            
 
 # Embedding size
-emb_size = 20
+emb_size =  30
+
+# Learning rate
+learning_rate = 0.0001
+
 
 tree = etree.parse(input_train)
 for e in tree.iter("cghr_cat"):
@@ -70,7 +76,7 @@ for child in root:
     cghr_cat = child.find('cghr_cat')
     try:
         text = narrative.text.lower()
-        text = re.sub('[^a-z0-9\s]','',text)           #Note:this steps removes all punctionations and symbols in text, which is optional
+        text = re.sub('[^a-z0-9\s\!\@\#\$\%\^\&\*\(\)\.\,]','',text)           #Note:this steps removes all punctionations and symbols in text, which is optional
         data[cghr_cat.text].append((MG_ID.text,text))
     except AttributeError:
         continue
@@ -101,11 +107,14 @@ for v in data.itervalues():
 
 vocab = list(set(all_text))
 
+
+
 print("vocab: " +str(vocab))
 n_letters = len(vocab)
 
 def letterToIndex(letter):
     return vocab.index(letter)
+
 
 def letterToTensor(letter):
     tensor = torch.zeros([1, n_letters],device=cuda)
@@ -117,6 +126,7 @@ def letterToTensor(letter):
 def lineToTensor(narrative):
     tensor = torch.zeros([len(narrative),1],device=cuda)
     for li, letter in enumerate(narrative):
+
         tensor[li][0] = letterToIndex(letter)
     return tensor
 
@@ -209,7 +219,7 @@ print('category =', category,category_tensor, '/ line =', line)
 
 # In[110]:
 
-learning_rate = 0.001
+
 criterion = nn.NLLLoss()
 optimizer = torch.optim.Adam(gru.parameters(),lr=learning_rate)
 
@@ -219,7 +229,8 @@ optimizer = torch.optim.Adam(gru.parameters(),lr=learning_rate)
 # If you set this too high, it might explode. If too low, it might not learn
 
 def train(category_tensor, line_tensor):
-    optimizer.zero_grad()      
+    optimizer.zero_grad()  
+    
     output,hidden = gru(line_tensor,None)
 
     loss = criterion(output, category_tensor)
@@ -250,9 +261,9 @@ def timeSince(since):
 
 def train_iter():
     
-    print_every = 100
-    plot_every = 500
-    epochs = 20
+    print_every = 1000
+    plot_every = 5000
+    epochs = 30
     # Keep track of losses for plotting
     current_loss = 0
     all_losses = []
@@ -266,12 +277,14 @@ def train_iter():
             l.append((k,v[i]))
     shuffle(l)
     print(len(l))
-    for e in range(epochs):
+    for i in range(epochs):
 
         for e in l:
             k,v = e[0],e[1]
             iter += 1
             category, line, category_tensor, line_tensor = getTensors(k,v[1])
+            if line_tensor.size() == (0,):
+                continue  
             output, loss = train(category_tensor, line_tensor)
             current_loss += loss
             guess, guess_i = categoryFromOutput(output)
@@ -295,7 +308,7 @@ def testTrainSet(model):
     result = []
     cat_pred,cat_true = [],[]
     iter = 0
-    print_every = 100
+    print_every = 1000
     start = time.time()
     for k,v in data.iteritems():
         for i in range(len(v)):
@@ -303,13 +316,73 @@ def testTrainSet(model):
             if iter % print_every == 0:
                 print(iter,timeSince(start))
             category, line, category_tensor, line_tensor = getTensors(k,v[i][1])
+            if line_tensor.size() == (0,):
+                continue 
             MG_ID = v[i][0]
-            output,hidden = gru(line_tensor,None)
+            output,hidden = model(line_tensor,None)
             guess, guess_i = categoryFromOutput(output)
             result.append({'Correct_ICD':category,'Predicted_ICD':guess,'MG_ID':MG_ID})
-            print(category,guess)         #uncomment this line for detailed label/prediction pairs
+            #print(category,guess)         #uncomment this line for detailed label/prediction pairs
             cat_pred.append(guess)
             cat_true.append(category)
+    f1score = f1_score(cat_true,cat_pred,average="weighted")
+    print(f1score)
+    writeToFile("f1score: " + str(f1score),out_text_filename)
+    for i in range(len(result)):
+        result[i] = str(result[i])
+    writeToFile('\n'.join(result),out_results_filename)
+    
+    return
+def test(model):
+    print(input_test)
+    
+    for k in data:
+        data[k] = []
+    tree = etree.parse(input_test)
+    root = tree.getroot()
+    
+    for child in root:
+        MG_ID = child.find('MG_ID')
+        narrative = child.find('narrative')
+        cghr_cat = child.find('cghr_cat')
+        try:
+            text = narrative.text.lower()
+            text = re.sub('[^a-z0-9\s]','',text)           #Note:this steps removes all punctionations and symbols in text, which is optional
+            text = re.sub(r'(^[ \t]+|[ \t]+(?=:))', '', text, flags=re.M)
+            data[cghr_cat.text].append((MG_ID.text,text))
+        except AttributeError:
+            continue
+
+
+    result = []
+    cat_pred,cat_true = [],[]
+    iter = 0
+    print_every = 1000
+    start = time.time()
+    for k,v in data.iteritems():
+        for i in range(len(v)):
+            iter += 1
+            if iter % print_every == 0:
+                print(iter,timeSince(start))
+            try:
+                category, line, category_tensor, line_tensor = getTensors(k,v[i][1])
+            except ValueError:
+                print('----------------outsided text----------------')
+                print(text)
+                print('\t' in text)
+                
+                iter -= 1
+                continue
+            if line_tensor.size() == (0,):
+                continue 
+            MG_ID = v[i][0]
+            output,hidden = model(line_tensor,None)
+            guess, guess_i = categoryFromOutput(output)
+            result.append({'Correct_ICD':category,'Predicted_ICD':guess,'MG_ID':MG_ID})
+            #print(category,guess)         #uncomment this line for detailed label/prediction pairs
+            cat_pred.append(guess)
+            cat_true.append(category)
+    print('----------------------------------------------')
     f1score = f1_score(cat_true,cat_pred,average="weighted")
     print(f1score)
     writeToFile("f1score: " + str(f1score),out_text_filename)
@@ -324,3 +397,4 @@ if __name__ == '__main__':
     #model = torch.load(out_model_filename)
 
     testTrainSet(model)
+    test(model)
