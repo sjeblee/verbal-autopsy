@@ -41,45 +41,47 @@ from random import shuffle
 ###########################################################
 
 # In[3]:
-cuda = torch.device("cuda:1")
+cuda = torch.device("cuda:0")
 data={}         
 all_categories = []
-input_train = '/u/yanzhaod/data/va/mds+rct/train_neonate_cat.xml'
-input_test = '/u/yanzhaod/data/va/mds+rct/test_neonate_cat.xml'
-out_model_filename = "./output/model_neonate_lstm_128_2.pt"
-out_text_filename = "output/out_neonate_lstm_test_128_2.txt"
-out_results_filename = 'output/out_neonate_lstm_results.txt'
+input_train = '/u/yanzhaod/data/va/mds+rct/train_adult_cat.xml'
+#input_test = '/u/yanzhaod/data/va/mds+rct/test_child_cat_spell.xml'
+input_test = '/u/yanzhaod/data/va/mds+rct/test_adult_cat.xml'
+out_model_filename = "./output/model_adult_gru_128.pt"
+out_text_filename = "output/out_adult_test_128.txt"
+out_results_filename = 'output/out_adult_results.txt'
 
 # Hidden size
-n_hidden = 128           
+n_hidden = 128            
 
 # Embedding size
-emb_size = 30
+emb_size =  30
 
 # Learning rate
 learning_rate = 0.0001
 
-
-tree = etree.parse(input_train)
-for e in tree.iter("cghr_cat"):
-        text = e.text.lower()
-        if text not in data:
-             data[text]=[]
-             all_categories.append(text)
-             
-
-root = tree.getroot()
-for child in root:
-    MG_ID = child.find('MG_ID')
-    narrative = child.find('narrative')
-    cghr_cat = child.find('cghr_cat')
-    try:
-        text = narrative.text.lower()
-        text = re.sub('[^a-z0-9\s]','',text)           #Note:this steps removes all punctionations and symbols in text, which is optional
-        data[cghr_cat.text].append((MG_ID.text,text))
-    except AttributeError:
-        continue
-        
+def get_data(input_train):
+    tree = etree.parse(input_train)
+    for e in tree.iter("cghr_cat"):
+            text = e.text.lower()
+            if text not in data:
+                data[text]=[]
+                all_categories.append(text)
+                
+    
+    root = tree.getroot()
+    for child in root:
+        MG_ID = child.find('MG_ID')
+        narrative = child.find('narrative')
+        cghr_cat = child.find('cghr_cat')
+        try:
+            text = narrative.text.lower()
+            text = re.sub('[^a-z0-9\s\!\@\#\$\%\^\&\*\(\)\.\,]','',text)           #Note:this steps removes all punctionations and symbols in text, which is optional
+            data[cghr_cat.text].append((MG_ID.text,text))
+        except AttributeError:
+            continue
+    return data
+data = get_data(input_train)
         
 # In[15]:  
 # for e in child.iter("MG_ID","narrative","cghr_cat"):
@@ -103,11 +105,8 @@ all_text = ''
 for v in data.itervalues():
     l = [v[i][1] for i in range(len(v))]
     all_text = all_text + u"-".join(l)
-
 vocab = list(set(all_text))
-
-
-
+print(vocab)
 print("vocab: " +str(vocab))
 n_letters = len(vocab)
 
@@ -129,14 +128,14 @@ def lineToTensor(narrative):
         tensor[li][0] = letterToIndex(letter)
     return tensor
 
-print("a sample tensor of letter 'a':")
-print(letterToTensor('a'))
+# print("a sample tensor of letter 'a':")
+# print(letterToTensor('a'))
 narr = data[data.keys()[0]][1][1]
-print(data[data.keys()[0]][1])
-print("the size of a sample input (narr): ")
+# print(data[data.keys()[0]][1])
+# print("the size of a sample input (narr): ")
 input = lineToTensor(narr)
 input=input.to(cuda)
-print(input.size())
+# print(input.size())
 
 for k in data:
     print("key: " + str(k) + "; size: " +str(len(data[k]))) 
@@ -144,40 +143,40 @@ for k in data:
 
 import torch.nn as nn
 
-class LSTM(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size):
-        super(LSTM, self).__init__()
-
+class GRU(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size, emb_size):
+        super(GRU, self).__init__()
         self.hidden_size = hidden_size
         self.encoder = nn.Embedding(input_size,emb_size)
-        self.lstm = nn.LSTM(emb_size,hidden_size)
+        self.gru = nn.GRU(emb_size,hidden_size)
         self.linear = nn.Linear(hidden_size,output_size)
         self.softmax = nn.LogSoftmax(dim=1)
 
     def forward(self, input, hidden):
-        print(input.size(),111111111)
         input = self.encoder(input.long())
-        output,hidden = self.lstm(input,hidden)
-        print(output.size(),111)
+        output,hidden = self.gru(input,hidden)
         output = self.linear(output[-1])
-        print(output.size(),122)
         output = self.softmax(output)
+        
         return output, hidden
-
+        
     def initHidden(self):
-        return torch.zeros(1, self.hidden_size)
+        return torch.zeros([1, self.hidden_size],device=cuda)
 
-lstm = LSTM(n_letters, n_hidden, n_categories)
-lstm.to(cuda)
+
+gru = GRU(n_letters, n_hidden, n_categories,emb_size)
+gru.to(cuda)
+
+
 
 # In[104]:
 hidden = torch.zeros([1,1,n_hidden],device=cuda)
 
-output, hn = lstm(input,None)
+output, hn = gru(input,None)
 print("the sample output and output size: ")
 print(output,output.size())
 print(output[-1])
-#print(hn.view(hn.size()[1], hn.size(2)))
+print(hn.view(hn.size()[1], hn.size(2)))
 
 # In[105]:
 
@@ -220,7 +219,7 @@ print('category =', category,category_tensor, '/ line =', line)
 
 
 criterion = nn.NLLLoss()
-optimizer = torch.optim.Adam(lstm.parameters(),lr=learning_rate,weight_decay=learning_rate/10)
+optimizer = torch.optim.Adam(gru.parameters(),lr=learning_rate)
 
 
 # In[113]:
@@ -230,7 +229,7 @@ optimizer = torch.optim.Adam(lstm.parameters(),lr=learning_rate,weight_decay=lea
 def train(category_tensor, line_tensor):
     optimizer.zero_grad()  
     
-    output,hidden = lstm(line_tensor,None)
+    output,hidden = gru(line_tensor,None)
 
     loss = criterion(output, category_tensor)
     loss.backward()
@@ -238,7 +237,7 @@ def train(category_tensor, line_tensor):
     return output, loss.item()
 
 def save():
-    torch.save(lstm, out_model_filename)
+    torch.save(gru, out_model_filename)
     print('Saved as %s' % out_model_filename)
     
 def writeToFile(line,filename):
@@ -276,7 +275,7 @@ def train_iter():
             l.append((k,v[i]))
     shuffle(l)
     print(len(l))
-    for e in range(epochs):
+    for i in range(epochs):
 
         for e in l:
             k,v = e[0],e[1]
@@ -300,7 +299,7 @@ def train_iter():
                 current_loss = 0
     save()
     writeToFile("losses: " + str(all_losses),out_text_filename)
-    return lstm
+    return gru
 
 
 def testTrainSet(model):
@@ -334,21 +333,16 @@ def testTrainSet(model):
     return
 def test(model):
     print(input_test)
+    
     for k in data:
         data[k] = []
     tree = etree.parse(input_test)
-
-    
     root = tree.getroot()
-
+    
     for child in root:
         MG_ID = child.find('MG_ID')
         narrative = child.find('narrative')
         cghr_cat = child.find('cghr_cat')
-        # try:
-        #     print(MG_ID.text,narrative.text,cghr_cat.text)
-        # except:
-        #     pass
         try:
             text = narrative.text.lower()
             text = re.sub('[^a-z0-9\s]','',text)           #Note:this steps removes all punctionations and symbols in text, which is optional
@@ -388,7 +382,7 @@ def test(model):
             cat_true.append(category)
     print('----------------------------------------------')
     f1score = f1_score(cat_true,cat_pred,average="weighted")
-    print(f1score,111)
+    print(f1score)
     writeToFile("f1score: " + str(f1score),out_text_filename)
     for i in range(len(result)):
         result[i] = str(result[i])

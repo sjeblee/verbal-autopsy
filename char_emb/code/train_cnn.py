@@ -135,6 +135,7 @@ class CNN(nn.Module):
 
     def forward(self, input):
         #input = self.encoder(input.long())
+        print(input)
         input = input.transpose(1, 2)
         output = self.conv1(input)
         output = self.conv2(output)
@@ -142,7 +143,9 @@ class CNN(nn.Module):
         output = self.conv4(output)
         output = self.conv5(output)
         output = self.conv6(output)
+        print(output.size())
         output = output.view(output.size(0), -1)
+        print(output.size())
         output = self.fc1(output)
         output = self.fc2(output)
         output = self.fc3(output)
@@ -313,19 +316,96 @@ def test(model):
             guess,guess_i = categoryFromOutput(output)
             cat_pred.append(guess)
             cat_true.append(category)
-
+            print(guess,category)
+            model = torch.load(out_model_filename)
+            output = model.forward(line_tensor)
+            guess,guess_i = categoryFromOutput(output)
+            cat_pred.append(guess)
+            cat_true.append(category)
+            print(guess,category)
+            print('********')
     # print(cat_true,'true')
     # print(cat_pred,'pred')
     # print(len(cat_true),len(cat_pred))
     f1score = metrics.f1_score(np.asarray(cat_true),np.asarray(cat_pred),average="weighted")
     print("f1score: ")
     print(f1score)
-    print(len(set(cat_true)))
-    print(len(set(cat_pred)))
-    print(len(all_categories))
-    print(classification_report(np.asarray(cat_true),np.asarray(cat_pred),target_names=all_categories))
+    # print(len(set(cat_true)))
+    # print(len(set(cat_pred)))
+    # print(len(all_categories))
+    print(classification_report(np.asarray(cat_true),np.asarray(cat_pred),target_names=list(set(cat_true))))
     return     
+def get_evaluation(y_true, y_prob, list_metrics):
+    y_pred = np.argmax(y_prob, -1)
+    output = {}
+    if 'accuracy' in list_metrics:
+        output['accuracy'] = metrics.accuracy_score(y_true, y_pred)
+    if 'loss' in list_metrics:
+        try:
+            output['loss'] = metrics.log_loss(y_true, y_prob)
+        except ValueError:
+            output['loss'] = -1
+    if 'confusion_matrix' in list_metrics:
+        output['confusion_matrix'] = str(metrics.confusion_matrix(y_true, y_pred))
+    return output
+def test2(model):
+    Tdata={}
+    tree = etree.parse(input_test)
+    for e in tree.iter('cghr_cat'):
+        if e.text not in Tdata:
+            Tdata[e.text] = []
+            
+    for e in tree.iter("narrative","cghr_cat"):
+        if e.tag == "narrative":
+            value= e.text
+            value = value.lower()
+            value = re.sub('[^a-z0-9\s]','',value)
+            if seq_length < len(value):
+                print("Warning: the length of the narr is longer than the sequence_length")
+                print(seq_length,len(value))
+                value = value[:seq_length]
+        
+        if e.tag == 'cghr_cat':
+            Tdata[e.text].append(value)
+            
+    batch_size = 128
+    tensor_size = 0
+    for k,v in Tdata.iteritems():
+            tensor_size += len(v)
+    test_params = {"batch_size": batch_size,
+                       "shuffle": False,
+                       "num_workers": 0}
+    l = []
+    for k,v in Tdata.iteritems():
+        for i in range(len(v)):
+            category, line, category_tensor, line_tensor = getTensors(k,v[i])
+            l.append([category_tensor,line_tensor])
+    test_set = l
+    test_generator = DataLoader(test_set, **test_params)
+    
+    
+    model.eval()
+    loss_ls = []
+    te_label_ls = []
+    te_pred_ls = []
+    for batch in test_generator:
+        te_label, te_feature  = batch
+        num_sample = len(te_label)
 
+        #te_feature = te_feature.cuda()
+        #te_label = te_label.cuda()
+        with torch.no_grad():
+            te_predictions = model(te_feature)
+        te_label_ls.extend(te_label.clone().cpu())
+        te_pred_ls.append(te_predictions.clone().cpu())
+        
+        
+    te_pred = torch.cat(te_pred_ls, 0)
+    te_label = np.array(te_label_ls)
+    test_metrics = get_evaluation(te_label, te_pred.numpy(), list_metrics=["accuracy", "confusion_matrix"])
+    print(test_metrics)
+    f1score = metrics.f1_score(te_label,te_pred,average="weighted")
+    print(f1score)
 # In[92]:
 
 if __name__ == '__main__':
@@ -333,7 +413,7 @@ if __name__ == '__main__':
     #model,train_data = trainIters(epochs)
     model = torch.load(out_model_filename)
     #testTrainSet(model,train_data=train_data)
-    test(model)
+    test2(model)
     
 
 

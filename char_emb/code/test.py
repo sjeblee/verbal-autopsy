@@ -44,12 +44,12 @@ from random import shuffle
 cuda = torch.device("cuda:0")
 data={}         
 all_categories = []
-input_train = '/u/yanzhaod/data/va/mds+rct/train_adult_cat.xml'
-#input_test = '/u/yanzhaod/data/va/mds+rct/test_child_cat_spell.xml'
-input_test = '/u/yanzhaod/data/va/mds+rct/test_adult_cat.xml'
-out_model_filename = "./output/model_adult_gru_128.pt"
-out_text_filename = "output/out_adult_test_128.txt"
-out_results_filename = 'output/out_adult_results.txt'
+input_train = '/u/yanzhaod/data/va/mds+rct/train_child_cat.xml'
+input_test = '/u/yanzhaod/data/va/mds+rct/test_child_cat_spell.xml'
+#input_test = '/u/yanzhaod/data/va/mds+rct/test_child_cat.xml'
+out_model_filename = "./output/model_child_gru_128.pt"
+out_text_filename = "output/out_child_test_128.txt"
+out_results_filename = 'output/out_child_results.txt'
 
 # Hidden size
 n_hidden = 128            
@@ -61,26 +61,29 @@ emb_size =  30
 learning_rate = 0.0001
 
 
-tree = etree.parse(input_train)
-for e in tree.iter("cghr_cat"):
-        text = e.text.lower()
-        if text not in data:
-             data[text]=[]
-             all_categories.append(text)
-             
-
-root = tree.getroot()
-for child in root:
-    MG_ID = child.find('MG_ID')
-    narrative = child.find('narrative')
-    cghr_cat = child.find('cghr_cat')
-    try:
-        text = narrative.text.lower()
-        text = re.sub('[^a-z0-9\s\!\@\#\$\%\^\&\*\(\)\.\,]','',text)           #Note:this steps removes all punctionations and symbols in text, which is optional
-        data[cghr_cat.text].append((MG_ID.text,text))
-    except AttributeError:
-        continue
-        
+def get_data(input_train):
+    tree = etree.parse(input_train)
+    for e in tree.iter("cghr_cat"):
+            text = e.text.lower()
+            if text not in data:
+                data[text]=[]
+                all_categories.append(text)
+                
+    
+    root = tree.getroot()
+    for child in root:
+        MG_ID = child.find('MG_ID')
+        narrative = child.find('narrative')
+        cghr_cat = child.find('cghr_cat')
+        try:
+            text = narrative.text.lower()
+            text = re.sub('[^a-z0-9\s\!\@\#\$\%\^\&\*\(\)\.\,]','',text)           #Note:this steps removes all punctionations and symbols in text, which is optional
+            
+            data[cghr_cat.text].append((MG_ID.text,text))
+        except AttributeError:
+            continue
+    return data,all_categories
+data,all_categories = get_data(input_train)
         
 # In[15]:  
 # for e in child.iter("MG_ID","narrative","cghr_cat"):
@@ -104,11 +107,8 @@ all_text = ''
 for v in data.itervalues():
     l = [v[i][1] for i in range(len(v))]
     all_text = all_text + u"-".join(l)
-
 vocab = list(set(all_text))
-
-
-
+print(vocab)
 print("vocab: " +str(vocab))
 n_letters = len(vocab)
 
@@ -126,18 +126,17 @@ def letterToTensor(letter):
 def lineToTensor(narrative):
     tensor = torch.zeros([len(narrative),1],device=cuda)
     for li, letter in enumerate(narrative):
-
         tensor[li][0] = letterToIndex(letter)
     return tensor
 
-print("a sample tensor of letter 'a':")
-print(letterToTensor('a'))
+# print("a sample tensor of letter 'a':")
+# print(letterToTensor('a'))
 narr = data[data.keys()[0]][1][1]
-print(data[data.keys()[0]][1])
-print("the size of a sample input (narr): ")
+# print(data[data.keys()[0]][1])
+# print("the size of a sample input (narr): ")
 input = lineToTensor(narr)
 input=input.to(cuda)
-print(input.size())
+# print(input.size())
 
 for k in data:
     print("key: " + str(k) + "; size: " +str(len(data[k]))) 
@@ -155,7 +154,9 @@ class GRU(nn.Module):
         self.softmax = nn.LogSoftmax(dim=1)
 
     def forward(self, input, hidden):
+        
         input = self.encoder(input.long())
+        print(input.size(),1123323)
         output,hidden = self.gru(input,hidden)
         output = self.linear(output[-1])
         output = self.softmax(output)
@@ -318,6 +319,7 @@ def testTrainSet(model):
             category, line, category_tensor, line_tensor = getTensors(k,v[i][1])
             if line_tensor.size() == (0,):
                 continue 
+            print(line_tensor.size(),'tensor size')
             MG_ID = v[i][0]
             output,hidden = model(line_tensor,None)
             guess, guess_i = categoryFromOutput(output)
