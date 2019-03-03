@@ -44,12 +44,12 @@ from random import shuffle
 cuda = torch.device("cuda:0")
 data={}         
 all_categories = []
-input_train = '/u/yanzhaod/data/va/mds+rct/train_child_cat.xml'
+input_train = '/u/yanzhaod/data/va/mds+rct/train_adult_cat.xml'
 input_test = '/u/yanzhaod/data/va/mds+rct/test_child_cat_spell.xml'
 #input_test = '/u/yanzhaod/data/va/mds+rct/test_child_cat.xml'
-out_model_filename = "./output/model_child_gru_128.pt"
-out_text_filename = "output/out_child_test_128.txt"
-out_results_filename = 'output/out_child_results.txt'
+out_model_filename = "./output/model_adult_gru_128.pt"
+out_text_filename = "output/out_adult_test_128.txt"
+out_results_filename = 'output/out_adult_results.txt'
 
 # Hidden size
 n_hidden = 128            
@@ -77,8 +77,9 @@ def get_data(input_train):
         cghr_cat = child.find('cghr_cat')
         try:
             text = narrative.text.lower()
-            text = re.sub('[^a-z0-9\s\!\@\#\$\%\^\&\*\(\)\.\,]','',text)           #Note:this steps removes all punctionations and symbols in text, which is optional
-            
+            #text = re.sub('[^a-z0-9\s\!\@\#\$\%\^\&\*\(\)\.\,]','',text)           #Note:this steps removes all punctionations and symbols in text, which is optional
+            text = re.sub('[\t\n]','',text)
+            text = re.sub('[^a-z0-9\s]','',text)
             data[cghr_cat.text].append((MG_ID.text,text))
         except AttributeError:
             continue
@@ -111,7 +112,7 @@ vocab = list(set(all_text))
 print(vocab)
 print("vocab: " +str(vocab))
 n_letters = len(vocab)
-
+print('n_letters',n_letters)
 def letterToIndex(letter):
     return vocab.index(letter)
 
@@ -129,14 +130,15 @@ def lineToTensor(narrative):
         tensor[li][0] = letterToIndex(letter)
     return tensor
 
-# print("a sample tensor of letter 'a':")
-# print(letterToTensor('a'))
+def getTensors(category,line):
+    category_tensor = torch.tensor([all_categories.index(category)], dtype=torch.long,device=cuda)
+    line_tensor = lineToTensor(line)
+    category_tensor = category_tensor.to(cuda)
+    return category, line, category_tensor, line_tensor
+    
 narr = data[data.keys()[0]][1][1]
-# print(data[data.keys()[0]][1])
-# print("the size of a sample input (narr): ")
 input = lineToTensor(narr)
 input=input.to(cuda)
-# print(input.size())
 
 for k in data:
     print("key: " + str(k) + "; size: " +str(len(data[k]))) 
@@ -154,9 +156,9 @@ class GRU(nn.Module):
         self.softmax = nn.LogSoftmax(dim=1)
 
     def forward(self, input, hidden):
-        
+        #print(input.size())
         input = self.encoder(input.long())
-        print(input.size(),1123323)
+        #print(input.size(),1123323)
         output,hidden = self.gru(input,hidden)
         output = self.linear(output[-1])
         output = self.softmax(output)
@@ -196,29 +198,6 @@ print(categoryFromOutput(output))
 
 # In[109]:
 
-import random
-def randomChoice(l):
-    return l[random.randint(0, len(l) - 1)]
-
-def randomTrainingExample():
-    category = randomChoice(all_categories)
-    line = randomChoice(data[category][1])
-    category_tensor = torch.tensor([all_categories.index(category)], dtype=torch.long,device=cuda)
-    line_tensor = lineToTensor(line)
-    return category, line, category_tensor, line_tensor
-def getTensors(category,line):
-    category_tensor = torch.tensor([all_categories.index(category)], dtype=torch.long,device=cuda)
-    line_tensor = lineToTensor(line)
-    category_tensor = category_tensor.to(cuda)
-    return category, line, category_tensor, line_tensor
-    
-print("sample category,line,category_tensor from the randomTraningExample")
-#line_tensor should look like tensor([[77.],[88.],])
-category, line, category_tensor, line_tensor = randomTrainingExample()
-print('category =', category,category_tensor, '/ line =', line)
-
-
-# In[110]:
 
 
 criterion = nn.NLLLoss()
@@ -398,5 +377,10 @@ if __name__ == '__main__':
     model = train_iter()
     #model = torch.load(out_model_filename)
 
-    testTrainSet(model)
-    test(model)
+    # testTrainSet(model)
+    # test(model)
+    # out_model_filename = './output/model_adult_gru_128.pt'
+    # model = torch.load(out_model_filename)
+    # trained_weights = model.encoder.weight.data
+    # print(trained_weights.size())
+    # print(n_letters,emb_size)

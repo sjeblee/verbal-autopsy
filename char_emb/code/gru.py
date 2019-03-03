@@ -36,7 +36,7 @@ from random import shuffle
 ###########################################################
 
 # In[3]:
-cuda = torch.device("cuda:2")
+cuda = torch.device("cuda:1")
 data={}         
 all_categories = []
 input_train = '/u/yanzhaod/data/va/mds+rct/train_child_cat.xml'
