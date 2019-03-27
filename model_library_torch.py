@@ -20,10 +20,11 @@ import pickle
 
 numpy.set_printoptions(threshold=numpy.inf)
 use_cuda = torch.cuda.is_available()
+#use_cuda = False
 if use_cuda:
-    torch.cuda.set_device(0)
+    torch.cuda.set_device(2)
 
-use_cuda = False
+#use_cuda = False
 
 
 ######################################################################
@@ -660,12 +661,12 @@ def cnn_model(X, Y, act=None, windows=[1, 2, 3, 4, 5], X2=[], num_epochs=10, los
 
             if k == 0: # Init cnn model
                 cnn = CNN_Text(dim, pre_labels, dropout=dropout, kernel_sizes=kernel_sizes)
-                if use_cuda:
-                    cnn = cnn.cuda()
             else: # Replace the last layer
                 cnn.fc1 = nn.Linear(cnn.Co*cnn.Ks, pre_labels)
 
             # Pre-train the model
+            if use_cuda:
+                cnn = cnn.cuda()
             cnn = train_cnn(cnn, trainX, trainY, batch_size, num_epochs, learning_rate)
 
         # Replace the last layer for the final model
@@ -673,8 +674,9 @@ def cnn_model(X, Y, act=None, windows=[1, 2, 3, 4, 5], X2=[], num_epochs=10, los
 
     else: # No pre-training
         cnn = CNN_Text(dim, num_labels, dropout=dropout, kernel_sizes=kernel_sizes)
-        if use_cuda:
-            cnn = cnn.cuda()
+
+    if use_cuda:
+        cnn = cnn.cuda()
 
     # Train final model
     cnn = train_cnn(cnn, X, Y, batch_size, num_epochs, learning_rate)

@@ -52,7 +52,7 @@ vec_types = ["narr_vec", "narr_seq", "event_vec", "event_seq", "symp_vec", "kw_v
 numpy.set_printoptions(threshold=numpy.inf)
 
 # Use keras or pytorch
-use_torch = False
+use_torch = True
 
 # Output top K features
 output_topk_features = True
@@ -133,7 +133,7 @@ def hyperopt(arg_model, arg_train_feats, arg_test_feats, arg_result_file, arg_pr
             #'embedding_size':hp.choice('embedding_size', [100, 150, 200, 250, 300, 400]),
             'dropout':hp.uniform('dropout', 0.1, 0.9)
         }
-    
+
     elif h_model == "svm":
         objective = obj_svm
         space = {
@@ -392,7 +392,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
         rec_type = 'child'
     elif 'neo' in arg_result_file:
         rec_type = 'neonate'
-    
+
     # Read in feature keys
     print "reading feature keys..."
     global keys
@@ -410,7 +410,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
 
     # Transform ICD codes and record types to numbers
     global labelencoder, typeencoder
-    labelencoder = preprocessing.LabelEncoder()                        
+    labelencoder = preprocessing.LabelEncoder()
     typeencoder = preprocessing.LabelEncoder()
 
     # TEMP
@@ -457,7 +457,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     if output_topk_features == True:
         if arg_model == "nn":
             select_top_k_features_per_class(X,Y,anova_function,arg_prefix, 100)
-    
+
     # Select best features for all data
     if ((not is_nn) or arg_model == "nn") and num_feats < x_feats:
         anova_filter, X = create_anova_filter(X, Y, anova_function,arg_prefix, num_feats)
@@ -538,7 +538,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
                 num_nodes = 56
                 Y = to_categorical(Y)
                 model, X, Y = create_filter_rnn_model(X, Y, embedding_dim, num_nodes)
-	  
+
 	    print "saving the model..."
 
 	    if not use_torch: # Save Keras model
@@ -613,7 +613,7 @@ def run_joint(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_res
     X2_adult = [] # Extra features for hybrid model
     X2_child = []
     X2_neonate = []
-    
+
     # Read in feature keys
     print "reading feature keys..."
     global keys
@@ -642,20 +642,23 @@ def run_joint(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_res
         #print "hybrid not supported for joint model!"
         #Y_adult = preprocess(arg_train_feats[0], trainids, trainlabels, X_adult, Y_adult, vec_keys, True)
         #preprocess(arg_train_feats, [], [], X2, [], point_keys, True)
-    Y_adult = preprocess(arg_train_feats[0], trainids_adult, trainlabels_adult, X_adult, Y_adult, keys, rec_type='adult', trainlabels=True)
-    Y_child = preprocess(arg_train_feats[1], trainids_child, trainlabels_child, X_child, Y_child, keys, rec_type='child', trainlabels=True)
-    Y_neonate = preprocess(arg_train_feats[2], trainids_neonate, trainlabels_neonate, X_neonate, Y_neonate, keys, rec_type='neonate', trainlabels=True)
+    adult_test_labels = get_labels(arg_test_feats[0], arg_labelname)
+    child_test_labels = get_labels(arg_test_feats[1], arg_labelname)
+    neonate_test_labels = get_labels(arg_test_feats[2], arg_labelname)
+    Y_adult = preprocess(arg_train_feats[0], trainids_adult, trainlabels_adult, X_adult, Y_adult, keys, rec_type='adult', trainlabels=True, extra_labels=adult_test_labels)
+    Y_child = preprocess(arg_train_feats[1], trainids_child, trainlabels_child, X_child, Y_child, keys, rec_type='child', trainlabels=True, extra_labels=child_test_labels)
+    Y_neonate = preprocess(arg_train_feats[2], trainids_neonate, trainlabels_neonate, X_neonate, Y_neonate, keys, rec_type='neonate', trainlabels=True, extra_labels=neonate_test_labels)
     if hybrid:
         preprocess(arg_train_feats[0], [], [], X2_adult, [], point_keys, rec_type='adult', trainlabels=True)
         preprocess(arg_train_feats[1], [], [], X2_child, [], point_keys, rec_type='child', trainlabels=True)
         preprocess(arg_train_feats[2], [], [], X2_neonate, [], point_keys, rec_type='neonate', trainlabels=True)
-        
+
     print "adult X: " + str(len(X_adult)) + " Y: " + str(len(Y_adult))
     print "child X: " + str(len(X_child)) + " Y: " + str(len(Y_child))
     print "neonate X: " + str(len(X_neonate)) + " Y: " + str(len(Y_neonate))
-    #Y_adult = to_categorical(Y_adult)
-    #Y_child = to_categorical(Y_child)
-    #Y_neonate = to_categorical(Y_neonate)
+    Y_adult = to_categorical(Y_adult)
+    Y_child = to_categorical(Y_child)
+    Y_neonate = to_categorical(Y_neonate)
     #print "X2: " + str(len(X2))
     #outfile = open('filternn_ids', 'w')
     #outfile.write(str(trainids))
@@ -683,7 +686,7 @@ def run_joint(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_res
     #    X = numpy.asarray(X)
     #else:
     print "creating a new neural network model"
-    embedding_dim = 200 
+    embedding_dim = 200
         #if arg_model == "nn":
         #    model, X, Y = create_nn_model(X, Y, anova_function, num_feats, num_nodes, 'relu')
     if arg_model == "lstm" or arg_model == "gru" or arg_model == "rnn" or arg_model=="cnn":
@@ -697,7 +700,10 @@ def run_joint(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_res
         if hybrid:
             X2_pretrain = [X2_child, X2_neonate]
         if arg_model == "cnn":
-            model_adult, X_adult_out, Y_adult_out = model_library.cnn_model(X_adult, to_categorical(Y_adult), X2=X2_adult, pretrainX=X_pretrain, pretrainY=Y_pretrain, pretrainX2=X2_pretrain, num_epochs=10)
+            if use_torch:
+                model_adult = model_library_torch.cnn_model(X_adult, Y_adult, pretrainX=X_pretrain, pretrainY=Y_pretrain, num_epochs=10)
+            else:
+                model_adult, X_adult_out, Y_adult_out = model_library.cnn_model(X_adult, to_categorical(Y_adult), X2=X2_adult, pretrainX=X_pretrain, pretrainY=Y_pretrain, pretrainX2=X2_pretrain, num_epochs=10)
         else:
             model_adult, X_adult_out, Y_adult_out = model_library.rnn_model(X_adult, Y_adult, num_nodes, modelname=arg_model, X2=X2_adult, pretrainX=X_pretrain, pretrainY=Y_pretrain, pretrainX2=X2_pretrain, num_epochs=10)
         testids_adult, testlabels_adult, predictedlabels_adult = test(arg_model, model_adult, arg_test_feats[0], hybrid=hybrid, rec_type='adult')
@@ -710,11 +716,14 @@ def run_joint(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_res
         if hybrid:
             X2_pretrain = [X2_adult, X2_neonate]
         if arg_model == "cnn":
-             model_child, X_child_out, Y_child_out = model_library.cnn_model(X_child, to_categorical(Y_child), X2=X2_child, pretrainX=X_pretrain, pretrainY=Y_pretrain, pretrainX2=X2_pretrain, num_epochs=15)
+            if use_torch:
+                model_child = model_library_torch.cnn_model(X_child, Y_child, pretrainX=X_pretrain, pretrainY=Y_pretrain, num_epochs=10)
+            else:
+                model_child, X_child_out, Y_child_out = model_library.cnn_model(X_child, to_categorical(Y_child), X2=X2_child, pretrainX=X_pretrain, pretrainY=Y_pretrain, pretrainX2=X2_pretrain, num_epochs=15)
         else:
              model_child, X_child_out, Y_child_out = model_library.rnn_model(X_child, Y_child, num_nodes, modelname=arg_model, X2=X2_child, pretrainX=X_pretrain, pretrainY=Y_pretrain, pretrainX2=X2_pretrain, num_epochs=15)
         testids_child, testlabels_child, predictedlabels_child = test(arg_model, model_child, arg_test_feats[1], hybrid=hybrid, rec_type='child')
-        
+
         # NEONATE
         print "NEONATE"
         X_pretrain = [X_adult, X_child]
@@ -723,7 +732,10 @@ def run_joint(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_res
         if hybrid:
             X2_pretrain = [X2_adult, X2_child]
         if arg_model == "cnn":
-            model_neonate, X_neonate_out, Y_neonate_out = model_library.cnn_model(X_neonate, to_categorical(Y_neonate), X2=X2_neonate, pretrainX=X_pretrain, pretrainY=Y_pretrain, pretrainX2=X2_pretrain, num_epochs=15)
+            if use_torch:
+                model_neonate = model_library_torch.cnn_model(X_neonate, Y_neonate, pretrainX=X_pretrain, pretrainY=Y_pretrain, num_epochs=10)
+            else:
+                model_neonate, X_neonate_out, Y_neonate_out = model_library.cnn_model(X_neonate, to_categorical(Y_neonate), X2=X2_neonate, pretrainX=X_pretrain, pretrainY=Y_pretrain, pretrainX2=X2_pretrain, num_epochs=15)
         else:
             model_neonate, X_neonate_out, Y_neonate_out = model_library.rnn_model(X_neonate, Y_neonate, num_nodes, modelname=arg_model, X2=X2_neonate, pretrainX=X_pretrain, pretrainY=Y_pretrain, pretrainX2=X2_pretrain, num_epochs=15)
         testids_neonate, testlabels_neonate, predictedlabels_neonate = test(arg_model, model_neonate, arg_test_feats[2], hybrid=hybrid, rec_type='neonate')
@@ -796,12 +808,12 @@ def test(model_type, model, testfile, anova_filter=None, hybrid=False, rec_type=
         inputs.append(testX2)
     if is_nn:
 	if use_torch: # Test using pytorch model
-	    if model_type == "nn": 
-		results = model_library_torch.test_nn(model,testX,threshold=threshold)
+	    if model_type == "nn":
+		results = model_library_torch.test_nn(model, testX, threshold=threshold)
 	    elif model_type == "cnn":
-		results = model_library_torch.test_cnn(model,testX, testY,threshold=threshold)
+		results = model_library_torch.test_cnn(model, testX, testY, threshold=threshold)
 	    elif model_type == "cnn-rnn":
-		results = model_library_torch.test_cnn_attnrnn(model[0],model[1], testX, testY)
+		results = model_library_torch.test_cnn_attnrnn(model[0], model[1], testX, testY)
 	else: # Test using Keras model
 	    predictedY = model.predict(inputs)
 	    results = map_back(predictedY)
@@ -987,7 +999,7 @@ def train_test_joint_lstm_model(X_adult, Y_adult, X_child, Y_child, X_neo, Y_neo
     prediction_adult = Dense(Y_adult.shape[1], activation='softmax')(dropout_out)
     prediction_child = Dense(Y_child.shape[1], activation='softmax')(dropout_out)
     prediction_neo = Dense(Y_neo.shape[1], activation='softmax')(dropout_out)
-    
+
     model_adult = Model(inputs=inputs, outputs=prediction_adult)
     model_adult.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
     model_child = Model(inputs=inputs, outputs=prediction_child)
@@ -1000,13 +1012,13 @@ def train_test_joint_lstm_model(X_adult, Y_adult, X_child, Y_child, X_neo, Y_neo
     print "test feats: " + arg_test_feats[0]
     testids_adult, testlabels_adult, predictedlabels_adult = test(modelname, model_adult, arg_test_feats[0], hybrid, 'adult')
     write_results(arg_results_file[0], testids_adult, testlabels_adult, predictedlabels_adult)
-    
+
     model_child.fit(X_child, Y_child, epochs=15)
     model_child.summary()
     print "test feats: " + arg_test_feats[1]
     testids_child, testlabels_child, predictedlabels_child = test(modelname, model_child, arg_test_feats[1], hybrid, 'child')
     write_results(arg_results_file[1], testids_child, testlabels_child, predictedlabels_child)
-    
+
     model_neo.fit(X_neo, Y_neo, epochs=15)
     model_neo.summary()
     print "test feats: " + arg_test_feats[2]
@@ -1052,7 +1064,7 @@ def create_filter_rnn_model(X, Y, embedding_size, num_nodes, activation='tanh', 
     #permute1 = Permute((2,1))
     #permuted_weights = permute1(norm_weights)
     #print "permute1 output_shape: " + str(permute1.output_shape)
-    
+
     repeat = TimeDistributed(RepeatVector(embedding_size))
     repeated_weights = repeat(weights)
 
@@ -1061,7 +1073,7 @@ def create_filter_rnn_model(X, Y, embedding_size, num_nodes, activation='tanh', 
     final_weights = Reshape(input_shape)(repeated_weights)
     #TODO: mutiply layer - need to convert 1d weight to embedding_size vector?
     filter_out = multiply([input1, final_weights])
-    #filter_out = merge([input1, norm_weights], mode=scalarMult, output_shape=input_shape) 
+    #filter_out = merge([input1, norm_weights], mode=scalarMult, output_shape=input_shape)
     #TODO: masking layer???
     #Masking(mask_value) # but want <= mask_value, not just ==
     # TODO: save the weights for each word so we can look at them
@@ -1089,8 +1101,8 @@ def create_filter_rnn_model(X, Y, embedding_size, num_nodes, activation='tanh', 
     outfile = open(filename, 'w')
     outfile.write(str(train_weights))
     outfile.close()
-    
-    return nn, X, Y    
+
+    return nn, X, Y
 
 def scalarMult(layersList):
     vector = layersList[0]
@@ -1128,7 +1140,7 @@ def create_anova_filter(X, Y, function, output_path, num_feats):
     selected = anova_filter.get_support(True)
     print "Best indices: " + str(selected)
 
-    # Sort selected indices in terms of scores. Descending order. 
+    # Sort selected indices in terms of scores. Descending order.
     scores = anova_filter.scores_
     sorted_idx = numpy.argsort(scores)[::-1][:num_feats]
 
@@ -1174,7 +1186,7 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
             vector = eval(line)
             features = []
 
-            # Edit by Yoona. Fix keys in narrative symptoms vector. 
+            # Edit by Yoona. Fix keys in narrative symptoms vector.
             #if not symptoms_keys_fixed:
             #    if "narr_symptoms" in keys:
             #        symptoms_vec = vector["narr_symptoms"]
@@ -1212,13 +1224,14 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
                         #features = numpy.asarray(features)#.reshape(max_seq_len, 1)
                         feature = numpy.asarray(feature)
                         if len(features) == 0:
-			    features = feature
-			else:
-			    features = numpy.concatenate((features, feature), axis = 0)
+                            features = feature
+                        else:
+                            print('features:', len(features), 'feature:', feature.shape)
+                            features = numpy.concatenate((features, feature), axis=0)
                         #print "narr_vec shape: " + str(features.shape)
                     elif not vec_feats:
-                        if vector.has_key(key):
-			    #print "This is: " + str(key) + "and value is : " + str(vector[key])
+                        if key in vector:
+                            #print "This is: " + str(key) + "and value is : " + str(vector[key])
                             features.append(vector[key])
                         else:
                             features.append('0')
@@ -1310,7 +1323,7 @@ def map_back(results):
     return output
 
 def split_feats(keys, labelname):
-    ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4"] 
+    ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4"]
     vec_keys = [] # vector/matrix features for CNN and RNN models
     point_keys = [] # traditional features for other models
     for key in keys:
@@ -1375,4 +1388,4 @@ def select_top_k_features_per_class(X, Y, function, output_path, k = 100):
             output.write(str(scores[sorted_idx[i]]))
         output.close()
 
-if __name__ == "__main__":main() 
+if __name__ == "__main__":main()

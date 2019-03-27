@@ -25,10 +25,10 @@ def main():
     narratives = []
     
     for child in root:
-        node = child.find("narrative")
+        node = child.find("MG_ID")
         narr = ""
         if node != None:
-            narr = node.text.encode('utf-8')
+            narr = node.text#.encode('utf-8')
         if len(narr) > 0:
             narratives.append(narr)
 
@@ -37,7 +37,7 @@ def main():
         sentences = narr.split(".")
         for sen in sentences:
             if len(sen) > 0:
-                out.write(sen.strip().lower() + " .\n")
+                out.write(sen.strip().lower() + "\n")
     out.close()
 
 if __name__ == "__main__":main()

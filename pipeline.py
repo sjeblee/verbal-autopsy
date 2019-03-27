@@ -9,7 +9,7 @@ import data_util
 import extract_features
 import heidel_tag
 import medttk_tag
-import model
+import model_symp as model
 #import rebalance
 import results_stats
 import spellcorrect
@@ -163,7 +163,7 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
     datafile_child = dataloc + "/" + dset + "/all_child_cat_spell.txt"
     datafile_neo = dataloc + "/" + dset + "/all_neonate_cat_spell.txt"
     datafile_adult = dataloc + "/" + dset + "/all_adult_cat_spell.txt"
-    datafile = dataloc + "/" + dset + "/all_" + arg_train + "_cat_spell_symp.txt"
+    datafile = dataloc + "/" + dset + "/all_" + arg_train + "_cat_spell.txt"
     train_extra = []
 
     #if "spell" in arg_preprocess:
@@ -177,14 +177,14 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
     datadir = arg_prefix + "/" + arg_name
     #datapath = datadir + "/" + arg_dataset
     datapath = dataloc + "/" + dset
-    create_datasets = True
-    if os.path.exists(datapath):
-        print "Data files already exist, re-using them"
-        #create_datasets = False
-    else:
-        os.mkdir(datapath)
+    #create_datasets = True
+    #if os.path.exists(datapath):
+    #    print "Data files already exist, re-using them"
+    #    #create_datasets = False
+    #else:
+    #    os.mkdir(datapath)
 
-    #create_datasets = False
+    create_datasets = False
     # TODO: If dirs exist already, don't recreate the datasets, just re-run the models that don't have output
     if create_datasets:
         main_files = []
@@ -326,17 +326,19 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
         #vecfile = arg_vecfile
 
         # Retrain word vectors for this set
+        #vec_feats = False
         if vec_feats:
             print "Training word vectors..."
             if joint_training:
+                suffix = '_cat_spell'
                 # Concatenate training files
-                trainfile = datapath + "/train_all_" + str(z) + "_cat.txt"
-                adult_xml = datapath + "/train_adult_" + str(z) + "_cat.xml"
-                adult_file = datapath + "/train_adult_" + str(z) + "_cat.txt"
-                child_xml = datapath + "/train_child_" + str(z) + "_cat.xml"
-                child_file = datapath + "/train_child_" + str(z) + "_cat.txt"
-                neonate_xml = datapath + "/train_neonate_" + str(z) + "_cat.xml"
-                neonate_file = datapath + "/train_neonate_" + str(z) + "_cat.txt"
+                trainfile = datapath + "/train_all_" + str(z) + suffix + ".txt"
+                adult_xml = datapath + "/train_adult_" + str(z) + suffix + ".xml"
+                adult_file = datapath + "/train_adult_" + str(z) + suffix + ".txt"
+                child_xml = datapath + "/train_child_" + str(z) + suffix + ".xml"
+                child_file = datapath + "/train_child_" + str(z) + suffix + ".txt"
+                neonate_xml = datapath + "/train_neonate_" + str(z) + suffix + ".xml"
+                neonate_file = datapath + "/train_neonate_" + str(z) + suffix + ".txt"
                 data_util.xml_to_txt(adult_xml)
                 data_util.xml_to_txt(child_xml)
                 data_util.xml_to_txt(neonate_xml)
@@ -359,7 +361,9 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
             dim = 100
             shouldstem = "stem" in arg_preprocess
             name = "ice+medhelp+narr_all_" + str(z)
-            vecfile = word2vec.run(trainfile, dim, name, stem=shouldstem)
+            vecfile = datapath + '/' + name
+            if not os.path.exists(vecfile):
+                vecfile = word2vec.run(trainfile, dim, name, stem=shouldstem)
 	    # Yoona: No vector file for cross validation. Use original vector file used for train-test instead
 	    #vecfile = arg_vecfile
 
@@ -614,14 +618,14 @@ def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_feature
         joint = True
 
     if joint:
-        trainfeatures_adult, devfeatures_adult, devresults_adult = setup(arg_modelname, 'adult', 'adult', arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, dataloc, arg_vecfile, crossval_num=arg_crossval_num, arg_prefix=arg_prefix)
-        trainfeatures_child, devfeatures_child, devresults_child = setup(arg_modelname, 'child', 'child', arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, dataloc, arg_vecfile, crossval_num=arg_crossval_num, arg_prefix=arg_prefix)
-        trainfeatures_neonate, devfeatures_neonate, devresults_neonate = setup(arg_modelname, 'neonate', 'neonate', arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, dataloc, arg_vecfile, crossval_num=arg_crossval_num, arg_prefix=arg_prefix)
+        trainfeatures_adult, devfeatures_adult, devresults_adult = setup(arg_modelname, 'adult', 'adult', arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, dataloc, arg_vecfile, crossval_num=arg_crossval_num, arg_prefix=arg_prefix, arg_sympfile=arg_sympfile, arg_chvfile=arg_chvfile)
+        trainfeatures_child, devfeatures_child, devresults_child = setup(arg_modelname, 'child', 'child', arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, dataloc, arg_vecfile, crossval_num=arg_crossval_num, arg_prefix=arg_prefix, arg_sympfile=arg_sympfile, arg_chvfile=arg_chvfile)
+        trainfeatures_neonate, devfeatures_neonate, devresults_neonate = setup(arg_modelname, 'neonate', 'neonate', arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, dataloc, arg_vecfile, crossval_num=arg_crossval_num, arg_prefix=arg_prefix, arg_sympfile=arg_sympfile, arg_chvfile=arg_chvfile)
         trainfeatures = [trainfeatures_adult, trainfeatures_child, trainfeatures_neonate]
         devfeatures = [devfeatures_adult, devfeatures_child, devfeatures_neonate]
         devresults = [devresults_adult, devresults_child, devresults_neonate]
     else:
-        trainfeatures, devfeatures, devresults = setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, dataloc, arg_vecfile, arg_prefix=arg_prefix,arg_sympfile=arg_sympfile, arg_chvfile=arg_chvfile)
+        trainfeatures, devfeatures, devresults = setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, dataloc, arg_vecfile, arg_prefix=arg_prefix, arg_sympfile=arg_sympfile, arg_chvfile=arg_chvfile)
 
     labels = arg_labels
     modeltype = arg_model # svm, knn, nn, lstm, nb, rf
