@@ -44,8 +44,8 @@ from random import shuffle
 cuda = torch.device("cuda:1")
 data={}         
 all_categories = []
-input_train = '/u/yanzhaod/data/va/mds+rct/train_neonate_cat.xml'
-input_test = '/u/yanzhaod/data/va/mds+rct/test_neonate_cat.xml'
+input_train = '/u/yanzhaod/data/va/mds+rct/train_child_cat.xml'
+input_test = '/u/yanzhaod/data/va/mds+rct/test_child_cat.xml'
 out_model_filename = "./output/model_neonate_lstm_128_2.pt"
 out_text_filename = "output/out_neonate_lstm_test_128_2.txt"
 out_results_filename = 'output/out_neonate_lstm_results.txt'
@@ -155,12 +155,10 @@ class LSTM(nn.Module):
         self.softmax = nn.LogSoftmax(dim=1)
 
     def forward(self, input, hidden):
-        print(input.size(),111111111)
+
         input = self.encoder(input.long())
         output,hidden = self.lstm(input,hidden)
-        print(output.size(),111)
         output = self.linear(output[-1])
-        print(output.size(),122)
         output = self.softmax(output)
         return output, hidden
 

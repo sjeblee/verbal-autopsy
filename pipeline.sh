@@ -5,16 +5,16 @@
 prefix="/u/yanzhaod/research/output"   # File output prefix
 dataloc="/u/yanzhaod/data/va"  # Location of data files (i.e. parent of mds+rct folder
 
-name="gru_neonate_who_02"   # Give the output folder a name, will be created in $prefix
-modelname="gru"        # Model type: one of: nn cnn svm rnn gru
+name="cnn_child_who_02"   # Give the output folder a name, will be created in $prefix
+modelname="cnn"        # Model type: one of: nn cnn svm rnn gru
 prep="spell"          # Preprocessings: any comma-separated list of: none spell stem, kwc
 feats="narr_vec"    # Features, comma-separated list of: narr_count narr_vec narr_symp dem narr_tfidf lda
 fname="narrv_08"         # Give the featureset a name
 labels="cghr_cat"     # ICD categories to use (leave this as cghr_cat)
 dataset="mds+rct"     # Dataset to use (leave this as mds+rct)
-trainset="neonate"      # Training data to use: all adult child neonate
-devset="neonate"        # Testing data to use: all adult child neonate
-vecfile="$dataloc/mds+rct/narr+ice+medhelp.vectors.100" # Vectors for narr_vec features
+trainset="child"      # Training data to use: all adult child neonate
+devset="child"        # Testing data to use: all adult child neonate
+vecfile="$u/yanzhaod/data/va/mds+rct/narr+ice+medhelp.vectors.100" # Vectors for narr_vec features
 sympfile="/u/yoona/symptom_files/SYMP.csv" # Symptom file for symptom extraction
 chvfile="/u/yoona/symptom_files/CHV_concepts_terms_flatfile_20110204.tsv" # CHV file for symptom extraction
 

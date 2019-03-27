@@ -1,12 +1,19 @@
 from __future__ import unicode_literals, print_function, division
 from io import open
-
+import glob
 import os
 import torch
+import sys
 from lxml import etree
+import argparse
+import calendar
+import csv
 import re
+import subprocess
 import time
 import math 
+import time
+import math
 from sklearn.metrics import f1_score
 import numpy as np
 from random import shuffle
@@ -32,12 +39,12 @@ from random import shuffle
 cuda = torch.device("cuda:0")
 data={}         
 all_categories = []
-input_train = "/u/yanzhaod/data/va/mds+rct/train_child_cat_spell.xml"
-input_test = "/u/yanzhaod/data/va/mds+rct/test_child_cat_spell.xml"
+input_train = '/u/yanzhaod/data/va/mds+rct/train_child_cat.xml'
+input_test = '/u/yanzhaod/data/va/mds+rct/test_child_cat_spell.xml'
 #input_test = '/u/yanzhaod/data/va/mds+rct/test_child_cat.xml'
-out_model_filename = "output/model_child_gru_128.pt"
-out_text_filename = "out_child_test_128.txt"
-out_results_filename = 'out_child_results.txt'
+out_model_filename = "./output/model_child_gru_128.pt"
+out_text_filename = "output/out_child_test_128.txt"
+out_results_filename = 'output/out_child_results.txt'
 
 # Hidden size
 n_hidden = 128            
@@ -64,28 +71,38 @@ for child in root:
     cghr_cat = child.find('cghr_cat')
     try:
         text = narrative.text.lower()
-        text = re.sub('[^a-z0-9 ]','',text)          
-        text = re.sub('[\t\n]','',text)
-        text = re.sub(' +', ' ', text)
+        text = re.sub('[^a-z0-9\s\!\@\#\$\%\^\&\*\(\)\.\,]','',text)           #Note:this steps removes all punctionations and symbols in text, which is optional
         data[cghr_cat.text].append((MG_ID.text,text))
     except AttributeError:
         continue
         
+        
+# In[15]:  
+# for e in child.iter("MG_ID","narrative","cghr_cat"):
+#     print(e)
+print("keys of data:")
+print(data.keys()[0])
+print("values of data:")
+print(data.values()[0][2])  
+#print(data.values()[0][4]) 
+#print(data.values()[0][28])      
 print('all categories: '+str(all_categories))
 n_categories= len(all_categories)
 n_iters = 0
 
-for k,v in data.items():
+for k,v in data.iteritems():
     n_iters += len(v)
 print("size of the narratives: %d" %n_iters)
 
 # In[78]:
 all_text = ''
-for v in data.values():
+for v in data.itervalues():
     l = [v[i][1] for i in range(len(v))]
     all_text = all_text + u"-".join(l)
 
 vocab = list(set(all_text))
+
+
 
 print("vocab: " +str(vocab))
 n_letters = len(vocab)
@@ -104,11 +121,21 @@ def letterToTensor(letter):
 def lineToTensor(narrative):
     tensor = torch.zeros([len(narrative),1],device=cuda)
     for li, letter in enumerate(narrative):
+
         tensor[li][0] = letterToIndex(letter)
     return tensor
 
-#for k in data:
-#    print("key: " + str(k) + "; size: " +str(len(data[k]))) 
+print("a sample tensor of letter 'a':")
+print(letterToTensor('a'))
+narr = data[data.keys()[0]][1][1]
+print(data[data.keys()[0]][1])
+print("the size of a sample input (narr): ")
+input = lineToTensor(narr)
+input=input.to(cuda)
+print(input.size())
+
+for k in data:
+    print("key: " + str(k) + "; size: " +str(len(data[k]))) 
 # In[79]:
 
 import torch.nn as nn
@@ -122,12 +149,12 @@ class GRU(nn.Module):
         self.linear = nn.Linear(hidden_size,output_size)
         self.softmax = nn.LogSoftmax(dim=1)
 
-    def forward(self, inp, hidden):
-#        print(input
-        inp = self.encoder(inp.long())
-        output,hidden = self.gru(inp,hidden)
+    def forward(self, input, hidden):
+        input = self.encoder(input.long())
+        output,hidden = self.gru(input,hidden)
         output = self.linear(output[-1])
         output = self.softmax(output)
+        
         return output, hidden
         
     def initHidden(self):
@@ -137,18 +164,33 @@ class GRU(nn.Module):
 gru = GRU(n_letters, n_hidden, n_categories,emb_size)
 gru.to(cuda)
 
+
+
+# In[104]:
+hidden = torch.zeros([1,1,n_hidden],device=cuda)
+
+output, hn = gru(input,None)
+print("the sample output and output size: ")
+print(output,output.size())
+print(output[-1])
+print(hn.view(hn.size()[1], hn.size(2)))
+
 # In[105]:
 
 def categoryFromOutput(output):
     top_n, top_i = output.topk(1)
+    #print(top_n)
+    #print(top_i.size())
     category_i = top_i[0].item()
+    #print(category_i)
     return all_categories[category_i], category_i
 
-#print("category from output:")
-#print(categoryFromOutput(output))
+print("category from output:")
+print(categoryFromOutput(output))
 
 # In[109]:
 
+import random
 def getTensors(category,line):
     category_tensor = torch.tensor([all_categories.index(category)], dtype=torch.long,device=cuda)
     line_tensor = lineToTensor(line)
@@ -222,8 +264,11 @@ def train_iter():
                 continue  
             output, loss = train(category_tensor, line_tensor)
             current_loss += loss
+            guess, guess_i = categoryFromOutput(output)
+            #print('guess: %s;   category:  %s' %(guess, category))    
+            # Print iter number, loss, name and guess
             if iter % print_every == 0:
-                print('%d %d%% (%s) %.4f' % (iter, iter / n_iters/epochs*100, timeSince(start), loss))
+                print('%d %d%% (%s) %.4f %s / %s %s' % (iter, iter / n_iters/epochs*100, timeSince(start), loss, line, guess))
     
             # Add current loss avg to list of losses
             if iter % plot_every == 0:
@@ -240,7 +285,7 @@ def testTrainSet(model):
     iter = 0
     print_every = 1000
     start = time.time()
-    for k,v in data.items():
+    for k,v in data.iteritems():
         for i in range(len(v)):
             iter += 1
             if iter % print_every == 0:
@@ -289,7 +334,7 @@ def test(model):
     iter = 0
     print_every = 1000
     start = time.time()
-    for k,v in data.items():
+    for k,v in data.iteritems():
         for i in range(len(v)):
             iter += 1
             if iter % print_every == 0:

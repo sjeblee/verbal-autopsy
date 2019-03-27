@@ -49,12 +49,11 @@ from word2vec import get
 
 # In[3]:
 
-cuda = torch.device("cuda:0")
-data={}         
+cuda = torch.device("cuda:0")        
 all_categories = []
-input_train = '/u/yanzhaod/data/va/mds+rct/train_adult_cat.xml'
+input_train = '/u/yanzhaod/data/va/mds+rct/train_child_cat_spell.xml'
 #input_test = '/u/yanzhaod/data/va/mds+rct/test_child_cat_spell.xml'
-input_test = '/u/yanzhaod/data/va/mds+rct/test_adult_cat.xml'
+input_test = '/u/yanzhaod/data/va/mds+rct/train_child_cat_spell.xml'
 out_model_filename = "./char_emb/code/output/model_adult_gru_128.pt"
 out_text_filename = "char_emb/code/output/out_adult_test_128.txt"
 out_results_filename = 'char_emb/code/output/out_adult_results.txt'
@@ -69,6 +68,7 @@ emb_dim_char =  30
 learning_rate = 0.0001
 
 def get_data(input_train):
+    data = {}
     tree = etree.parse(input_train)
     for e in tree.iter("cghr_cat"):
             text = e.text.lower()
@@ -343,8 +343,11 @@ def test(model):
             #print(category,guess)         #uncomment this line for detailed label/prediction pairs
             cat_pred.append(guess)
             cat_true.append(category)
+            print(guess,category)
     print('----------------------------------------------')
     f1score = f1_score(cat_true,cat_pred,average="weighted")
+    #print("cat_true",cat_true)
+    #print("cat_pred",cat_pred)
     print(f1score)
     writeToFile("f1score: " + str(f1score),out_text_filename)
     for i in range(len(result)):
@@ -355,6 +358,6 @@ def test(model):
 
 if __name__ == '__main__':
     
-    model = train_iter()
-    #model = torch.load(out_model_filename)
+    #model = train_iter()
+    model = torch.load(out_model_filename)
     test(model)

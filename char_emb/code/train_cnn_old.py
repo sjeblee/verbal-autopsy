@@ -136,7 +136,9 @@ class CNN(nn.Module):
         self.softmax = nn.LogSoftmax(dim=1)
 
     def forward(self, input):
+        print(input.size(),11111111111)
         input = self.encoder(input.long())
+        print(input.size(),22222222222)
         print(input.size(),121)
         input = input.squeeze(1)
         print(input.size(),122)

@@ -50,17 +50,17 @@ from word2vec import get
 # In[3]:
 
 cuda = torch.device("cuda:0")
-data={}         
+        
 all_categories = []
-input_train = '/u/yanzhaod/data/va/mds+rct/train_adult_cat.xml'
-#input_test = '/u/yanzhaod/data/va/mds+rct/test_child_cat_spell.xml'
-input_test = '/u/yanzhaod/data/va/mds+rct/test_adult_cat.xml'
-out_model_filename = "./char_emb/code/output/model_adult_gru_128.pt"
-out_text_filename = "char_emb/code/output/out_adult_test_128.txt"
-out_results_filename = 'char_emb/code/output/out_adult_results.txt'
+input_train = '/u/yanzhaod/data/va/mds+rct/train_child_cat.xml'
+input_test = '/u/yanzhaod/data/va/mds+rct/test_child_cat_spell.xml'
+#input_test = '/u/yanzhaod/data/va/mds+rct/test_child_cat.xml'
+out_model_filename = "./char_emb/code/output/model_neonate_gru_128.pt"
+out_text_filename = "char_emb/code/output/out_neonate_test_128.txt"
+out_results_filename = 'char_emb/code/output/out_neonate_results.txt'
 
 # Hidden size
-n_hidden = 128            
+n_hidden = 128
 
 # Embedding size
 emb_dim_char =  30
@@ -68,8 +68,9 @@ emb_dim_char =  30
 # Learning rate
 learning_rate = 0.0001
 
-def get_data(input_train):
-    tree = etree.parse(input_train)
+def get_data(input):
+    data={} 
+    tree = etree.parse(input)
     for e in tree.iter("cghr_cat"):
             text = e.text.lower()
             if text not in data:
@@ -298,7 +299,9 @@ def train_iter():
             #cnn
             line_tensor_word = getWordTensors(v[1])
             
+            #print(type(line_tensor_char))
             line_tensor_char = line_tensor_char.to(cuda)
+            #print(type(line_tensor_char),1)
             #train
             optimizer.zero_grad()  
             output,hidden = model.forward(line_tensor_word,line_tensor_char,None)
@@ -308,6 +311,7 @@ def train_iter():
             if iter % print_every == 0:
                 guess, guess_i = categoryFromOutput(output)
                 print('%d %d%% (%s) %.4f %s / %s' % (iter, iter / n_iters/epochs*100, timeSince(start), loss, line, guess))
+            #guess, guess_i = categoryFromOutput(output)
     save()
     return model
 
@@ -355,6 +359,21 @@ def test(model):
 
 if __name__ == '__main__':
     
-    model = train_iter()
-    #model = torch.load(out_model_filename)
+    #model = train_iter()
+    model = torch.load(out_model_filename)
     test(model)
+    
+    # tdata,all_categories = get_data(input_test)
+    # l2 = []
+    # for k in tdata:
+    #     v = tdata[k]
+    #     for i in range(len(v)):
+    #         word_list = re.split(' ',v[i][1])
+    #         l2.append((k,(v[i][0],word_list)))
+    # count = 0
+    # for e in l2:
+    #     if e in l:
+    #         print(e[1][0])
+    #         count += 1 
+    # print(len(l),len(l2))
+    # print(count,count/len(l2))

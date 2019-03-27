@@ -68,6 +68,7 @@ def main():
     argparser.add_argument('--prefix', action="store", dest="prefix")
     args = argparser.parse_args()
 
+    
     if not (args.infile and args.outfile and args.testfile and args.model):
         print "usage: python model.py --in [train.features] --test [test.features] --out [test.results] --labels [ICD_cat/ICD_cat_neo/Final_code] --model [nn/cnn/lstm/gru/filternn] --name [rnn_ngram3] --prefix [/sjeblee/research/models]"
         exit()
@@ -367,6 +368,11 @@ def obj_rf(params):
 
 
 def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_file, arg_prefix, arg_labelname, arg_n_feats=500, arg_anova="chi2", arg_nodes=192, arg_activation='relu', arg_dropout=0.5, arg_rebalance=""):
+    print('--------------------------------------------------------testing-------------------------------------------')
+    print(arg_train_feats)
+    print(arg_test_feats)
+    print('--------------------------------------------------------testing end---------------------------------------')
+    
     total_start_time = time.time()
 
     # Special handling for neural network models
@@ -571,7 +577,12 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
         testids, testlabels, predictedlabels = test_multi(arg_model, model, arg_test_feats)
     else:
         testids, testlabels, predictedlabels = test(arg_model, model, arg_test_feats, anova_filter, hybrid, kw_cnn=cnn_model)
-
+    
+    print "Real Labels shape: " + str(testlabels)
+    print "Predicted Labels shape: " + str(predictedlabels)
+    f1score = metrics.f1_score(testlabels, predictedlabels, average='weighted')
+    print(f1score)
+    
     # Write results to a file
     output = open(arg_result_file, 'w')
     for i in range(len(testids)):
@@ -1285,9 +1296,9 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
         labenc = labelencoder_neonate
     if trainlabels:
         labenc.fit(labels + extra_labels)
-    print(labels)
+    print("labels",labels)
     y = labenc.transform(labels)
-
+    print("y",y)
     # Normalize features to 0 to 1 (if not word vectors)
     if not vec_feats:
 	preprocessing.minmax_scale(x, copy=False)

@@ -30,7 +30,7 @@ import numpy as np
 from random import shuffle
 from word2vec import load
 from word2vec import get
-
+from torch.utils.data import DataLoader
 ###########################################################
 #**********************Parameters************************
 #cuda -> the selected gpu
@@ -50,11 +50,11 @@ from word2vec import get
 # In[3]:
 
 cuda = torch.device("cuda:0")
-data={}         
+        
 all_categories = []
-input_train = '/u/yanzhaod/data/va/mds+rct/train_adult_cat.xml'
+input_train = "D:/projects/zhaodong/research/va/data/dataset/train_adult_cat_spell.xml"
 #input_test = '/u/yanzhaod/data/va/mds+rct/test_child_cat_spell.xml'
-input_test = '/u/yanzhaod/data/va/mds+rct/test_adult_cat.xml'
+input_test = "D:/projects/zhaodong/research/va/data/dataset/test_adult_cat_spell.xml"
 out_model_filename = "./char_emb/code/output/model_adult_gru_128.pt"
 out_text_filename = "char_emb/code/output/out_adult_test_128.txt"
 out_results_filename = 'char_emb/code/output/out_adult_results.txt'
@@ -68,7 +68,10 @@ emb_dim_char =  30
 # Learning rate
 learning_rate = 0.0001
 
+stime = time.time()
+print("preprocessing...")
 def get_data(input_train):
+    data={} 
     tree = etree.parse(input_train)
     for e in tree.iter("cghr_cat"):
             text = e.text.lower()
@@ -80,24 +83,43 @@ def get_data(input_train):
         MG_ID = child.find('MG_ID')
         narrative = child.find('narrative')
         cghr_cat = child.find('cghr_cat')
+        cghr_cat2 = [child.find('CODINGKEYWORDS1'),child.find('CODINGKEYWORDS2')]
+        second_try = []
         try:
             text = narrative.text.lower()
-            text = re.sub('[^a-z0-9\s]','',text)           #Note:this steps removes all punctionations and symbols in text, which is optional
-            text = re.sub('[\t\n]','',text)
-            data[cghr_cat.text].append((MG_ID.text,text))
         except AttributeError:
-            continue
+            for e in cghr_cat2:
+                try:
+                    second_try.append(child.find('CODINGKEYWORDS1').text.lower())
+                except AttributeError:
+                    continue
+            if len(second_try) == 2:
+                if second_try[0] == second_try[1]:
+                    second_try = second_try[0]
+                else:
+                    second_try = ' '.join(second_try)
+            elif len(second_try) == 1:
+                second_try = second_try[0]
+            else:
+                print("undetected mgid: "+MG_ID.text)
+        if second_try:
+            text = text + ' ' + second_try.lower()
+            #print(MG_ID.text)
+        text = re.sub('[^a-z0-9 ]','',text)           #Note:this steps removes all punctionations and symbols in text, which is optional
+        text = re.sub('[\t\n]','',text)
+        text = re.sub(' +', ' ', text)
+        data[cghr_cat.text].append((MG_ID.text,text))
     return data,all_categories
 data,all_categories = get_data(input_train)
             
 n_categories= len(all_categories)
 vocab = 'abcdefghijklmnopqrstuvwxyz0123456789 '
+print("vocab: %s" %vocab)
 n_letters = len(vocab)
 n_iters = 0
-for k,v in data.iteritems():
+for k,v in data.items():
     n_iters += len(v)
 print("size of the narratives: %d" %n_iters)
-
 print(vocab)
 
 
@@ -119,7 +141,6 @@ def get_dic(fname):
                 emb_dic[letter] = emb 
     return emb_dic
 emb_dic = get_dic(fname)
-print(' ' in emb_dic,'I lobv tat')
 l = []
 max_num_word = 0
 max_num_char = 0
@@ -132,7 +153,8 @@ for k in data:
         l.append((k,(v[i][0],word_list)))
         if len(word_list) > max_num_word:
             max_num_word = len(word_list)
-print(max_num_word,word_list,max_num_char)
+print("max number of word %d" %max_num_word)
+print("max number of char %d" %max_num_char)
 
 def letterToTensor(letter):
     tensor = torch.tensor(emb_dic[letter],device=cuda)
@@ -140,7 +162,10 @@ def letterToTensor(letter):
 def lineToTensor(narrative):
     tensor = torch.zeros([max_num_char,emb_dim_char],device=cuda)
     for li, letter in enumerate(narrative):
-        tensor[li] = letterToTensor(letter)
+        try:
+            tensor[li] = letterToTensor(letter)
+        except IndexError: #for test set, it's length may exceed max_num_char
+            break
     return tensor
 # narr = data[data.keys()[0]][1][1]
 # input = lineToTensor(narr)
@@ -150,21 +175,18 @@ def categoryFromOutput(output):
     return all_categories[category_i], category_i
 
 def getTensors(category,line):
-    category_tensor = torch.tensor([all_categories.index(category)], dtype=torch.long,device=cuda)
+    category_tensor = torch.tensor(all_categories.index(category), dtype=torch.long,device=cuda)
     #category_tensor = torch.tensor([all_categories.index(category)], dtype=torch.long)
     line_tensor = lineToTensor(line)
     category_tensor = category_tensor.to(cuda)
     return category, line, category_tensor, line_tensor
     
-max_num_word = 200   
+#max_num_word = 200   
 shuffle(l)
-wmodel,dim = load('/u/yanzhaod/data/narr_ice_medhelp.vectors.100')
+wmodel,dim = load('D:/projects/zhaodong/research/va/data/dataset/narr+ice+medhelp.vectors.100')
 emb_dim_word = len(get('have',wmodel))
 class_num = n_categories
 
-narr = data[data.keys()[0]][1][1]
-input = lineToTensor(narr)
-input=input.to(cuda)
 
 class CNN_GRU_Text(nn.Module):
     def __init__(self, emb_dim_word,  emb_dim_char, class_num, hidden, kernel_num=200, kernel_sizes=5, dropout=0.0, ensemble=False, hidden_size=100):
@@ -194,18 +216,14 @@ class CNN_GRU_Text(nn.Module):
         self.fc1 = nn.Linear(self.Co*self.Ks+max_num_char*10, C)
 
     def conv_and_pool(self, x, conv,n):
-        #print(x.size())
-        #x = self.encoder(x.long())  #200,1,100
-        x = x.squeeze(1).squeeze(1).unsqueeze(0).unsqueeze(0) #1,1,200,100
-        #print(conv(x).size())     
         x = F.relu(conv(x)).squeeze(3)  
         x = F.max_pool1d(x, x.size(2)).squeeze(2)
         return x
 
     def forward(self,a,b, hidden):
-        
+        #print(a.size(),b.size(),51) #[128, 200, 1, 100],[128, 1484, 30]
         #Word
-        a = a.unsqueeze(1)  # (N, Ci, W, D)]
+        a = a.squeeze(2).unsqueeze(1)   #[128, 1, 200, 100]=(N, Ci, Co, D)]
         a1 = self.conv_and_pool(a, self.conv11,1) # (N,Co)
         a2 = self.conv_and_pool(a, self.conv12,2) # (N,Co)
         a3 = self.conv_and_pool(a, self.conv13,3) # (N,Co)
@@ -214,18 +232,16 @@ class CNN_GRU_Text(nn.Module):
         a = torch.cat((a1, a2, a3, a4, a5), 1)
         a = self.dropout(a)  # (N, len(Ks)*Co)
         #Char
-        b = b.unsqueeze(1)
-        #print(b.size(),51)   ##ofchars,1,399  
         b,hidden = self.gru(b,hidden)
-        b = b.contiguous()
-        b = b.view(-1,b.shape[2])
         b = self.linear(b)
-        b = b.view(-1,b.size(0)*b.size(1))
+        b = b.view(-1,b.size(1)*b.size(2))
         b = F.relu(b)
+        input = torch.cat((a,b),1)      #1 is the horizontal concat
+        output = self.fc1(input)
+        output = self.softmax(output)
         
         #print(a.size(),b.size(),62)   #(1,1000), (1,1000)
         input = torch.cat((a,b),1)      #1 is the horizontal concat
-        
         output = self.fc1(input)
         output = self.softmax(output)
         return output, hidden
@@ -237,7 +253,7 @@ def getWordTensors(word_list):
     tensor = torch.zeros([max_num_word, emb_dim_word],device=cuda)
     for i in range(max_num_word):
         if i < len(word_list):
-            tensor[i] = torch.tensor(get(word_list[i],wmodel),dtype=torch.long)
+            tensor[i] = torch.tensor(get(word_list[i],wmodel),dtype=torch.float)
     tensor = torch.unsqueeze(tensor,1)   #d 
     return tensor
     
@@ -284,59 +300,120 @@ def train_iter():
     all_losses = []
     start = time.time()
     iter = 0
-    for i in range(epochs):
+    
+    batch_size = 16
+    training_set = []
+    for e in l:
+        k,v = e[0],e[1]
         
-        for e in l:
-            iter += 1
-            #print(iter)
-            k,v = e[0],e[1]
-            
-            #gru
-            category, line, category_tensor, line_tensor_char = getTensors(k,' '.join(v[1]))
-            if line_tensor_char.size() == (0,):
-                continue  
-            #cnn
-            line_tensor_word = getWordTensors(v[1])
-            
-            line_tensor_char = line_tensor_char.to(cuda)
+        #gru
+        category, line, category_tensor, line_tensor_char = getTensors(k,' '.join(v[1]))
+        if line_tensor_char.size() == (0,):
+            continue  
+        #cnn
+        line_tensor_word = getWordTensors(v[1])
+        
+        line_tensor_char = line_tensor_char.to(cuda)  
+        training_set.append([line_tensor_word,line_tensor_char,category_tensor])
+    training_params = {"batch_size": batch_size,
+                "shuffle": True,
+                "num_workers": 0}
+    training_generator = DataLoader(training_set, **training_params)
+    print("Preprocessing took %s"%timeSince(stime))
+    print("Training...")
+    count = 0
+    for i in range(epochs):
+        for iter, batch in enumerate(training_generator):
+            count += 1
+            line_tensor_word, line_tensor_char, category_tensor= batch
             #train
             optimizer.zero_grad()  
             output,hidden = model.forward(line_tensor_word,line_tensor_char,None)
+            #print(output.size(),category_tensor.size(),2)  ((batch,9);(batch,))
+#            print(output.size(),1)
+#            print(category_tensor.size(),2)
             loss = criterion(output, category_tensor)
             loss.backward()
             optimizer.step()
             if iter % print_every == 0:
                 guess, guess_i = categoryFromOutput(output)
                 print('%d %d%% (%s) %.4f %s / %s' % (iter, iter / n_iters/epochs*100, timeSince(start), loss, line, guess))
+    print("Training took %s"%timeSince(stime))
     save()
     return model
-
 def test(model):
     tdata,all_categories = get_data(input_test)
+    lt = []
+    for k in tdata:
+        v = tdata[k]
+        for i in range(len(v)):
+            word_list = re.split(' ',v[i][1])
+            lt.append((k,(v[i][0],word_list)))
+    print("size of the testing set %d"%len(lt))
+    testing_set = []
+    for e in lt:
+        k,v = e[0],e[1]
+        
+        #gru
+        category, line, category_tensor, line_tensor_char = getTensors(k,' '.join(v[1]))
+        if line_tensor_char.size() == (0,):
+            print("empty line tensor")
+            continue  
+        #cnn
+        line_tensor_word = getWordTensors(v[1])
+        
+        line_tensor_char = line_tensor_char.to(cuda)  
+        testing_set.append([line_tensor_word,line_tensor_char,category_tensor,category])
+    batch_size = 16
+    testing_params = {"batch_size": batch_size,
+                       "shuffle": True,
+                       "num_workers": 0}
+    testing_generator = DataLoader(testing_set, **testing_params)
+    cat_pred,cat_true = [],[]
+    for iter, batch in enumerate(testing_generator):
+        line_tensor_word, line_tensor_char, category_tensor,category= batch 
+        output,hidden = model.forward(line_tensor_word,line_tensor_char,None)
+        l = []
+        for i in range(output.size(0)):
+            guess,guess_i = categoryFromOutput(output[i])
+            l.append(guess)
+#        guess, guess_i = categoryFromOutput(output)
+        guess=l
+        cat_pred += list(guess)
+        cat_true += category
+    f1score = f1_score(cat_true,cat_pred,average="weighted")
+    return f1score
+def test_backup(model):
+    tdata,all_categories = get_data(input_test)
+    
     result = []
     cat_pred,cat_true = [],[]
     iter = 0
     print_every = 1000
     start = time.time()
-    for k,v in tdata.iteritems():
+    for k,v in tdata.items():
         for i in range(len(v)):
             iter += 1
             if iter % print_every == 0:
                 print(iter,timeSince(start))
             try:
-                category, line, category_tensor, line_tensor_char = getTensors(k,v[i][1])
+                category, line, category_tensor, line_tensor_char = getTensors(k,' '.join(v[i][1]))
+                
             except ValueError:
                 print('----------------outsided text----------------')
-                print(text)
-                print('\t' in text)
+                print(v[i][1])
+                print('\t' in v[i][1])
                 
                 iter -= 1
                 continue
             if line_tensor_char.size() == (0,):
                 continue 
-            line_tensor_word = getWordTensors(v[1])
-            
+            line_tensor_word = getWordTensors(v[i][1])
             MG_ID = v[i][0]
+            line_tensor_word = line_tensor_word.unsqueeze(0)
+            line_tensor_char = line_tensor_char.unsqueeze(0)    #(batch=1,num,1) 
+            #print(line_tensor_word.size(),line_tensor_char.size(),62)
+            print(line_tensor_word)
             output,hidden = model(line_tensor_word,line_tensor_char,None)
             guess, guess_i = categoryFromOutput(output)
             result.append({'Correct_ICD':category,'Predicted_ICD':guess,'MG_ID':MG_ID})
@@ -357,4 +434,5 @@ if __name__ == '__main__':
     
     model = train_iter()
     #model = torch.load(out_model_filename)
-    test(model)
+    f1_score = test(model)
+    print('f1score: '+str(f1_score))

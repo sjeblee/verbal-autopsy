@@ -1,4 +1,4 @@
-
+ran
 # @author sjeblee@cs.toronto.edu
 
 import math
@@ -50,19 +50,18 @@ class CNN_Text(nn.Module):
           Ci = 1
           Co = kernel_num
           Ks = kernel_sizes
-	  self.ensemble = ensemble
-
-	  self.conv11 = nn.Conv2d(Ci, Co, (1, D))
+          self.ensemble = ensemble
+          self.conv11 = nn.Conv2d(Ci, Co, (1, D))
           self.conv12 = nn.Conv2d(Ci, Co, (2, D))
           self.conv13 = nn.Conv2d(Ci, Co, (3, D))
           self.conv14 = nn.Conv2d(Ci, Co, (4, D))
-	  self.conv15 = nn.Conv2d(Ci, Co, (5, D))
+          self.conv15 = nn.Conv2d(Ci, Co, (5, D))
           #self.conv16 = nn.Conv2d(Ci, Co, (6, D))
           #self.conv17 = nn.Conv2d(Ci, Co, (7, D))
           #self.conv18 = nn.Conv2d(Ci, Co, (8, D))
 
           self.dropout = nn.Dropout(dropout)
-	  self.fc1 = nn.Linear(Co*Ks, C) # Use this layer when train with only CNN model, i.e. No ensemble 
+          self.fc1 = nn.Linear(Co*Ks, C) # Use this layer when train with only CNN model, i.e. No ensemble 
 	  
      def conv_and_pool(self, x, conv):
           x = F.relu(conv(x)).squeeze(3)  # (N, Co, W)
@@ -72,22 +71,21 @@ class CNN_Text(nn.Module):
 
      def forward(self, x):
           x = x.unsqueeze(1)  # (N, Ci, W, D)] 
-	  x1 = self.conv_and_pool(x,self.conv11) #(N,Co)
+          x1 = self.conv_and_pool(x,self.conv11) #(N,Co)
           x2 = self.conv_and_pool(x,self.conv12) #(N,Co)
           x3 = self.conv_and_pool(x,self.conv13) #(N,Co)
           x4 = self.conv_and_pool(x,self.conv14) #(N,Co)
-	  x5 = self.conv_and_pool(x,self.conv15) #(N,Co)
+          x5 = self.conv_and_pool(x,self.conv15) #(N,Co)
           #x6 = self.conv_and_pool(x,self.conv16) #(N,Co)
           #x7 = self.conv_and_pool(x,self.conv17) 
           #x8 = self.conv_and_pool(x,self.conv18)
- 	  x = torch.cat((x1, x2, x3, x4, x5), 1)
+          x = torch.cat((x1, x2, x3, x4, x5), 1)
           
           x = self.dropout(x)  # (N, len(Ks)*Co)
-
-	  if self.ensemble == False: # Train CNN with no ensemble  
+          if self.ensemble == False: # Train CNN with no ensemble  
               logit = self.fc1(x)  # (N, C)
-	  else: # Train CNN with ensemble. Output of CNN will be input of another model
-	      logit = x
+          else: # Train CNN with ensemble. Output of CNN will be input of another model
+              logit = x
           return logit
 
 # Neural Network Model (1 hidden layer)

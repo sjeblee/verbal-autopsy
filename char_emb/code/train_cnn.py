@@ -26,10 +26,10 @@ from torch.utils.data import DataLoader
 from sklearn.metrics import classification_report
 
 # In[7]:
-cuda = torch.device("cuda:1")
-input_train = '/u/yanzhaod/data/va/mds+rct/train_adult_cat.xml'
-#input_test = '/u/yanzhaod/data/va/mds+rct/test_child_cat_spell.xml'
-input_test = '/u/yanzhaod/data/va/mds+rct/test_adult_cat.xml'
+cuda = torch.device("cuda:0")
+input_train = '/u/yanzhaod/data/va/mds+rct/train_child_cat.xml'
+input_test = '/u/yanzhaod/data/va/mds+rct/test_child_cat_spell.xml'
+#input_test = '/u/yanzhaod/data/va/mds+rct/test_adult_cat.xml'
 out_file = "out_cnn_test.txt"           #output report text filename
 out_model_filename = './model_cnn_adult.pt'   #output filename for the model
 
@@ -234,7 +234,6 @@ def trainIters(epochs):
             l.append([category_tensor,line_tensor])
     training_set = l
     training_generator = DataLoader(training_set, **training_params)
-    #print(l[0][1].size(),1123)
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(cnn.parameters(), lr=learning_rate)
     num_iter_per_epoch = len(training_generator)
@@ -242,11 +241,10 @@ def trainIters(epochs):
         for iter, batch in enumerate(training_generator):
             iter += batch_size
             label, feature = batch
-            #print(feature.size())
-            #feature = feature.cuda()
-            #label = label.cuda()
+
             optimizer.zero_grad()
             predictions = cnn.forward(feature)
+            print(predictions.size(),label.size(),2)
             loss = criterion(predictions, label)
             loss.backward()
             optimizer.step()
@@ -410,8 +408,8 @@ def test2(model):
 
 if __name__ == '__main__':
     
-    #model,train_data = trainIters(epochs)
-    model = torch.load(out_model_filename)
+    model,train_data = trainIters(epochs)
+    #model = torch.load(out_model_filename)
     #testTrainSet(model,train_data=train_data)
     test2(model)
     
