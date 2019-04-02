@@ -460,7 +460,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
 
     # Select best features for all data
     if ((not is_nn) or arg_model == "nn") and num_feats < x_feats:
-        anova_filter, X = create_anova_filter(X, Y, anova_function,arg_prefix, num_feats)
+        anova_filter, X = create_anova_filter(X, Y, anova_function, arg_prefix, num_feats)
 
     global model
     model = None
@@ -472,31 +472,31 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
         if os.path.exists(modelfile):
             print "using pre-existing model at " + modelfile
 
-	    if use_torch:
-		model = torch.load(modelfile)
-	    else:
-		model = load_model(modelfile)
-            X = numpy.asarray(X)
+            if use_torch:
+                model = torch.load(modelfile)
+            else:
+                model = load_model(modelfile)
+                X = numpy.asarray(X)
 
-	# For CNN-RNN ensemble
-	elif arg_model == "cnn-rnn":
-	    cnn_modelfile = arg_prefix + "/" + arg_modelname + "_cnn.model"
-	    rnn_modelfile = arg_prefix + "/" + arg_modelname + "_rnn.model"
-	    if (os.path.exists(cnn_modelfile) and os.path.exists(rnn_modelfile)):
-		print "using pre-existing model at " + cnn_modelfile + " and " + rnn_modelfile
-		cnn_input_model = torch.load(cnn_modelfile)
-		rnn_model = torch.load(rnn_modelfile)
-		model = [cnn_input_model, rnn_model]
-		X = numpy.asarray(X)
-	    else:
-		print "creating a new cnn-rnn ensemble model"
-		if use_torch:
+        # For CNN-RNN ensemble
+        elif arg_model == "cnn-rnn":
+            cnn_modelfile = arg_prefix + "/" + arg_modelname + "_cnn.model"
+            rnn_modelfile = arg_prefix + "/" + arg_modelname + "_rnn.model"
+            if (os.path.exists(cnn_modelfile) and os.path.exists(rnn_modelfile)):
+                print "using pre-existing model at " + cnn_modelfile + " and " + rnn_modelfile
+                cnn_input_model = torch.load(cnn_modelfile)
+                rnn_model = torch.load(rnn_modelfile)
+                model = [cnn_input_model, rnn_model]
+                X = numpy.asarray(X)
+            else:
+                print "creating a new cnn-rnn ensemble model"
+                if use_torch:
                     Y = to_categorical(Y)
-                    cnn_input_model, rnn_model = model_library_torch.cnn_attnrnn(X,Y)
+                    cnn_input_model, rnn_model = model_library_torch.cnn_attnrnn(X, Y)
                     model = [cnn_input_model, rnn_model]
 
-		    # Save both models
-		    torch.save(cnn_input_model,cnn_modelfile)
+                    # Save both models
+                    torch.save(cnn_input_model, cnn_modelfile)
                     torch.save(rnn_model, rnn_modelfile)
                 else:
                     print "cnn-rnn model must use pytorch"
@@ -515,10 +515,10 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
                 if len(X) == 0 and len(X2) > 0:
                     X = X2
                 Y = to_categorical(Y)
-		if use_torch:
-		    model = model_library_torch.nn_model(X,Y,num_nodes,'relu')
-		else:
-		    model, X, Y = model_library.nn_model(X, Y, num_nodes, 'relu')
+                if use_torch:
+                    model = model_library_torch.nn_model(X, Y, num_nodes, 'relu')
+                else:
+                    model, X, Y = model_library.nn_model(X, Y, num_nodes, 'relu')
             elif arg_model == "rnn" or arg_model == "lstm" or arg_model == "gru":
                 num_nodes = 100
                 #Y = to_categorical(Y)
@@ -527,42 +527,51 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
                 Y = to_categorical(Y)
                 num_nodes = 100
                 model, X, Y = model_library.rnn_cnn_model(X, Y, num_nodes, arg_activation, arg_model, X2=X2)
-            elif arg_model == "cnn":
+            elif arg_model == "cnn" or arg_model == 'cnn-query':
                 Y = to_categorical(Y)
+                if arg_model == 'cnn-query':
+                    dataloc = os.path.abspath(os.path.join(arg_train_feats, '..'))
+                    clusterfile = dataloc + "/train_adult_cat_spell_kwkm100.clusters"
+                    print('query vector path:', clusterfile + '.centers')
+                    vec_list = eval(open(clusterfile + '.centers', 'r').read())
+                    query_vectors = numpy.asarray(vec_list)
+                    print('Loaded query vectors:', type(query_vectors))
+                else:
+                    query_vectors = None
                 print("use_torch:", use_torch)
-		if use_torch:
-                    model = model_library_torch.cnn_model(X,Y)
-		else:
+                if use_torch:
+                    model = model_library_torch.cnn_model(X, Y, query_vectors=query_vectors)
+                else:
                     model, X, Y = model_library.cnn_model(X, Y, X2=X2)
             elif arg_model == "filternn":
                 num_nodes = 56
                 Y = to_categorical(Y)
                 model, X, Y = create_filter_rnn_model(X, Y, embedding_dim, num_nodes)
 
-	    print "saving the model..."
+            print "saving the model..."
 
-	    if not use_torch: # Save Keras model
-	        model.save(modelfile)
-	        plotname = modelfile + ".png"
-	        plot_model(model, to_file=plotname)
-	    else: # Save Pytorch model
-	        torch.save(model, modelfile)
+            if not use_torch: # Save Keras model
+                model.save(modelfile)
+                plotname = modelfile + ".png"
+                plot_model(model, to_file=plotname)
+            else: # Save Pytorch model
+                torch.save(model, modelfile)
     # Other models
     else:
-         if arg_model == "svm":
-             print "svm model"
-             model = svm.SVC(kernel='linear', decision_function_shape='ovr', probability=True)
-         elif arg_model == "knn":
-             print "k-nearest neighbor model"
-             model = neighbors.KNeighborsClassifier(n_neighbors=1, weights='distance', n_jobs=-1)
-         elif arg_model == "nb":
-             print "naive bayes model"
-             model = MultinomialNB()
-         elif arg_model == "rf":
-             print "random forest model"
-             model = RandomForestClassifier(n_estimators=26, max_features=0.0485, min_samples_split=4, class_weight='balanced', n_jobs=-1)
+        if arg_model == "svm":
+            print "svm model"
+            model = svm.SVC(kernel='linear', decision_function_shape='ovr', probability=True)
+        elif arg_model == "knn":
+            print "k-nearest neighbor model"
+            model = neighbors.KNeighborsClassifier(n_neighbors=1, weights='distance', n_jobs=-1)
+        elif arg_model == "nb":
+            print "naive bayes model"
+            model = MultinomialNB()
+        elif arg_model == "rf":
+            print "random forest model"
+            model = RandomForestClassifier(n_estimators=26, max_features=0.0485, min_samples_split=4, class_weight='balanced', n_jobs=-1)
 
-         model.fit(X, Y)
+        model.fit(X, Y)
 
     etime = time.time()
     print "training took " + str(etime - stime) + " s"
