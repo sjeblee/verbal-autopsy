@@ -38,6 +38,9 @@ import math
 global anova_filter
 global labelencoder
 import ast
+import statistics
+from word2vec import load
+from word2vec import get
 labelencoder = None
 labelencoder_adult = None
 labelencoder_child = None
@@ -55,8 +58,8 @@ The difference compared with the
 def main():
     train_mode = True
     to_preprocess = True
-    learning_rate = 0.001
-    num_epochs = 10
+    learning_rate = 0.0005
+    num_epochs = 12
     batch_size= 16
     total_start_time = time.time()
     rec_type = "child"
@@ -72,7 +75,6 @@ def main():
     cuda = torch.device("cuda:0")
     labelname = "cghr_cat"
     trainids,trainlabels = [],[]        # VA record id # Correct ICD codes
-    global Y
     X,Y=[],[]   # Feature vectors
     X2 = [] # Extra features for hybrid model
     
@@ -86,82 +88,55 @@ def main():
     typeencoder = preprocessing.LabelEncoder()
     modelfile = rec_type+"_model.pt"
     stime = time.time()
-    input_train = "D:/projects/zhaodong/research/va/data/dataset/train_"+rec_type+"_cat_spell.xml"  #input train file for char_embeeding
-    input_test = "D:/projects/zhaodong/research/va/data/dataset/dev_"+rec_type+"_cat.xml"      #input test file for char_embedding
     char_fname = 'char_emb/code/char_emb_30.txt'         #pretrained char_embeddings
     vocab='abcdefghijklmnopqrstuvwxyz0123456789 '
     emb_dic = get_dic(char_fname,vocab)
-    if train_mode== True:
-        if to_preprocess == True:
-            #-----------------collecting  gpu features char----------------------------
-            char_dic,all_categories,max_num_char,n_iters = preprocess_char(input_train)
-            #------------------------collecting cnn features---------------------------
-            print("Keys tested")
-            Y = preprocess(arg_train_feats, trainids, trainlabels, X, X2, Y, keys, char_dic,trainlabels=True, Y2_labels='keyword_clusters')
-            print("X: " + str(len(X)) + " X2: " + str(len(X2)) +" Y: " + str(len(Y)))
-            print("Y",Y)
-            
-            # Train the model
-            print("training model...")
-            print("creating a new neural network model")
-            store_dic = {"all_categories":all_categories,
-                         "max_num_char":max_num_char,
-                         "n_iters":n_iters,}
-            f = open("store_dic.txt","w")
-            f.write(str(store_dic))
-            f.close()
-#            torch.save(X,"X.pt")
-#            torch.save(Y,"Y.pt")
-        else:
-            f = open("store_dic.txt","r")
-            store_dic= eval(f.read())
-            all_categories = store_dic["all_categories"]
-            max_num_char = store_dic["max_num_char"]
-            n_iters = store_dic["n_iters"]
-            X = torch.load('X.pt')
-            Y = torch.load('Y.pt')
-        Y = to_categorical(Y)
-        model = model_lib_test.cnn_gru_model(X,X2,Y,all_categories,max_num_char,learning_rate=learning_rate,batch_size=batch_size,num_epochs=num_epochs)
-        torch.save(model, modelfile)
+    f1scores = []
+    ind_list = [0,1,2,5,6,7,8,9]
+    for i in ind_list:
+        
+        input_train = "D:/projects/zhaodong/research/va/data/crossval_sets/train_"+rec_type+"_"+str(i)+"_cat_spell.xml"  #input train file for char_embeeding
+        input_test = "D:/projects/zhaodong/research/va/data/crossval_sets/test_"+rec_type+"_"+str(i)+"_cat_spell.xml"    #input test file for char_embedding
 
-    else:
-        f = open("store_dic.txt","r")
-        store_dic= eval(f.read())
-        all_categories = store_dic["all_categories"]
-        max_num_char = store_dic["max_num_char"]
-        model = torch.load(modelfile)
-    etime = time.time()
-    print("training took " + str(etime - stime) + " s")
-    testids, testlabels, predictedlabels = test(model,input_test,arg_test_feats,all_categories,max_num_char,emb_dic)
-#    print("Real Labels shape: " + str(testlabels))
-#    print("Predicted Labels shape: " + str(predictedlabels))
-    f1score = metrics.f1_score(testlabels, predictedlabels, average='weighted')
-    print(f1score)
+        if train_mode== True:
+            X,Y,label,emb_comb,ID= preprocess(input_train,i)
+            print("X: " + str(len(X)) + " X2: " + str(len(X2)) +" Y: " + str(len(Y)))
+            Y = to_categorical(Y)
+            model = model_lib_test.cnn_comb_model(X,Y,emb_comb,learning_rate=learning_rate,batch_size=batch_size,num_epochs=num_epochs)
+            torch.save(model, modelfile)
+    
+        else:
+            model = torch.load(modelfile)
+        etime = time.time()
+        print("training "+str(i)+" took " + str(etime - stime) + " s")
+        testids, testlabels, predictedlabels = test(model,input_test,arg_test_feats,i)
+#        print("Real Labels shape: " + str(testlabels))
+#        print("Predicted Labels shape: " + str(predictedlabels))
+        f1score = metrics.f1_score(testlabels, predictedlabels, average='weighted')
+        print(f1score)
+        f1scores.append(f1score)
+        
+    print(statistics.mean(f1scores))
     print("Overall it takes " + timeSince(total_start_time))
-def test(model,input_test, testfile,all_categories,max_num_char,emb_dic,emb_dim_char=30,anova_filter=None, hybrid=False, rec_type=None, kw_cnn=None, threshold=0.01):
+#    result  =[]
+#    for i in range(len(testids)):
+#        result.append({'Correct_ICD':testlabels[i],'Predicted_ICD':predictedlabels[i],'MG_ID':testids[i]})
+#    for i in range(len(result)):
+#        result[i] = str(result[i])
+#    f = open('result_for_confusion_mat.txt','w')
+#    f.write('\n'.join(result))
+#    f.close()
+
+def test(model,input_test, testfile,ind,emb_dim_char=30,anova_filter=None, hybrid=False, rec_type=None, kw_cnn=None, threshold=0.01):
     print("testing...")
     stime = time.time()
-    testids = []
     testlabels = []
     testX = []
-    testX2 = []
     testY = []
-    predictedY = []
-    char_dic,all_categories,max_num_char_test,n_iters = preprocess_char(input_test)    #max_num_char_test is not used
-    tdata,all_categories = get_data(input_test)
+    testX,testY,testlabels,emb_dim_comb,testids = preprocess(input_test,ind)
 
-    char_dic = {}
-    for k,v in tdata.items():
-        for i in range(len(v)):   
-            category, line, category_tensor, line_tensor_char = getTensors(k,v[i][1],all_categories,max_num_char,emb_dim_char,emb_dic)
-            line_tensor_char = Variable(line_tensor_char).data.numpy()
-#            print(line_tensor_char.shape)   (max_num_char,30)
-            char_dic[v[i][0]] = line_tensor_char
-    testY = preprocess(testfile, testids, testlabels, testX, testX2, testY, keys, char_dic,Y2_labels='keyword_clusters')
     testX = numpy.asarray(testX).astype('float')
-    testX2 = numpy.asarray(testX2).astype('float')
-    inputs = [testX]
-    results = test_both(model,testX,testX2, testY,threshold=threshold)
+    results = test_both(model,testX, testY,threshold=threshold)
     print("testX shape: " + str(testX.shape))
     #elif model_type == "cnn":
     #    attn_vec = get_attention_vector(model, testX)
@@ -176,7 +151,7 @@ def test(model,input_test, testfile,all_categories,max_num_char,emb_dic,emb_dim_
 #    print("results: " + str(results))
 #    print("predicted labels: " + str(predictedlabels))
     return testids, testlabels, predictedlabels
-def test_both(model, testX, testX2, testids, probfile='/u/yoona/data/torch/probs_win200_epo10', labelencoder=None, collapse=False, threshold=0.1):
+def test_both(model, testX, testids, probfile='/u/yoona/data/torch/probs_win200_epo10', labelencoder=None, collapse=False, threshold=0.1):
     y_pred = [] # Original prediction if threshold is not in used for ill-defined.
 #    y_pred_softmax = []
 #    y_pred_logsoftmax = []
@@ -186,16 +161,11 @@ def test_both(model, testX, testX2, testids, probfile='/u/yoona/data/torch/probs
 #    new_y_pred = [] # class prediction if threshold for ill-difined is used.
     for x in range(len(testX)):
         input_row = testX[x]
-        input_row2 = testX2[x]
         icd = None
         if icd is None:
             input_tensor = torch.from_numpy(numpy.asarray([input_row]).astype('float')).float()
             input_tensor = input_tensor.contiguous().cuda()
-
-            input_tensor2 =numpy.asarray([input_row2]).astype('float')
-            input_tensor2 = torch.from_numpy(numpy.asarray([input_row2]).astype('float')).float()
-            input_tensor2 = input_tensor2.contiguous().cuda()
-            icd_var,hidden = model.forward(Variable(input_tensor),Variable(input_tensor2),None)
+            icd_var = model.forward(Variable(input_tensor))
             # Softmax and log softmax values
             icd_vec = logsoftmax(icd_var)
 #            icd_vec_softmax = softmax(icd_var)
@@ -203,127 +173,6 @@ def test_both(model, testX, testX2, testids, probfile='/u/yoona/data/torch/probs
         icd_code = icd_code.item()
         y_pred.append(icd_code)
     return y_pred  # Comment this line out if threshold is not in used. 
-def preprocess(filename, ids, labels, x,x2, y, feats,char_dic, rec_type=None, trainlabels=False, Y2_labels=None):
-    global labelencoder, labelencoder_adult, labelencoder_child, labelencoder_neonate
-    labelencoder  = preprocessing.LabelEncoder()
-    #ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4","symp_vec"]
-    ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4"]
-    # Read in the feature vectors
-    starttime = time.time()
-    print("preprocessing features: " + str(feats))
-    types = []
-    kw_clusters = []
-    vec_feats = False
-    labels2 = []
-    extra_labels = False
-    mg = []
-    with open(filename, 'r') as f:
-        for line in f:
-            vector = eval(line)      
-            features = []
-            for key in keys:
-            #for key in feats:
-                if key == 'MG_ID':
-                    mg.append(vector[key])
-                    ids.append(vector[key])
-                    try:
-                        char_feature = char_dic[vector[key]]
-                    except KeyError:
-                        print(vector[key])
-                        char_feature = None
-                elif key == labelname:
-                    labels.append(vector[key])
-                elif key in feats and key not in ignore_feats: # Only pull out the desired features
-                    if key == "CL_type":
-                        print("CL_type: " + vector[key])
-                        types.append(vector[key])
-                    elif key == "keyword_clusters":
-                        kw_text = vector[key]
-                        kw_list = []
-                        if kw_text is not None:
-                            kw_list = vector[key].split(',')
-                        kw_clusters.append(kw_list)
-                    elif key in vec_types:
-                        # The feature matrix for word2vec can't have other features
-                        #features = vector[key]
-                        feature = vector[key]
-                        vec_feats = True
-                        if key == "narr_seq":
-                            global vocab_size
-                            vocab_size = vector['vocab_size']
-                        global max_seq_len
-                        max_seq_len = vector['max_seq_len']
-                        #print "max_seq_len: " + str(max_seq_len)
-                        #features = numpy.asarray(features)#.reshape(max_seq_len, 1)
-                        feature = numpy.asarray(feature)
-                        if len(features) == 0:
-                            features = feature
-                        else:
-                            features = numpy.concatenate((features, feature), axis = 0)
-            #print "narr_vec shape: " + str(features.shape)
-                    elif not vec_feats:
-                        if vector.has_key(key):
-                    
-                            features.append(vector[key])
-                        else:
-                            features.append('0')
-            
-            if char_feature is not None:
-                x.append(feature)
-                x2.append(char_feature)
-    # Convert type features to numerical features
-    if len(types) > 0: #and not vec_feats:
-        print("converting types to numeric features")
-        if trainlabels:
-            typeencoder.fit(types)
-        enc_types = typeencoder.transform(types)
-
-        # Add the types back to the feature vector
-        for i in range(len(x)):
-            val = enc_types[i]
-            x[i].append(val)
-        keys.remove("CL_type")
-        keys.append("CL_type")
-
-    # Convert the keyword clusters to multi-hot vectors
-    if len(kw_clusters) > 0:
-        use_multi_hot = True
-        #use_multi_hot = (Y2_labels == 'keyword_clusters')
-        if use_multi_hot:
-            print("converting keyword clusters to multi-hot vectors")
-            cluster_feats = data_util.multi_hot_encoding(kw_clusters, 100)
-            labels2 = cluster_feats
-        else:
-            # Convert keywords to cluster embeddings
-            print("converting clusters to embeddings...")
-            clusterfile = "/u/sjeblee/research/va/data/datasets/mds+rct/train_adult_cat_spell.clusters_e2"
-            vecfile = "/u/sjeblee/research/va/data/datasets/mds+rct/narr+ice+medhelp.vectors.100"
-            cluster_feats = cluster_keywords.cluster_embeddings(kw_clusters, clusterfile, vecfile)
-            vec_feats = True
-
-        # Update keys and features
-        for i in range(len(x)):
-            x[i][0] = x[i][0] + cluster_feats[i]
-        keys.remove("keyword_clusters")
-        keys.append("keyword_clusters")
-        #vec_feats = True
-    print('label',list(set(labels)))
-    labenc = labelencoder
-    labenc.fit(labels)
-    y = labenc.transform(labels)
-#    print("Y",y)
-    #label is a list of string representation of categories,y is a list of encoded integers
-    # Normalize features to 0 to 1 (if not word vectors)
-    if not vec_feats:
-    	preprocessing.minmax_scale(x, copy=False)
-    endtime = time.time()
-    mins = float(endtime-starttime)/60
-    print("preprocessing took " + str(mins) + " mins")
-    if extra_labels:
-        print("returning extra labels")
-        return [y, labels2]
-    else:
-        return y
 
 def split_feats(keys, labelname):
     ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4"] 
@@ -463,28 +312,50 @@ def timeSince(since):
    m = math.floor(s / 60)
    s -= m * 60
    return '%dm %ds' % (m, s)
-def preprocess_char(input_train,n_hidden=128,emb_dim_char=30,learning_rate=0.0001,vocab='abcdefghijklmnopqrstuvwxyz0123456789 '):
-
-    data,all_categories = get_data(input_train)
+def preprocess(input_file,ind,n_hidden=128,emb_dim_char=30,emb_dim_word = 100,max_num_word = 200,max_char_in_word = 7,learning_rate=0.0001,vocab='abcdefghijklmnopqrstuvwxyz0123456789 '):
+    global labelencoder
+    labelencoder  = preprocessing.LabelEncoder()
+    #wmodel,dim = load('D:/projects/zhaodong/research/va/data/dataset/narr+ice+medhelp.vectors.100')
+    wmodel,dim = load('D:/projects/zhaodong/research/va/data/crossval_sets/ice+medhelp+narr_all_'+str(ind)+'.vectors.100')
+    emb_dim_comb = max_char_in_word*emb_dim_char+emb_dim_word
+    def letterToNumpy(letter):
+        return numpy.array(emb_dic[letter])
+    def lettersToNumpy(word):
+        arr = numpy.zeros((max_char_in_word,emb_dim_char))
+        for i in range(max_char_in_word):
+            if i < len(word):
+                arr[i,:] = letterToNumpy(word[i])
+        return arr
+    
+    def wordToNumpy(word):
+        emb_word = numpy.array(get(word,wmodel))
+        emb_letters = lettersToNumpy(word).flatten('C')    #'C' means to flatten in row major  #of shaoe(max_char_in_word*emb_dim_char,)
+        return numpy.hstack((emb_word,emb_letters))    #(max_char_in_word*emb_dim_char+emb_dim_word,)
+    def lineToNumpy(line):
+        l = line.split()
+        emb_line = numpy.zeros((max_num_word,emb_dim_comb))
+        for i in range(max_num_word):
+            if i < len(l):
+                emb_line[i,:] = wordToNumpy(l[i])
+        return emb_line
+    data,all_categories = get_data(input_file)
     print("vocab: %s" %vocab)
     n_iters = 0
     for k,v in data.items():
         n_iters += len(v)
     print("size of the narratives: %d" %n_iters)
-
-    dic = {}
-    max_num_char = 0
+    
+    ID = []
+    X,label = [],[]
     for k,v in data.items():
         for i in range(len(v)):
-            if len(v[i][1]) > max_num_char:
-                max_num_char = len(v[i][1])
-    for k,v in data.items():
-        for i in range(len(v)):   
-            category, line, category_tensor, line_tensor_char = getTensors(k,v[i][1],all_categories,max_num_char,emb_dim_char,emb_dic)
-            line_tensor_char = Variable(line_tensor_char).data.numpy()
-            dic[v[i][0]] = line_tensor_char
-    print("max number of char %d" %max_num_char)
-
-    return dic,all_categories,max_num_char,n_iters
+            ID.append(v[i][0])
+            X.append(lineToNumpy(v[i][1]))
+            label.append(k)
+    label = numpy.array(label)
+    labenc = labelencoder
+    labenc.fit(label)
+    Y = labenc.transform(label)
+    return X,Y,label,emb_dim_comb,ID
 
 if __name__ == "__main__":main() 

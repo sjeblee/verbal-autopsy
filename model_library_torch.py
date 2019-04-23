@@ -1,4 +1,4 @@
-
+ran
 # @author sjeblee@cs.toronto.edu
 
 import math
@@ -41,6 +41,25 @@ use_cuda = False
 #	hidden_size	: number of nodes in hidden layers
 #
 #
+
+def GRU_CHAR():
+    def __init__(self, input_size, hidden_size, output_size, emb_size):
+        super(GRU, self).__init__()
+        self.hidden_size = hidden_size
+        self.encoder = nn.Embedding(input_size,emb_size)
+        self.gru = nn.GRU(emb_size,hidden_size)
+        self.linear = nn.Linear(hidden_size,output_size)
+        self.softmax = nn.LogSoftmax(dim=1)
+
+    def forward(self, input, hidden):
+        input = self.encoder(input.long())
+        output,hidden = self.gru(input,hidden)
+        output = self.linear(output[-1])
+        output = self.softmax(output)
+        return output, hidden
+    def initHidden(self):
+        return torch.zeros([1, self.hidden_size],device=cuda)
+
 class CNN_Text(nn.Module):
 
      def __init__(self, embed_dim, class_num, kernel_num=200, kernel_sizes=6, dropout=0.0, ensemble=False, hidden_size = 100):
@@ -50,19 +69,18 @@ class CNN_Text(nn.Module):
           Ci = 1
           Co = kernel_num
           Ks = kernel_sizes
-	  self.ensemble = ensemble
-
-	  self.conv11 = nn.Conv2d(Ci, Co, (1, D))
+          self.ensemble = ensemble
+          self.conv11 = nn.Conv2d(Ci, Co, (1, D))
           self.conv12 = nn.Conv2d(Ci, Co, (2, D))
           self.conv13 = nn.Conv2d(Ci, Co, (3, D))
           self.conv14 = nn.Conv2d(Ci, Co, (4, D))
-	  self.conv15 = nn.Conv2d(Ci, Co, (5, D))
+          self.conv15 = nn.Conv2d(Ci, Co, (5, D))
           #self.conv16 = nn.Conv2d(Ci, Co, (6, D))
           #self.conv17 = nn.Conv2d(Ci, Co, (7, D))
           #self.conv18 = nn.Conv2d(Ci, Co, (8, D))
 
           self.dropout = nn.Dropout(dropout)
-	  self.fc1 = nn.Linear(Co*Ks, C) # Use this layer when train with only CNN model, i.e. No ensemble 
+          self.fc1 = nn.Linear(Co*Ks, C) # Use this layer when train with only CNN model, i.e. No ensemble 
 	  
      def conv_and_pool(self, x, conv):
           x = F.relu(conv(x)).squeeze(3)  # (N, Co, W)
@@ -72,22 +90,21 @@ class CNN_Text(nn.Module):
 
      def forward(self, x):
           x = x.unsqueeze(1)  # (N, Ci, W, D)] 
-	  x1 = self.conv_and_pool(x,self.conv11) #(N,Co)
+          x1 = self.conv_and_pool(x,self.conv11) #(N,Co)
           x2 = self.conv_and_pool(x,self.conv12) #(N,Co)
           x3 = self.conv_and_pool(x,self.conv13) #(N,Co)
           x4 = self.conv_and_pool(x,self.conv14) #(N,Co)
-	  x5 = self.conv_and_pool(x,self.conv15) #(N,Co)
+          x5 = self.conv_and_pool(x,self.conv15) #(N,Co)
           #x6 = self.conv_and_pool(x,self.conv16) #(N,Co)
           #x7 = self.conv_and_pool(x,self.conv17) 
           #x8 = self.conv_and_pool(x,self.conv18)
- 	  x = torch.cat((x1, x2, x3, x4, x5), 1)
+          x = torch.cat((x1, x2, x3, x4, x5), 1)
           
           x = self.dropout(x)  # (N, len(Ks)*Co)
-
-	  if self.ensemble == False: # Train CNN with no ensemble  
+          if self.ensemble == False: # Train CNN with no ensemble  
               logit = self.fc1(x)  # (N, C)
-	  else: # Train CNN with ensemble. Output of CNN will be input of another model
-	      logit = x
+          else: # Train CNN with ensemble. Output of CNN will be input of another model
+              logit = x
           return logit
 
 # Neural Network Model (1 hidden layer)
@@ -291,22 +308,22 @@ class RNNClassifier(nn.Module):
         self.n_layers = n_layers
         self.n_directions = int(bidirectional) + 1
 
-	self.gru = nn.GRU(input_size, hidden_size, n_layers, bidirectional=bidirectional)
+        self.gru = nn.GRU(input_size, hidden_size, n_layers, bidirectional=bidirectional)
         self.fc = nn.Linear(hidden_size, output_size)
 
     def forward(self, input, seq_lengths):
         
-	print "Size of RNN input: " + str(input.size())
+        print("Size of RNN input: " + str(input.size()))
         # batch size set to 1. Take one data at a time. 
-	batch_size = 1
+        batch_size = 1
 
         # Make a hidden
         hidden = self._init_hidden(batch_size)
 
         # No embedding necessary since it takes output from CNN
-	embedded = input.view(1,batch_size, -1)
+        embedded = input.view(1,batch_size, -1)
 
-	output, hidden = self.gru(embedded, hidden)
+        output, hidden = self.gru(embedded, hidden)
         
 	# Use hidden layer as an input to the final layer
         #fc_output = self.fc(hidden[-1])
@@ -316,10 +333,10 @@ class RNNClassifier(nn.Module):
     def _init_hidden(self, batch_size):
         hidden = Variable(torch.zeros(self.n_layers * self.n_directions,
                              batch_size, self.hidden_size))
-	if use_cuda:
-	    return hidden.cuda()
-	else:
-	    return hidden    
+        if use_cuda:
+            return hidden.cuda()
+        else:
+            return hidden    
 
 
 ###########################################################
@@ -363,9 +380,9 @@ def cnn_attnrnn(X,Y, num_epochs=10, loss_func='categorical_crossentropy',dropout
    
     # If use cuda......
     if use_cuda:
-	cnn = cnn.cuda()
-	rnn = rnn.cuda()
-    start = time.time()
+        cnn = cnn.cuda()
+        rnn = rnn.cuda()
+        start = time.time()
     
     cnn_optimizer = torch.optim.Adam(cnn.parameters(), lr=learning_rate)
     rnn_optimizer = torch.optim.Adam(rnn.parameters(), lr=learning_rate)
@@ -373,36 +390,36 @@ def cnn_attnrnn(X,Y, num_epochs=10, loss_func='categorical_crossentropy',dropout
     steps = 0
     cnn.train()
     for epoch in range(num_epochs):
-	print("epoch", str(epoch))
-	i = 0
-	numpy.random.seed(seed=1)
-	permutation = torch.from_numpy(numpy.random.permutation(X_len)).long()
-	Xiter = Xarray[permutation]
-	Yiter = Yarray[permutation]
+        print("epoch", str(epoch))
+        i = 0
+        numpy.random.seed(seed=1)
+        permutation = torch.from_numpy(numpy.random.permutation(X_len)).long()
+        Xiter = Xarray[permutation]
+        Yiter = Yarray[permutation]
 
-	while i+batch_size < X_len:
-	    batchX = Xiter[i:i+batch_size]
-	    batchY = Yiter[i:i+batch_size]
-	    Xtensor = torch.from_numpy(batchX).float()
-	    Ytensor = torch.from_numpy(batchY).long()
-	    feature = Variable(Xtensor)
-	    target = Variable(Ytensor)
+        while i+batch_size < X_len:
+            batchX = Xiter[i:i+batch_size]
+            batchY = Yiter[i:i+batch_size]
+            Xtensor = torch.from_numpy(batchX).float()
+            Ytensor = torch.from_numpy(batchY).long()
+            feature = Variable(Xtensor)
+            target = Variable(Ytensor)
 
 	    # Define optimizers
-	    cnn_optimizer.zero_grad()
-	    rnn_optimizer.zero_grad()
+        cnn_optimizer.zero_grad()
+        rnn_optimizer.zero_grad()
 
 	    # Train CNN_Text
-	    cnn_output = cnn(feature)
-    	    print "CNN trained"	
-	    print "CNN output size: " + str(cnn_output.size())
+        cnn_output = cnn(feature)
+        print "CNN trained"	
+        print "CNN output size: " + str(cnn_output.size())
 
 	    # Train RNNClassifier one-by-one
 	    for j in range(batch_size):
-		if i + j < X_len:
-		    rnn_output = rnn(cnn_output[j],1)
-		    loss = F.cross_entropy(rnn_output, torch.argmax(target[j]).reshape((1,)))
-	    print "RNN trained"
+            if i + j < X_len:
+                rnn_output = rnn(cnn_output[j],1)
+                loss = F.cross_entropy(rnn_output, torch.argmax(target[j]).reshape((1,)))
+	    print("RNN trained"
 	    
 	    loss.backward()
 	    cnn_optimizer.step()
@@ -628,7 +645,15 @@ def rnn_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', dropout=0
 
     print("NOT IMPLEMENTED")
 
-
+def gru_model_char(X,Y, num_epoches=30,dropout=0.0,kernel_size=5):
+    st = time.time()
+    Xarray = numpy.asarray(X).astype('float')
+    Yarray = Y.astype('int') 
+    print("X numpy shape: ", str(Xarray.shape), "Y numpy shape:", str(Yarray.shape))
+    
+    
+    
+    
 ''' Create and train a CNN model
     Hybrid features supported - pass structured feats as X2
     Does NOT support joint training yet

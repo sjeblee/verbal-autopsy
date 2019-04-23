@@ -60,62 +60,75 @@ def main():
     learning_rate = 0.001
     num_epochs = 10
     batch_size= 16
-    rec_type = "child"
     total_start_time = time.time()
+    rec_type = "child"
+    arg_train_feats = "D:/projects/zhaodong/research/va/data/dataset/train_"+rec_type+"_cat_spell.features.narrv_08"
+    arg_test_feats = "D:/projects/zhaodong/research/va/data/dataset/dev_"+rec_type+"_cat_spell.features.narrv_08"
+    #    arg_train_feats = "/u/yanzhaod/data/va/mds+rct/train_child_cat_spell.features.narrv_08"
+    #    arg_test_feats = "/u/yanzhaod/data/va/mds+rct/dev_child_cat_spell.features.narrv_08"
     global labelname
     global cuda
     global keys
     global emb_dic
     global  typeencoder
-    global vocab
     cuda = torch.device("cuda:0")
     labelname = "cghr_cat"
     trainids,trainlabels = [],[]        # VA record id # Correct ICD codes
     X,Y=[],[]   # Feature vectors
+    X2 = [] # Extra features for hybrid model
+    
+    with open(arg_train_feats + ".keys", "r") as kfile:
+        keys = eval(kfile.read())
     vec_keys = [] # vector/matrix features for CNN and RNN models
     point_keys = [] # traditional features for other models
+    vec_keys, point_keys = split_feats(keys, labelname)
 
     labelencoder = preprocessing.LabelEncoder()                        
     typeencoder = preprocessing.LabelEncoder()
     modelfile = rec_type+"_model.pt"
     stime = time.time()
     input_train = "D:/projects/zhaodong/research/va/data/dataset/train_"+rec_type+"_cat_spell.xml"  #input train file for char_embeeding
-    input_test = "D:/projects/zhaodong/research/va/data/dataset/dev_"+rec_type+"_cat.xml"      #input test file for char_embedding
+    input_test = "D:/projects/zhaodong/research/va/data/dataset/test_"+rec_type+"_cat_spell.xml"      #input test file for char_embedding
     char_fname = 'char_emb/code/char_emb_30.txt'         #pretrained char_embeddings
     vocab='abcdefghijklmnopqrstuvwxyz0123456789 '
     emb_dic = get_dic(char_fname,vocab)
-    emb_dim_char = 30
     if train_mode== True:
-        Y= preprocess(input_train,trainids,trainlabels,X,Y,emb_dim_char=emb_dim_char)
-        print("X: " + str(len(X)) +" Y: " + str(len(Y)))
+        X,Y,label,emb_comb,ID= preprocess(input_train)
+        print("X: " + str(len(X)) + " X2: " + str(len(X2)) +" Y: " + str(len(Y)))
         Y = to_categorical(Y)
-        model = model_lib_test.char_cnn_model_train2(X,Y,learning_rate=learning_rate,batch_size=batch_size,num_epochs=num_epochs)
+        model = model_lib_test.cnn_comb_model(X,Y,emb_comb,learning_rate=learning_rate,batch_size=batch_size,num_epochs=num_epochs)
         torch.save(model, modelfile)
 
     else:
         model = torch.load(modelfile)
     etime = time.time()
     print("training took " + str(etime - stime) + " s")
-    testids, testlabels, predictedlabels = test(model,input_test)
+    testids, testlabels, predictedlabels = test(model,input_test,arg_test_feats)
     print("Real Labels shape: " + str(testlabels))
     print("Predicted Labels shape: " + str(predictedlabels))
 
     f1score = metrics.f1_score(testlabels, predictedlabels, average='weighted')
     print(f1score)
     print("Overall it takes " + timeSince(total_start_time))
+    result  =[]
+    for i in range(len(testids)):
+        result.append({'Correct_ICD':testlabels[i],'Predicted_ICD':predictedlabels[i],'MG_ID':testids[i]})
+    for i in range(len(result)):
+        result[i] = str(result[i])
+    f = open('result_for_confusion_mat.txt','w')
+    f.write('\n'.join(result))
+    f.close()
 
-def test(model,input_test, emb_dim_char=30,anova_filter=None, hybrid=False, rec_type=None, kw_cnn=None, threshold=0.01):
+def test(model,input_test, testfile,emb_dim_char=30,anova_filter=None, hybrid=False, rec_type=None, kw_cnn=None, threshold=0.01):
     print("testing...")
     stime = time.time()
-    testids = []
     testlabels = []
     testX = []
     testY = []
-    predictedY = []
+    testX,testY,testlabels,emb_dim_comb,testids = preprocess(input_test)
 
-    testY = preprocess(input_test, testids, testlabels, testX, testY)
-    testX = numpy.asarray(testX)
-    results = test_char_cnn(model,testX, testY,threshold=threshold)
+    testX = numpy.asarray(testX).astype('float')
+    results = test_both(model,testX, testY,threshold=threshold)
     print("testX shape: " + str(testX.shape))
     #elif model_type == "cnn":
     #    attn_vec = get_attention_vector(model, testX)
@@ -123,16 +136,6 @@ def test(model,input_test, emb_dim_char=30,anova_filter=None, hybrid=False, rec_
 #    global labelencoder
 #    labelencoder = preprocessing.LabelEncoder()
     labenc = labelencoder
-    if rec_type == 'adult':
-        labenc = labelencoder_adult
-    elif rec_type == 'child':
-        labenc = labelencoder_child
-    elif rec_type == 'neonate':
-        labenc = labelencoder_neonate
-    
-    # Print out classes for index location of each class in the list
-#    print("Index location of each class: ")
-#    print(str(labenc.classes_))
     predictedlabels = labenc.inverse_transform(results)
     etime = time.time()
     print("testing took " + str(etime - stime) + " s")
@@ -140,39 +143,7 @@ def test(model,input_test, emb_dim_char=30,anova_filter=None, hybrid=False, rec_
 #    print("results: " + str(results))
 #    print("predicted labels: " + str(predictedlabels))
     return testids, testlabels, predictedlabels
-def preprocess(input_file,ids,labels,X,Y,n_hidden=128,emb_dim_char=30,max_num_char=1000,learning_rate=0.001,vocab='abcdefghijklmnopqrstuvwxyz0123456789 '):
-    global labelencoder
-    labelencoder  = preprocessing.LabelEncoder()
-            
-    input_size = len(vocab)+1
-    data,all_categories = get_data(input_file)
-    print("vocab: %s" %vocab)
-    n_iters = 0
-    for k,v in data.items():
-        n_iters += len(v)
-    print("size of the narratives: %d" %n_iters)
-    
-    for k,v in data.items():
-        for i in range(len(v)):
-            labels.append(k)
-            line = []
-            for j in range(max_num_char):
-                if j < len(v[i][1]):
-                    line.append(vocab.index(v[i][1][j])+1)    #+1 because reserve a space for 0
-            line = numpy.array(line)
-            line = numpy.expand_dims(line,axis=1)
-            zero_padding = numpy.zeros((max_num_char-line.shape[0],1))
-#                print(line.shape,zero_padding.shape)
-            line = numpy.vstack((line,zero_padding))
-            X.append(line)
-    X = numpy.array(X)
-    labels = numpy.array(labels)
-    labenc = labelencoder
-    labenc.fit(labels)
-    Y = labenc.transform(labels)
-    return Y
-def test_char_cnn(model, testX, probfile='/u/yoona/data/torch/probs_win200_epo10', labelencoder=None, collapse=False, threshold=0.1):
-    model.to(cuda)
+def test_both(model, testX, testids, probfile='/u/yoona/data/torch/probs_win200_epo10', labelencoder=None, collapse=False, threshold=0.1):
     y_pred = [] # Original prediction if threshold is not in used for ill-defined.
 #    y_pred_softmax = []
 #    y_pred_logsoftmax = []
@@ -333,6 +304,49 @@ def timeSince(since):
    m = math.floor(s / 60)
    s -= m * 60
    return '%dm %ds' % (m, s)
-
+def preprocess(input_file,n_hidden=128,emb_dim_char=30,emb_dim_word = 100,max_num_word = 200,max_char_in_word = 7,learning_rate=0.0001,vocab='abcdefghijklmnopqrstuvwxyz0123456789 '):
+    global labelencoder
+    labelencoder  = preprocessing.LabelEncoder()
+    wmodel,dim = load('D:/projects/zhaodong/research/va/data/dataset/narr+ice+medhelp.vectors.100')
+    emb_dim_comb = max_char_in_word*emb_dim_char+emb_dim_word
+    def letterToNumpy(letter):
+        return numpy.array(emb_dic[letter])
+    def lettersToNumpy(word):
+        arr = numpy.zeros((max_char_in_word,emb_dim_char))
+        for i in range(max_char_in_word):
+            if i < len(word):
+                arr[i,:] = letterToNumpy(word[i])
+        return arr
+    
+    def wordToNumpy(word):
+        emb_word = numpy.array(get(word,wmodel))
+        emb_letters = lettersToNumpy(word).flatten('C')    #'C' means to flatten in row major  #of shaoe(max_char_in_word*emb_dim_char,)
+        return numpy.hstack((emb_word,emb_letters))    #(max_char_in_word*emb_dim_char+emb_dim_word,)
+    def lineToNumpy(line):
+        l = line.split()
+        emb_line = numpy.zeros((max_num_word,emb_dim_comb))
+        for i in range(max_num_word):
+            if i < len(l):
+                emb_line[i,:] = wordToNumpy(l[i])
+        return emb_line
+    data,all_categories = get_data(input_file)
+    print("vocab: %s" %vocab)
+    n_iters = 0
+    for k,v in data.items():
+        n_iters += len(v)
+    print("size of the narratives: %d" %n_iters)
+    
+    ID = []
+    X,label = [],[]
+    for k,v in data.items():
+        for i in range(len(v)):
+            ID.append(v[i][0])
+            X.append(lineToNumpy(v[i][1]))
+            label.append(k)
+    label = numpy.array(label)
+    labenc = labelencoder
+    labenc.fit(label)
+    Y = labenc.transform(label)
+    return X,Y,label,emb_dim_comb,ID
 
 if __name__ == "__main__":main() 
