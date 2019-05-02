@@ -98,7 +98,24 @@ class CNN_GRU_Text(nn.Module):
         output = self.fc1(input)
         output = self.softmax(output)
         return output, hidden
-        
+class GRU_Text(nn.Module):
+
+     def __init__(self, embed_dim, class_num, kernel_num=200, kernel_sizes=6, dropout=0.0, ensemble=False, hidden_size = 64,max_num_char=1000):
+          super(GRU_Text, self).__init__()
+          self.gru = nn.GRU(embed_dim,hidden_size)
+          self.linear = nn.Linear(hidden_size*max_num_char,class_num)
+          self.softmax = nn.LogSoftmax(dim=1)
+     def forward(self, input, hidden):
+          input,hidden = self.gru(input,hidden)
+          input = input.view(-1,input.size(1)*input.size(2))
+          input = F.relu(input)
+          output = self.linear(input)
+          output = self.softmax(output)
+          return output,hidden
+         
+         
+         
+
 class CNN_Text(nn.Module):
 
      def __init__(self, embed_dim, class_num, kernel_num=200, kernel_sizes=6, dropout=0.0, ensemble=False, hidden_size = 100):
@@ -123,8 +140,11 @@ class CNN_Text(nn.Module):
 	  
      def conv_and_pool(self, x, conv):
 #          print(x.size(),22222) #torch.Size([16, 1, 1000, 37])
+#          print(conv(x).size(),00000)
           x = F.relu(conv(x)).squeeze(3)  # (N, Co, W)
+#          print(x.size(),11111)
           x = F.max_pool1d(x, x.size(2)).squeeze(2)
+#          print(x.size(),222222)
           return x
 	  
 
@@ -137,15 +157,17 @@ class CNN_Text(nn.Module):
           x5 = self.conv_and_pool(x,self.conv15) #(N,Co)
           #x6 = self.conv_and_pool(x,self.conv16) #(N,Co)
           #x7 = self.conv_and_pool(x,self.conv17) 
-          #x8 = self.conv_and_pool(x,self.conv18)
+          #x8 = self.conv_and_pool(x,self.conv18) 
+#          print(x1.size(),x2.size(),x3.size(),1111)
           x = torch.cat((x1, x2, x3, x4, x5), 1)
-          
+#          print(x.size(),3333333)
           x = self.dropout(x)  # (N, len(Ks)*Co)
           if self.ensemble == False: # Train CNN with no ensemble  
               logit = self.fc1(x)  # (N, C)
           else: # Train CNN with ensemble. Output of CNN will be input of another model
               logit = x
           return logit
+
 class CNN_Text_Train(nn.Module):
 
      def __init__(self, input_dim, class_num, emb_dim, kernel_num=1000, kernel_sizes=6, dropout=0.0, ensemble=False, hidden_size = 100):
@@ -180,7 +202,7 @@ class CNN_Text_Train(nn.Module):
 
      def forward(self, x):
 #          print(x.size(),22222222) 
-          x = self.encoder(x.long())
+          x = self.encoder(x)
           x = x.squeeze(2).unsqueeze(1)
 #          print(x.size(),11111111)
 #          x = x.unsqueeze(1)  # (N, Ci, W, D)] 
@@ -364,7 +386,7 @@ def char_cnn_model_train2(X, Y, emb_size=30, act=None, windows=[1,2,3,4,5], X2=[
         while i+batch_size < X_len:
              batchX = Xiter[i:i+batch_size]
              batchY = Yiter[i:i+batch_size]
-             Xtensor = torch.from_numpy(batchX).float()
+             Xtensor = torch.from_numpy(batchX).long()
              Xtensor.contiguous()
              Ytensor = torch.from_numpy(batchY).long()
              if use_cuda:
@@ -454,7 +476,69 @@ def char_cnn_model_train(X, Y, emb_size=30, act=None, windows=[1,2,3,4,5], X2=[]
             unit = "m"
         print("time so far: ", str(ct), unit)
     return model
+def char_gru_model(X, Y, emb_size=30, act=None, windows=[1,2,3,4,5], X2=[], learning_rate=0.001,batch_size=100,num_epochs=10, loss_func='categorical_crossentropy',dropout=0.25, kernel_sizes=5,max_num_char=1000):
+    st = time.time()
+    Xarray = numpy.asarray(X).astype('float')
+    Yarray = Y.astype('int') 
+    print("X numpy shape: ", str(Xarray.shape), "Y numpy shape:", str(Yarray.shape))
 
+    # Params
+    X_len = Xarray.shape[0]
+    dim = Xarray.shape[-1]
+    num_labels = Yarray.shape[-1]
+    num_epochs = num_epochs
+    steps = 0
+    best_acc = 0
+    last_step = 0
+    log_interval = 1000
+    num_batches = math.ceil(X_len/batch_size)
+    model = GRU_Text(dim, num_labels,hidden_size=64,dropout=dropout, kernel_sizes=kernel_sizes,max_num_char=max_num_char)
+
+    model = model.cuda()
+
+    # Train
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
+    steps = 0
+    model.train()
+    for epoch in range(num_epochs):
+        print("epoch", str(epoch))
+        i = 0
+        numpy.random.seed(seed=1)
+        permutation = torch.from_numpy(numpy.random.permutation(X_len)).long()
+        Xiter = Xarray[permutation]
+        Yiter = Yarray[permutation]
+
+        while i+batch_size < X_len:
+             batchX = Xiter[i:i+batch_size]
+             batchY = Yiter[i:i+batch_size]
+             Xtensor = torch.from_numpy(batchX).float()
+             Xtensor.contiguous()
+             Ytensor = torch.from_numpy(batchY).long()
+             if use_cuda:
+                  Xtensor = Xtensor.cuda()
+                  Ytensor = Ytensor.cuda()
+             feature = Variable(Xtensor)
+             target = Variable(Ytensor)
+             i = i+batch_size
+
+             optimizer.zero_grad() 
+             logit,hidden = model(feature,None)
+#             print(logit.size())    #
+             loss = F.cross_entropy(logit, torch.max(target,1)[1])
+             loss.backward()
+             optimizer.step()
+
+             steps += 1
+ 
+        # Print epoch time
+        ct = time.time() - st
+        unit = "s"
+        if ct > 60:
+            ct = ct/60
+            unit = "m"
+        print("time so far: ", str(ct), unit)
+    return model
 def cnn_comb_model(X,Y,emb_dim,batch_size=100,learning_rate=0.001,emb_dim_char=30,n_hidden=100,emb_dim_word=100,num_epochs=10, loss_func='categorical_crossentropy',dropout=0.0, kernel_sizes=5):
         # Train the CNN, return the model
     st = time.time()
@@ -531,7 +615,7 @@ def cnn_gru_model(X,X2,Y,all_categories,max_num_char,batch_size=100,learning_rat
     steps = 0
     model = CNN_GRU_Text(emb_dim_word, emb_dim_char, len(all_categories), n_hidden, max_num_char)
     model.cuda()
-#    print(Xarray.shape,X2array.shape,Yarray.shape,11111)  #(1580, 200, 100) (1580, 1484, 30) (1580, 9)
+    print(Xarray.shape,X2array.shape,Yarray.shape,11111)  #(1580, 200, 100) (1580, 1484, 30) (1580, 9)
     # Train
     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
@@ -560,7 +644,6 @@ def cnn_gru_model(X,X2,Y,all_categories,max_num_char,batch_size=100,learning_rat
              X2tensor = X2tensor.cuda()
              Ytensor = Ytensor.cuda()
               
-             feature = Variable(Xtensor)
              target = Variable(Ytensor)
              i = i+batch_size
 
