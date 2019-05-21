@@ -2,8 +2,8 @@
 # Script to run all the steps of the Verbal Autopsy pipeline
 
 # Directories for data input and output: SET THESE
-prefix="/u/sjeblee/research/va/data"   # File output prefix
-dataloc="/u/sjeblee/research/va/data/datasets"  # Location of data files (i.e. parent of mds+rct folder
+prefix="/u/tashkumar/research/va/data"   # File output prefix
+dataloc="/u/tashkumar/research/va/data/verbal_autopsy_data"  # Location of data files (i.e. parent of mds+rct folder
 
 name="gru_adult_who"   # Give the output folder a name, will be created in $prefix
 modelname="gru"        # Model type: one of: nn cnn svm rnn gru
