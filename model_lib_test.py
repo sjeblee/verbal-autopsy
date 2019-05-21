@@ -118,7 +118,7 @@ class GRU_Text(nn.Module):
 
 class CNN_Text(nn.Module):
 
-     def __init__(self, embed_dim, class_num, kernel_num=200, kernel_sizes=6, dropout=0.0, ensemble=False, hidden_size = 100):
+     def __init__(self, embed_dim, class_num, kernel_num=200, kernel_sizes=5, dropout=0.0, ensemble=False, hidden_size = 100):
           super(CNN_Text, self).__init__()
           D = embed_dim
           C = class_num
@@ -140,8 +140,8 @@ class CNN_Text(nn.Module):
 	  
      def conv_and_pool(self, x, conv):
 #          print(x.size(),22222) #torch.Size([16, 1, 1000, 37])
-#          print(conv(x).size(),00000)
-          x = F.relu(conv(x)).squeeze(3)  # (N, Co, W)
+#          temp = F.relu(conv(x))
+          x = F.relu(conv(x)).squeeze(3)  # (N, Co, W)   #used to be squeeze(3)
 #          print(x.size(),11111)
           x = F.max_pool1d(x, x.size(2)).squeeze(2)
 #          print(x.size(),222222)
@@ -245,8 +245,12 @@ class CNN_Comb_Text(nn.Module):
           self.fc1 = nn.Linear(Co*Ks, C) # Use this layer when train with only CNN model, i.e. No ensemble 
 	  
      def conv_and_pool(self, x, conv):
+          print(x.size(),555555)
+          print(conv(x).size(),22222) #torch.Size([16, 1, 1000, 37])
           x = F.relu(conv(x)).squeeze(3)  # (N, Co, W)
+          print(x.size(),333333) #torch.Size([16, 1, 1000, 37])
           x = F.max_pool1d(x, x.size(2)).squeeze(2)
+          print(x.size(),11111) #torch.Size([16, 1, 1000, 37])
           return x
 	  
 
@@ -539,7 +543,7 @@ def char_gru_model(X, Y, emb_size=30, act=None, windows=[1,2,3,4,5], X2=[], lear
             unit = "m"
         print("time so far: ", str(ct), unit)
     return model
-def cnn_comb_model(X,Y,emb_dim,batch_size=100,learning_rate=0.001,emb_dim_char=30,n_hidden=100,emb_dim_word=100,num_epochs=10, loss_func='categorical_crossentropy',dropout=0.0, kernel_sizes=5):
+def cnn_comb_model(X,Y,emb_dim,batch_size=100,learning_rate=0.001,n_hidden=100,num_epochs=10, loss_func='categorical_crossentropy',dropout=0.0, kernel_sizes=5):
         # Train the CNN, return the model
     st = time.time()
     Xarray = numpy.asarray(X).astype('float')
@@ -736,6 +740,12 @@ def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, loss_fu
             unit = "m"
         print("time so far: ", str(ct), unit)
     return cnn
+
+
+
+
+
+
 
 ##################################################
 # HELPER FUNCTIONS
