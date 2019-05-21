@@ -4,6 +4,7 @@
 # Directories for data input and output: SET THESE
 prefix="/u/tashkumar/research/va/data"   # File output prefix
 dataloc="/u/tashkumar/research/va/data/verbal_autopsy_data"  # Location of data files (i.e. parent of mds+rct folder
+# this is a test comment to make sure it pushes properly
 
 name="gru_adult_who"   # Give the output folder a name, will be created in $prefix
 modelname="gru"        # Model type: one of: nn cnn svm rnn gru
