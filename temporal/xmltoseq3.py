@@ -12,7 +12,7 @@ from lxml import etree
 import argparse
 import re
 
-debug = False
+debug = True
 id_name = "record_id"
 symp_narr_tag = "narr_timeml_gru"
 #symp_narr_tag = "narr_symp"
@@ -161,7 +161,7 @@ def xml_to_seq(text):
     time_start = ["<TIMEX3", "<SECTIME"]
     event_end = "</EVENT>"
     time_end = ["</TIMEX3>", "</SECTIME>"]
-    ignore_tags = ["<TLINK", "<SLINK", "<ALINK", "<MAKEINSTANCE"]
+    ignore_tags = ["<TLINK", "<SLINK", "<ALINK", "<MAKEINSTANCE", "<SIGNAL", "</SIGNAL>"]
     in_event = False
     b_event = False
     b_time = False
@@ -310,6 +310,7 @@ def to_xml(seq):
             in_elem = True
             elem_text = ""
         elif label == BE or (label == IE and (prevlabel != BE and prevlabel != IE)):
+            print('begin event')
             text = text + closelabel(prevlabel, elem_text) + ' <EVENT eid="e' + str(eid) + '" class="OCCURRENCE">'
             eid = eid+1
             in_elem = True
@@ -338,6 +339,7 @@ def to_xml(seq):
 
 
 def closelabel(prevlabel, elem_text):
+    print('closelabel', prevlabel, elem_text)
     t_labels = ['BT', 'IT']
     e_labels = ['BE', 'IE']
     text = ""

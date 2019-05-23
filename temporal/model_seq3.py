@@ -60,6 +60,9 @@ def main():
         run(args.trainfile, args.testfile, arg_inline=args.inline, devfile=args.devfile)
 
 def run(trainfile, testfile, outfile="", modelname="crf", arg_inline=False, devfile=""):
+    if 'va' in trainfile:
+        split_sents = True
+    
     if modelname == 'ncrf':
         global use_ncrf
         use_ncrf = True
@@ -70,21 +73,21 @@ def run(trainfile, testfile, outfile="", modelname="crf", arg_inline=False, devf
         # Convert data to ncrf format
         ncrf_path = '/u/sjeblee/research/git/NCRFpp'
         data_name = 'thyme'
-        ncrf_dir = '/u/sjeblee/research/git/NCRFpp/thyme_data'
+        ncrf_dir = '/u/sjeblee/research/git/NCRFpp/va_data'
         if 'TempEval' in trainfile:
             ncrf_dir = '/u/sjeblee/research/git/NCRFpp/tempeval_data'
             data_name = 'tempeval'
-        #elif 'thyme' in trainfile:
-        #    ncrf_dir = '/u/sjeblee/research/git/NCRFpp/thyme_data'
+        elif 'thyme' in trainfile:
+            ncrf_dir = '/u/sjeblee/research/git/NCRFpp/thyme_data'
         train_ncrf = ncrf_dir + '/train.bio'
         dev_ncrf = ncrf_dir + '/dev.bio'
         test_ncrf = ncrf_dir + '/test.bio'
-        #xml_to_ncrf.extract_features(trainfile, train_ncrf, arg_inline)
-        #xml_to_ncrf.extract_features(devfile, dev_ncrf, arg_inline)
-        #xml_to_ncrf.extract_features(testfile, test_ncrf, arg_inline)
+        xml_to_ncrf.extract_features(trainfile, train_ncrf, arg_inline)
+        xml_to_ncrf.extract_features(devfile, dev_ncrf, arg_inline)
+        xml_to_ncrf.extract_features(testfile, test_ncrf, arg_inline)
     else:
         # Extract sequences with labels
-        train_ids, train_seqs = get_seqs(trainfile, split_sents=True, inline=arg_inline, add_spaces=True)
+        train_ids, train_seqs = get_seqs(trainfile, split_sents=True, inline=False, add_spaces=True)
         test_ids, test_seqs = get_seqs(testfile, split_sents=True, inline=arg_inline, add_spaces=True)
         print("test_ids:", len(test_ids))
 
@@ -214,7 +217,7 @@ def train_crf(trainx, trainy):
             algorithm='lbfgs',
             c1=0.1,
             c2=0.1,
-            max_iterations=100,
+            max_iterations=500,
             all_possible_transitions=True
         )
     crf.fit(trainx, trainy)
@@ -541,7 +544,7 @@ def get_seqs(filename, split_sents=False, inline=True, add_spaces=False):
             narrs.append(narr_node.text)
 
     if inline:
-        split_sents = False
+        #split_sents = False
         for x in range(len(narrs)):
             narr = narrs[x]
             rec_id = ids[x]
@@ -553,11 +556,12 @@ def get_seqs(filename, split_sents=False, inline=True, add_spaces=False):
                     seq_ids.append(rec_id)
             else:
                 narr_seq = xmltoseq.xml_to_seq(narr)
-                seqs.append(narr_seq)
-                seq_ids.append(rec_id)
+                for seq in narr_seq:
+                    seqs.append(seq)
+                    seq_ids.append(rec_id)
     else:
         # TEMP
-        use_ncrf = True
+        use_ncrf = False
         split_sents = True
         print("split_sents: ", str(split_sents))
         for x in range(len(narrs)):
@@ -665,7 +669,7 @@ def word2features(sent, i):
     }
     if i > 0:
         word1 = sent[i-1][0]
-        postag1 = sent[i-1][1]
+        #postag1 = sent[i-1][1]
         features.update({
             '-1:word.lower()': word1.lower(),
             '-1:word.istitle()': word1.istitle(),
@@ -677,9 +681,9 @@ def word2features(sent, i):
         features['BOS'] = True
 
     if i < len(sent)-1:
-        print("sent[i+1]", str(sent[i+1]))
+        #print("sent[i+1]", str(sent[i+1]))
         word1 = sent[i+1][0]
-        postag1 = sent[i+1][1]
+        #postag1 = sent[i+1][1]
         features.update({
             '+1:word.lower()': word1.lower(),
             '+1:word.istitle()': word1.istitle(),

@@ -15,8 +15,8 @@ from xml.sax.saxutils import unescape
 
 thyme_path = '/u/sjeblee/research/data/thyme'
 thyme_text = thyme_path + '/text/test'
-thyme_ref = thyme_path + '/anafora/test'
-thyme_xml = thyme_path + '/test_dctrel.xml'
+thyme_ref = thyme_path + '/anafora/test_entities'
+thyme_xml = thyme_path + '/test_entities.xml'
 #anafora_dir = '/nbb/sjeblee/thyme/output/system_anafora'
 
 def main():
@@ -25,6 +25,7 @@ def main():
     argparser.add_argument('-i', '--in', action="store", dest="infile")
     argparser.add_argument('-o', '--out', action="store", dest="outdir")
     argparser.add_argument('--label', action="store", dest="label")
+    argparser.add_argument('--overlap', action="store_true", dest="use_overlap")
     #argparser.add_argument('-t', '--test', action="store", dest="testdir")
     args = argparser.parse_args()
 
@@ -34,7 +35,7 @@ def main():
 
     # Convert reference format to anafora (only need to do this once)
     #print("Converting ref dir...")
-    #thyme_dir = thyme_path + '/test_ref_sample'
+    #thyme_dir = thyme_path + '/test_ref_entities'
     #tempfile = thyme_xml + ".inline"
     #ref_name = 'narr_timeml_gold'
     #tools.to_inline(thyme_xml, tempfile, ref_name)
@@ -52,7 +53,10 @@ def main():
 
     # Run evaluation
     print("Running anafora eval script...")
-    evaluate.main(["--reference", thyme_ref, "--predicted", anafora_dir, "--include", "TIMEX3", "EVENT", "--verbose", "--overlap", "--no-props"])
+    if args.use_overlap:
+        evaluate.main(["--reference", thyme_ref, "--predicted", anafora_dir, "--include", "TIMEX3", "EVENT", "--verbose", "--overlap", "--no-props"])
+    else:
+        evaluate.main(["--reference", thyme_ref, "--predicted", anafora_dir, "--include", "TIMEX3", "EVENT", "--verbose", "--no-props"])
 
 
 def write_eval_files(output_file, eval_dir):

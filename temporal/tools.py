@@ -15,15 +15,16 @@ from xml.sax.saxutils import unescape
 #inline_narr_name = 'narr_ctakes'
 debug = True
 
-def adjust_spans(inline_xml, outfile, inline_narr_name, ref_dir=None):
+def adjust_spans(inline_xml, outfile, inline_narr_name, ref_dir=None, id_name='record_id'):
     print('adjust_spans')
     fix_arrows_only(inline_xml)
     inline_tree = etree.parse(inline_xml)
 
     for child in inline_tree.getroot():
-        rec_id = child.find("record_id").text
+        rec_id = child.find(id_name).text
         print("adjust_spans", rec_id)
         narr = unescape(stringify_children(child.find(inline_narr_name)))
+        print('narr:', narr)
         #narr = stringify_children(unescape(etree.tostring(child.find(inline_narr_name), encoding='utf-8').decode('utf-8')))
         ref_narr = child.find('narrative').text
 
@@ -36,6 +37,8 @@ def adjust_spans(inline_xml, outfile, inline_narr_name, ref_dir=None):
 
         print('Saving to xmltree...')
         narr_node = child.find(inline_narr_name)
+        child.remove(narr_node)
+        narr_node = etree.SubElement(child, inline_narr_name)
         narr_node.text = new_narr
 
         # Update spans
@@ -79,7 +82,7 @@ def fix_narr_spans(narr, ref_narr):
     index = 0
     ref_index = 0
     new_narr = ''
-    insert_chars = ['\n', '"', '#', ' ', ':', ';', '(', ')', '*', '%', '&', '-', '+', '$', '[', ']', '`', '@']
+    insert_chars = ['\n', '\t', '"', '#', ' ', ':', ';', '(', ')', '*', '%', '&', '-', '+', '$', '[', ']', '`', '@', '/', '\'']
     count = 0
 
     # Fix the text and save offsets
@@ -90,6 +93,7 @@ def fix_narr_spans(narr, ref_narr):
         # Check for the end of the pred narr
         if index >= len(narr):
             new_narr = new_narr + ref_narr[ref_index:]
+            if debug: print('end of pred narr, returning')
             return new_narr
 
         char = narr[index]
@@ -127,6 +131,7 @@ def fix_narr_spans(narr, ref_narr):
                 # Check for the end of the pred narr
                 if index >= len(narr) or char_buffer == '</TimeML>':
                     new_narr = new_narr + ref_narr[ref_index:]
+                    if debug: print('end of pred narr, returning')
                     return new_narr
 
                 char = narr[index]
@@ -150,7 +155,7 @@ def fix_narr_spans(narr, ref_narr):
 
                 # Check for the end of the ref narr
                 if ref_index >= len(ref_narr):
-                    return new_narr
+                    break
                 ref_char = ref_narr[ref_index]
                 count = 0
                 #continue
@@ -176,6 +181,7 @@ def fix_narr_spans(narr, ref_narr):
                 # Check for the end of the pred narr
                 if index >= len(narr):
                     new_narr = new_narr + ref_narr[ref_index:]
+                    if debug: print('end of pred narr, returning')
                     return new_narr
 
                 char = narr[index]
@@ -192,6 +198,7 @@ def fix_narr_spans(narr, ref_narr):
                 # Check for the end of the pred narr
                 if index >= len(narr):
                     new_narr = new_narr + ref_narr[ref_index:]
+                    if debug: print('end of pred narr, returning')
                     return new_narr
 
                 char = narr[index]
@@ -202,6 +209,39 @@ def fix_narr_spans(narr, ref_narr):
         new_narr = new_narr + char
         ref_index += 1
         index += 1
+
+    # Check for any last closing tags
+    if index < len(narr):
+        if debug: print('final check for closing tag')
+        char = narr[index]
+        while char.isspace() and index < len(narr)-1:
+            index += 1
+            char = narr[index]
+            if debug: print('skipped over trailing space')
+        print('last char:', char)
+        if char == '<' and narr[index+1] == '/': # Ignore tags
+            if debug: print('ignoring end tag')
+            char_buffer = ''
+            while not char == '>':
+                char_buffer = char_buffer + char
+                #new_narr = new_narr + char
+                index += 1
+                char = narr[index]
+                if debug: print('ignoring [', index, ']', char)
+            # Add the close >
+            char_buffer = char_buffer + char
+            if debug: print('closed [', index, ']', char)
+            index +=1
+            if 'TimeML' not in char_buffer:
+                # Delete trailing spaces from inside the tags
+                save_char = ''
+                while new_narr[-1] in insert_chars:
+                    save_char = save_char + new_narr[-1]
+                    new_narr = new_narr[0:-1]
+                    if debug: print('deleted trailing char')
+                new_narr = new_narr + char_buffer
+            else:
+                if debug: print('Dropped TimeML tag')
 
     return new_narr
 
@@ -216,6 +256,7 @@ def fix_arrows(filename):
 def fix_arrows_only(filename):
     subprocess.call(["sed", "-i", "-e", 's/&lt;/</g', filename])
     subprocess.call(["sed", "-i", "-e", 's/&gt;/>/g', filename])
+    subprocess.call(["sed", "-i", "-e", "s/&apos;/'/g", filename])
 
 def escape(text):
     text = re.sub('<', '&lt;', text)
@@ -292,7 +333,7 @@ def insert_tags(text, tags):
 
 ''' Convert inline xml to separate xml files
 '''
-def to_dir(filename, dirname, node_name):
+def to_dir(filename, dirname, node_name, id_name='record_id'):
     print('to_dir:', filename, dirname)
     if not os.path.exists(dirname):
         os.mkdir(dirname)
@@ -300,11 +341,14 @@ def to_dir(filename, dirname, node_name):
     treeroot = etree.parse(filename).getroot()
 
     for child in treeroot:
-        docid = child.find("record_id").text
+        docid = child.find(id_name).text
         print(docid)
         dct = ""
         timex_node = etree.Element('TIMEX3')
         narr_node = child.find(node_name)
+        ref_id_attrs = {"eventID", "signalID", "beginPoint", "endPoint", "valueFromFunction", "anchorTimeID",
+                        "eventInstanceID", "timeID", "signalID", "relatedToEventInstance", "relatedToTime",
+                        "subordinatedEventInstance", "tagID"}
         if narr_node is not None:
             # Fix escaped characters and read the node in properly as xml
             narr_string = escape_and(unescape(etree.tostring(narr_node, encoding='utf-8', with_tail=True).decode('utf-8')))
@@ -318,6 +362,7 @@ def to_dir(filename, dirname, node_name):
                 exit(1)
 
             # Use first identified TIMEX3 as the DCT - TODO: is there a better way to do this?
+            '''
             orig_node = narr_node.find("TIMEX3")
             timex_node = deepcopy(orig_node)
             timex_node.set("type", "DATE")
@@ -328,22 +373,34 @@ def to_dir(filename, dirname, node_name):
             if timex_node.tail is not None:
                 tail = timex_node.tail
             timex_node.tail = ""
+            '''
             #print("tail:", tail)
             dct = unescape(etree.tostring(timex_node, encoding='utf-8', with_tail=False).decode('utf-8'))
             #print('DCT:', dct)
             #narr_node.remove(orig_node)
 
             # Remove empty event nodes
-            for event_tag in narr_node.findall('EVENT'):
-                #del event_tag.attrib['span'] # TEMP for ctakes
-                #del event_tag.attrib['start'] # TEMP for ctakes
+            event_tags = narr_node.findall('EVENT')
+            for event_tag in event_tags:
+                # Fix id field names
+                if 'id' in event_tag.attrib:
+                    event_tag.set('eid', event_tag.get('id').lower())
                 if event_tag.text is None:
                     narr_node.remove(event_tag)
                     print('WARNING: Removed empty EVENT', event_tag.attrib['eid'], 'in', docid)
-            # TEMP for ctakes
-            #for time_tag in narr_node.findall('TIMEX3'):
-            #    del event_tag.attrib['span'] # TEMP for ctakes
-            #    del event_tag.attrib['start']
+            # Fix id field names
+            time_tags = narr_node.findall('TIMEX3')
+            sig_tags = narr_node.findall('SIGNAL')
+            for time_tag in time_tags:
+                if 'id' in time_tag.attrib:
+                    time_tag.set('tid', time_tag.get('id').lower())
+            for sig_tag in sig_tags:
+                if 'id' in sig_tag.attrib:
+                    sig_tag.set('sid', sig_tag.get('id').lower())
+            for tag in time_tags + sig_tags + event_tags:
+                for key in tag.attrib.keys():
+                    if key in ref_id_attrs:
+                        tag.set(key, tag.get(key).lower())
 
             narr_text = unescape(stringify_children(narr_node))
             if narr_text[0:4] == "None":
@@ -390,17 +447,44 @@ def unsplit_punc(filename):
     #subprocess.call(["sed", "-i", "-e", "s/\([1-9]\)-\([a-zA-Z]\)/\1 - \2/g", filename])
 
 # Temp function for fixing anafora dirs
-def fix_dirs():
-    source_dir = '/u/sjeblee/research/data/thyme/temporal/Test'
-    target_dir = '/u/sjeblee/research/data/thyme/anafora/test'
+def fix_ref_dirs():
+    source_dir = '/u/sjeblee/research/data/thyme/temporal/test_entities'
+    target_dir = '/u/sjeblee/research/data/thyme/anafora/test_entities'
     text_dir = '/u/sjeblee/research/data/thyme/text/test'
-    ref_dir = '/u/sjeblee/research/data/thyme/anafora/regenerated'
+    #ref_dir = '/u/sjeblee/research/data/thyme/temporal/test_entities'
 
-    for dir_name in os.listdir(ref_dir):
+    for filename in os.listdir(source_dir):
+        dir_name = filename[0:filename.index('.')]
         new_dir = os.path.join(target_dir, dir_name)
         os.mkdir(new_dir)
         # Copy text file
         shutil.copyfile(os.path.join(text_dir, dir_name), os.path.join(new_dir, dir_name))
         # Copy anafora file
         filename = dir_name + '.Temporal-Relation.gold.completed.xml'
+        if not os.path.exists(os.path.join(source_dir, filename)):
+            filename = dir_name + '.Temporal-Entity.gold.completed.xml'
         shutil.copyfile(os.path.join(source_dir, filename), os.path.join(new_dir, filename))
+
+def fix_narr_timeml(filename, outfile):
+    tree = etree.parse(filename)
+    root = tree.getroot()
+
+    for child in root:
+        heidelnode = child.find('narr_heidel')
+        if heidelnode is not None:
+            child.remove(heidelnode)
+        timemlnodes = child.findall('narr_timeml_simple')
+        if len(timemlnodes) > 1:
+            for timemlnode in timemlnodes[0:-1]:
+                child.remove(timemlnode)
+    tree.write(outfile)
+
+def add_rec_id(filename, outfile):
+    tree = etree.parse(filename)
+    root = tree.getroot()
+
+    for child in root:
+        recid = child.find('MG_ID').text
+        rec_node = etree.SubElement(child, 'record_id')
+        rec_node.text = recid
+    tree.write(outfile)
