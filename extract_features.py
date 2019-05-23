@@ -38,7 +38,7 @@ def main():
     if not (args.trainfile and args.testfile and args.trainoutfile and args.testoutfile):
         print "usage: ./extract_features.py --train [file.xml] --test [file.xml] --trainfeats [train.feats] --testfeats [test.feats] --labels [labelname] --features [f1,f2,f3] --rebalance [adasyn/smote]"
         print "labels: Final_code, ICD_cat"
-        print "features: checklist, kw_bow, kw_tfidf, kw_phrase, kw_count, kw_vec, lda, narr_bow, narr_count, narr_tfidf, narr_ngram, narr_vec, narr_seq, event_vec, event_seq, dem, narr_dem"
+        print "features: checklist, kw_bow, kw_tfidf, kw_phrase, kw_count, kw_vec, lda, narr_bow, narr_count, narr_tfidf, narr_ngram, narr_vec, narr_seq, event_vec, event_seq, dem, narr_dem, narr_words"
         exit()
 
     vecfile = ""
@@ -68,7 +68,7 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
     print "vecfile: " + vecfile
 
     # Feature types
-    global featurenames, rec_type, checklist, dem, kw_words, kw_bow, kw_tfidf, narr_bow, kw_count, kw_vec, kw_clusters, narr_count, narr_tfidf, narr_vec, narr_seq, narr_dem, event_vec, event_seq, lda, symp_train, symp_count
+    global featurenames, rec_type, checklist, dem, kw_words, kw_bow, kw_tfidf, narr_bow, kw_count, kw_vec, kw_clusters, narr_count, narr_tfidf, narr_vec, narr_seq, narr_dem, event_vec, event_seq, lda, symp_train, symp_count, narr_words
 
     #Edit by Yoona
     global narr_symp, symp_vec, narr_textrank, textrank_vec
@@ -98,6 +98,7 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
     lda = "lda"
     symp_train = "symp_train"
     symp_count = "symp_count"
+    narr_words = "narr_words"
 
     # Add by yoona for training using "symp_narr"
     featurenames = arg_featurenames.split(',')
@@ -118,7 +119,7 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
 
     global kw_features, narr_features, stopwords
     kw_features = kw_bow in featurenames or kw_tfidf in featurenames or kw_phrase in featurenames or kw_count in featurenames or kw_vec in featurenames or kw_words in featurenames
-    narr_features = narr_bow in featurenames or narr_tfidf in featurenames or narr_count in featurenames or narr_vec in featurenames or narr_seq in featurenames or lda in featurenames or event_vec in featurenames or event_seq in featurenames or symp_count in featurenames
+    narr_features = narr_bow in featurenames or narr_tfidf in featurenames or narr_count in featurenames or narr_vec in featurenames or narr_seq in featurenames or lda in featurenames or event_vec in featurenames or event_seq in featurenames or symp_count in featurenames or narr_words in featurenames
     print "narr_features: " + str(narr_features)
     stopwords = []
 
@@ -183,9 +184,11 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
             dict_keys = dict_keys + ["CL_DeathAge", "CL_Occupation", "CL_Marital", "CL_Hypertension", "CL_Heart", "CL_Stroke", "CL_Diabetes", "CL_TB", "CL_HIV", "CL_Cancer", "CL_Asthma","CL_InjuryHistory", "CL_SmokeD", "CL_AlcoholD", "CL_ApplytobaccoD"]
         elif dem in featurenames or narr_dem in featurenames:
             #dict_keys = dict_keys + ["CL_DeathAge", "CL_ageunit", "CL_DeceasedSex"]
-	    dict_keys = dict_keys + ["CL_DeathAge", "CL_DeceasedSex"]
+            dict_keys = dict_keys + ["CL_DeathAge", "CL_DeceasedSex"]
         elif kw_clusters in featurenames:
             dict_keys.append("keyword_clusters")
+        elif narr_words in featurenames:
+            dict_keys.append(narr_words)
         print "dict_keys: " + str(dict_keys)
         #keywords = set([])
         #narrwords = set([])
@@ -225,10 +228,10 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
 
         # KEYWORD features
         if kw_features:
-	    keyword_string = get_keywords(child, 'keyword_clusters_text')
+            keyword_string = get_keywords(child, 'keyword_clusters_text')
             #keyword_string = get_keywords(child, 'keywords_spell')
             # Remove punctuation and trailing spaces from keywords
-            words = [s.strip().translate(string.maketrans("",""), string.punctuation) for s in keyword_string.split(',')]
+            words = [s.strip().translate(string.maketrans("", ""), string.punctuation) for s in keyword_string.split(',')]
             # Split keyword phrases into individual words
             for word in words:
                 w = word.split(' ')
@@ -255,8 +258,12 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
 
                 if narr_string == "":
                     print "warning: empty narrative"
-                narr_words = [w.strip() for w in narr_string.lower().translate(string.maketrans("",""), string.punctuation).split(' ')]
-                text = " ".join(narr_words)
+                n_words = [w.strip() for w in narr_string.lower().translate(string.maketrans("", ""), string.punctuation).split(' ')]
+                text = " ".join(n_words)
+
+                # Word features
+                if narr_words in featurenames:
+                    features[narr_words] = n_words
 
                 if stem:
                     narr_string = preprocessing.stem(text)
@@ -275,7 +282,7 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
                     gender = data_util.decode_gender(features["CL_DeceasedSex"])
                     #dem_prefix = " age " + str(age) + " " + ageunit + " " + str(gender) + " "
                     dem_prefix = " age " + str(age) + " " + str(gender) + " "
-		    print "narr_dem: " + dem_prefix
+                    print "narr_dem: " + dem_prefix
                     narr_string = dem_prefix + narr_string
             narratives.append(narr_string.strip().lower())
             #print "Adding narr: " + narr_string.lower()
@@ -297,12 +304,11 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
         if narr_symp in element:
             symp_string = ""
             item = child.find(narr_symp) # Hard-coded. To be fixed
-            if item != None:
+            if item is not None:
                 item_text = item.text
                 #symp_string = " " + str(item_text) + " "
-		symp_string = str(item_text).lower().translate(string.maketrans("",""), string.punctuation)
+                symp_string = str(item_text).lower().translate(string.maketrans("",""), string.punctuation)
             symptoms.append(symp_string)
-
 
         # Keyword features extracted using textrank
         if narr_textrank in element:
@@ -340,7 +346,7 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
                 temp_keys = symp_count_vectorizer.get_feature_names()
                 symptom_keys = []
 
-		# Append "symp_" to each symptom word to distinguish extracted symptoms from narratives.
+                # Append "symp_" to each symptom word to distinguish extracted symptoms from narratives.
                 for key in temp_keys:
                     symptom_keys.append("symp_" + key)
                 print("Change symptoms key with appropriate name")
@@ -393,7 +399,7 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
             out_matrix.write(str(textrank_count_matrix))
             out_matrix.close()
 
-	if symp_only == False:
+        if symp_only == False:
             # Create count matrix (Narrative)
             global count_vectorizer
             if train:
@@ -565,6 +571,7 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
         dict_keys.remove("CL_DeathAge")
         #dict_keys.remove("CL_ageunit")
     data_util.write_to_file(matrix, dict_keys, outfile)
+
 
 ''' Get vector features
 '''

@@ -460,7 +460,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
 
     # Select best features for all data
     if ((not is_nn) or arg_model == "nn") and num_feats < x_feats:
-        anova_filter, X = create_anova_filter(X, Y, anova_function, arg_prefix, num_feats)
+        anova_filter, X = create_anova_filter(X, Y, anova_function,arg_prefix, num_feats)
 
     global model
     model = None
@@ -471,12 +471,11 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
         modelfile = arg_prefix + "/" + arg_modelname + ".model"
         if os.path.exists(modelfile):
             print "using pre-existing model at " + modelfile
-
             if use_torch:
                 model = torch.load(modelfile)
             else:
                 model = load_model(modelfile)
-                X = numpy.asarray(X)
+            X = numpy.asarray(X)
 
         # For CNN-RNN ensemble
         elif arg_model == "cnn-rnn":
@@ -531,7 +530,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
                 Y = to_categorical(Y)
                 if arg_model == 'cnn-query':
                     dataloc = os.path.abspath(os.path.join(arg_train_feats, '..'))
-                    clusterfile = dataloc + "/train_adult_cat_spell_kwkm100.clusters"
+                    clusterfile = dataloc + "/train_adult_cat_spell_kwkm50.clusters"
                     print('query vector path:', clusterfile + '.centers')
                     vec_list = eval(open(clusterfile + '.centers', 'r').read())
                     query_vectors = numpy.asarray(vec_list)
@@ -543,19 +542,20 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
                     model = model_library_torch.cnn_model(X, Y, query_vectors=query_vectors)
                 else:
                     model, X, Y = model_library.cnn_model(X, Y, X2=X2)
+
             elif arg_model == "filternn":
                 num_nodes = 56
                 Y = to_categorical(Y)
                 model, X, Y = create_filter_rnn_model(X, Y, embedding_dim, num_nodes)
 
-            print "saving the model..."
+        print "saving the model..."
 
-            if not use_torch: # Save Keras model
-                model.save(modelfile)
-                plotname = modelfile + ".png"
-                plot_model(model, to_file=plotname)
-            else: # Save Pytorch model
-                torch.save(model, modelfile)
+        if not use_torch: # Save Keras model
+            model.save(modelfile)
+            plotname = modelfile + ".png"
+            plot_model(model, to_file=plotname)
+        else: # Save Pytorch model
+            torch.save(model, modelfile)
     # Other models
     else:
         if arg_model == "svm":
@@ -790,6 +790,8 @@ def write_results(filename, testids, testlabels, predictedlabels):
 
 def test(model_type, model, testfile, anova_filter=None, hybrid=False, rec_type=None, kw_cnn=None, threshold=0.01):
     print "testing..."
+    if model is None:
+        print('ERROR: model is None')
     stime = time.time()
     testids = []
     testlabels = []
@@ -816,20 +818,20 @@ def test(model_type, model, testfile, anova_filter=None, hybrid=False, rec_type=
         #if "keyword_clusters" not in keys:
         inputs.append(testX2)
     if is_nn:
-	if use_torch: # Test using pytorch model
-	    if model_type == "nn":
-		results = model_library_torch.test_nn(model, testX, threshold=threshold)
-	    elif model_type == "cnn":
-		results = model_library_torch.test_cnn(model, testX, testY, threshold=threshold)
-	    elif model_type == "cnn-rnn":
-		results = model_library_torch.test_cnn_attnrnn(model[0], model[1], testX, testY)
-	else: # Test using Keras model
-	    predictedY = model.predict(inputs)
-	    results = map_back(predictedY)
-	print "testX shape: " + str(testX.shape)
-    #elif model_type == "cnn":
-    #    attn_vec = get_attention_vector(model, testX)
-    #    print "attention vector: " + str(attn_vec)
+        if use_torch: # Test using pytorch model
+            if model_type == "nn":
+                results = model_library_torch.test_nn(model, testX, threshold=threshold)
+            elif model_type == "cnn" or model_type == "cnn-query":
+                results = model_library_torch.test_cnn(model, testX, testY, threshold=threshold)
+            elif model_type == "cnn-rnn":
+                results = model_library_torch.test_cnn_attnrnn(model[0], model[1], testX, testY)
+        else: # Test using Keras model
+            predictedY = model.predict(inputs)
+            results = map_back(predictedY)
+        #print "testX shape: " + str(testX.shape)
+        #elif model_type == "cnn":
+        #    attn_vec = get_attention_vector(model, testX)
+        #    print "attention vector: " + str(attn_vec)
     else:
         testX = testX.astype('float')
         results = model.predict(testX)

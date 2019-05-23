@@ -90,6 +90,128 @@ class CNN_Text(nn.Module):
             logit = x
         return logit
 
+
+######################################################################
+# Convolutional Neural Network
+# ----------------------------
+#
+# 5 convlutional layers with max pooling, followed by a fully connected network
+# Arguments:
+#	embed_dim	: dimension of a word vector
+#	class_num	: number of classes
+#	kernel_num	: number of channels produced by the convolutions
+#	kernel_sizes	: size of convolving kernels
+#	dropout		: dropout to prevent overfitting
+#	ensemble	: if true, used as input of RNNClassifier
+#			  if false, used independently and make prediction
+#	hidden_size	: number of nodes in hidden layers
+#
+#
+class CNN_Query(nn.Module):
+
+    def __init__(self, query_vectors, embed_dim, class_num, kernel_num=25, kernel_sizes=8, ngram=8, dropout=0.1, ensemble=False):
+        super(CNN_Query, self).__init__()
+
+        D = embed_dim
+        self.dim = embed_dim
+        C = class_num
+        Ci = 1
+        self.Co = kernel_num
+        self.Ks = kernel_sizes
+        self.ensemble = ensemble
+        self.query_vectors = torch.from_numpy(query_vectors).float()
+        self.conv_map = {}
+        self.qn = self.query_vectors.size(0)
+        self.ngram = ngram
+
+        # ELMo
+        #options_file = "/u/sjeblee/research/data/elmo/weights/elmo_2x4096_512_2048cnn_2xhighway_options.json"
+        #weight_file = "/u/sjeblee/research/data/elmo/weights/elmo_2x4096_512_2048cnn_2xhighway_weights_PubMed_only.hdf5"
+        #self.elmo = Elmo(options_file, weight_file, 1, dropout=0).to(tdevice)
+
+        for q in range(self.qn):
+            self.conv_map[q] = []
+            for n in range(1, self.ngram+1):
+                self.conv_map[q].append(nn.Conv2d(Ci, self.Co, (n, D)).cuda())
+
+        # Normal convs
+        self.conv_map[self.qn] = []
+        for n in range(1, self.ngram+1):
+            self.conv_map[self.qn].append(nn.Conv2d(Ci, self.Co, (n, D)).cuda())
+
+        self.dropout = nn.Dropout(dropout)
+        print('input to linear layer:', self.Co*self.Ks*self.qn)
+        self.cosine = nn.CosineSimilarity(dim=2) # Could replace with Bilinear?
+        self.bilinear = nn.Bilinear(D, D, 1)
+        self.softmax = nn.Softmax(dim=0)
+        self.fc1 = nn.Linear(self.Co*self.Ks*(self.qn+1), C) # Use this layer when train with only CNN model, i.e. No ensemble
+
+    def conv_and_pool(self, x, conv):
+        x = F.relu(conv(x)).squeeze(3)  # (N, Co, W)
+        #print('conv output:', x.size())
+        x = F.max_pool1d(x, x.size(2)).squeeze(2)
+        #print('pool output:', x.size())
+        return x
+
+    def forward(self, x):
+        #print('forward x:', x.size()) # (batch, max_len, dim)
+        batch = x.size(0)
+        seq_len = x.size(1)
+        feat_list = []
+        attn_maps = {}
+        for b in range(batch):
+            attn_maps[b] = []
+
+        for q in range(self.qn):
+            pr = (q == 0)
+            query = self.query_vectors[q]
+            #query_matrix = Variable(query.expand(batch, seq_len, -1))
+            query_matrix = Variable(query.expand(seq_len, -1))
+            if pr: print('query_matrix', query_matrix)
+            attn_q = []
+            for b in range(batch):
+                sim_b = self.bilinear(query_matrix, x[b]).squeeze() # (seq_len)
+                attn_b = self.softmax(sim_b)
+                if pr: print('attn_b:', attn_b.size())
+                attn_maps[b].append(attn_b)
+                attn_q.append(attn_b)
+            #sim_matrix = self.cosine(query_matrix, x) # (batch, seq_len)
+            #attn = self.softmax(sim_matrix)
+
+            # Save the attention matrices for each query
+            #for b in range(batch):
+            #    attn_maps[b].append(attn[b])
+            attn = torch.stack(attn_q) # (batch, seq_len)
+
+            attn = attn.view(batch, seq_len, 1).expand(batch, seq_len, self.dim)
+            if pr: print('attn[0,0]:', attn.size(), attn[0, 0])
+            if pr: print('x:', x.size())
+            input = attn*x
+            if pr: print('input[0,0]:', input.size(), input[0, 0])
+
+            if pr: print('convs for q:', q)
+            input = input.unsqueeze(1)  # (N, Ci, W, D)] Create a single channel
+            for conv in self.conv_map[q]:
+                feats = self.conv_and_pool(input, conv)
+                feat_list.append(feats)
+
+        # Normal convs
+        input = x.unsqueeze(1)
+        for conv in self.conv_map[self.qn]:
+            feats = self.conv_and_pool(input, conv)
+            feat_list.append(feats)
+
+        x = torch.cat(feat_list, 1)
+        print('cnn output size:', x.size())
+        x = self.dropout(x)  # (N, len(Ks)*Co)
+
+        if not self.ensemble: # Train CNN with no ensemble
+            logit = self.fc1(x)  # (N, C)
+        else: # Train CNN with ensemble. Output of CNN will be input of another model
+            logit = x
+        return logit, attn_maps
+
+
 # Neural Network Model (1 hidden layer)
 class Net(nn.Module):
     def __init__(self, input_size, hidden_size, num_classes):
@@ -631,9 +753,10 @@ def rnn_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', dropout=0
     Does NOT support joint training yet
     returns: the CNN model
 '''
-def cnn_model(X, Y, act=None, windows=[1, 2, 3, 4, 5], X2=[], num_epochs=10, loss_func='categorical_crossentropy', dropout=0.0, kernel_sizes=5, pretrainX=[], pretrainY=[]):
+def cnn_model(X, Y, act=None, windows=[1, 2, 3, 4, 5], X2=[], num_epochs=10, loss_func='categorical_crossentropy', dropout=0.0, kernel_sizes=5, pretrainX=[], pretrainY=[], query_vectors=None):
     # Train the CNN, return the model
     st = time.time()
+    use_query = (query_vectors is not None)
 
     # Check for pretraining
     pretrain = False
@@ -645,7 +768,7 @@ def cnn_model(X, Y, act=None, windows=[1, 2, 3, 4, 5], X2=[], num_epochs=10, los
     Xarray = numpy.asarray(X).astype('float')
     dim = Xarray.shape[-1]
     num_labels = Y.shape[-1]
-    batch_size = 100
+    batch_size = 32
     learning_rate = 0.001
     #num_epochs = num_epochs
     #best_acc = 0
@@ -673,17 +796,23 @@ def cnn_model(X, Y, act=None, windows=[1, 2, 3, 4, 5], X2=[], num_epochs=10, los
         cnn.fc1 = nn.Linear(cnn.Co*cnn.Ks, num_labels)
 
     else: # No pre-training
-        cnn = CNN_Text(dim, num_labels, dropout=dropout, kernel_sizes=kernel_sizes)
+        if use_query:
+            dropout = 0.1
+            cnn = CNN_Query(query_vectors, dim, num_labels, dropout=dropout, kernel_sizes=kernel_sizes)
+        else:
+            cnn = CNN_Text(dim, num_labels, dropout=dropout, kernel_sizes=kernel_sizes)
 
     if use_cuda:
         cnn = cnn.cuda()
+        if use_query:
+            cnn.query_vectors = cnn.query_vectors.cuda()
 
     # Train final model
-    cnn = train_cnn(cnn, X, Y, batch_size, num_epochs, learning_rate)
+    cnn = train_cnn(cnn, X, Y, batch_size, num_epochs, learning_rate, query=use_query)
 
     return cnn
 
-def train_cnn(cnn, X, Y, batch_size, num_epochs, learning_rate):
+def train_cnn(cnn, X, Y, batch_size, num_epochs, learning_rate, query=False):
     Xarray = numpy.asarray(X).astype('float')
     Yarray = Y.astype('int')
     X_len = Xarray.shape[0]
@@ -718,9 +847,13 @@ def train_cnn(cnn, X, Y, batch_size, num_epochs, learning_rate):
             i = i+batch_size
 
             optimizer.zero_grad()
-            logit = cnn(feature)
+            if query:
+                logit, attn_maps = cnn(feature)
+            else:
+                logit = cnn(feature)
 
             loss = F.cross_entropy(logit, torch.max(target, 1)[1])
+            print('loss: ', str(loss.data[0]))
             loss.backward()
             optimizer.step()
             steps += 1
@@ -734,7 +867,7 @@ def train_cnn(cnn, X, Y, batch_size, num_epochs, learning_rate):
         print("time so far: ", str(ct), unit)
     return cnn
 
-def test_cnn(model, testX, testids, probfile='/u/yoona/data/torch/probs_win200_epo10', labelencoder=None, collapse=False, threshold=0.1):
+def test_cnn(model, testX, testids=None, probfile='/u/yoona/data/torch/probs_win200_epo10', labelencoder=None, collapse=False, threshold=0.1):
     y_pred = [] # Original prediction if threshold is not in used for ill-defined.
     y_pred_softmax = []
     y_pred_logsoftmax = []
@@ -750,14 +883,31 @@ def test_cnn(model, testX, testids, probfile='/u/yoona/data/torch/probs_win200_e
 
         icd = None
         if icd is None:
-            input_tensor = torch.from_numpy(numpy.asarray([input_row]).astype('float')).float()
+            input_tensor = torch.from_numpy(input_row.astype('float')).float().unsqueeze(0)
             if use_cuda:
-                input_tensor = input_tensor.contiguous().cuda()
+                #input_tensor = input_tensor.contiguous().cuda()
+                input_tensor = input_tensor.cuda()
+            print('input_tensor:', input_tensor.size())
+            print('input_tensor[0, 0]:', input_tensor[0, 0])
+            #icd_var, attn_maps = model(Variable(input_tensor))
             icd_var = model(Variable(input_tensor))
             # Softmax and log softmax values
             icd_vec = logsoftmax(icd_var)
             icd_vec_softmax = softmax(icd_var)
             icd_code = torch.max(icd_vec, 1)[1].data[0]
+
+            # Save the first example attn map
+            '''
+            if x == 0:
+                tempfile = '/u/sjeblee/research/va/data/cnn_query_cghr/attn_0.csv'
+                outf = open(tempfile, 'w')
+                for row in attn_maps[0]:
+                    row = row.squeeze()
+                    for i in range(row.size(0)):
+                        outf.write(str(row.data[i]) + ',')
+                    outf.write('\n')
+                outf.close()
+            '''
 
 	    # Assign to ill-defined class if the maximum probabilities is less than a threshold.
 	    #icd_prob = torch.max(icd_vec_softmax,1)[0]
