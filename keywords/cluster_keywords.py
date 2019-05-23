@@ -9,7 +9,7 @@ import data_util
 from collections import Counter
 from lxml import etree
 from numpy import array
-from sklearn.cluster import AgglomerativeClustering, MiniBatchKMeans, SpectralClustering
+from sklearn.cluster import AgglomerativeClustering, MiniBatchKMeans, SpectralClustering, KMeans
 from sklearn.metrics import calinski_harabaz_score
 from sklearn.neighbors import KNeighborsClassifier
 from scipy.stats import mode
@@ -58,13 +58,14 @@ def run(outfile, clusterfile, vecfile, infile=None, testfile=None, testoutfile=N
     # Load word2vec vectors
     print "loading vectors..."
     vec_model, dim = word2vec.load(vecfile)
-    
+
     # Extract keywords
     ids = [] # ids can occur more than once!
     keywords = []
     kw_vecs = []
     kw_clusters_correct = []
     cluster_names = []
+    num_clusters = int(num_clusters)
 
     if infile is not None:
         print "reading XML file..."
@@ -82,14 +83,16 @@ def run(outfile, clusterfile, vecfile, infile=None, testfile=None, testoutfile=N
     # Generate clusters
     kw_vecs_np = numpy.asarray(kw_vecs)
     print "shape: [num_keywords, dim]: " + str(kw_vecs_np.shape) # keywords listed individually
-    print "kw_vecs[0]: " + str(kw_vecs[0])
+    print "kw_vecs_np[0]: " + str(kw_vecs_np[0])
     print "generating clusters..."
-    clusterer = MiniBatchKMeans(n_clusters=num_clusters, max_iter=1000, n_init=100, batch_size=500, reassignment_ratio=0.03, max_no_improvement=50)
+    #clusterer = MiniBatchKMeans(n_clusters=num_clusters, max_iter=1000, n_init=1000, batch_size=500, reassignment_ratio=0.03, max_no_improvement=50)
+    #clusterer = MiniBatchKMeans(n_clusters=num_clusters)
+    clusterer = KMeans(n_clusters=num_clusters, max_iter=500)
     #clusterer = SpectralClustering(n_clusters=num_clusters, n_init=15, affinity='cosine', n_jobs=-1)
     #clusterer = AgglomerativeClustering(n_clusters=num_clusters, affinity='cosine', linkage='average')
     kw_clusters = clusterer.fit_predict(kw_vecs_np)
     #kw_clusters = map_back(clusterer.fit_predict(kw_vecs), cluster_names)
-    
+
 
     # Unsupervised cluster metrics
     cluster_labels = clusterer.labels_
@@ -155,24 +158,24 @@ def read_cluster_file(clusterfile, word2vec, dim, cluster_names=None):
     zero_vec = numpy.array(data_util.zero_vec(dim))
 
     with open(clusterfile, 'r') as f:
-            for line in f:
-                cols = line.split(',')
-                kw = cols[0]
-                clust = int(cols[1].strip())
-                # Look up keyword in word2vec
-                vec = zero_vec
-                for word in kw.split(' '):
-                    vec2 = zero_vec
-                    # ignore stopwords
-                    #if word not in stopwords and word in word2vec:
-                    if word in word2vec:
-                        vec2 = numpy.array(word2vec[word])
-                    vec = vec+vec2
-                keywords.append(kw)
-                kw_vecs.append(vec)
-                kw_clusters.append(clust)
-                if train:
-                    cluster_names.add(clust)
+        for line in f:
+            cols = line.split(',')
+            kw = cols[0]
+            clust = int(cols[1].strip())
+            # Look up keyword in word2vec
+            vec = zero_vec
+            for word in kw.split(' '):
+                vec2 = zero_vec
+                # ignore stopwords
+                #if word not in stopwords and word in word2vec:
+                if word in word2vec:
+                    vec2 = numpy.array(word2vec[word])
+                vec = vec+vec2
+            keywords.append(kw)
+            kw_vecs.append(vec)
+            kw_clusters.append(clust)
+            if train:
+                cluster_names.add(clust)
 
     # Convert cluster names to numbers 0 to num_clusters
     if train:
@@ -195,10 +198,10 @@ def read_xml_file(filename, vec_model, dim):
     for child in root:
         node = child.find('MG_ID')
         rec_id = node.text
-	# Symptoms cluster, not keywords. Currently commenting it out due to bad performance
-	# kws = extract_features.get_keywords(child, "narr_symp").split(',')
+        # Symptoms cluster, not keywords. Currently commenting it out due to bad performance
+        # kws = extract_features.get_keywords(child, "narr_symp").split(',')
 
-	# Keyword cluster
+        # Keyword cluster
         kws = extract_features.get_keywords(child, "keywords_spell").split(',')
         for kw in kws:
             kw = kw.strip()
@@ -263,6 +266,7 @@ def write_clusters_to_file(outfile, cluster_map):
         outf.write("\n")
     outf.close()
 
+
 ''' xmlfile: the xml file to add key phrases to
     ids: the list of record ids (collapsed)
     cluster_pred: a list of lists of cluster numbers (collapsed)
@@ -285,28 +289,28 @@ def write_clusters_to_xml(xmlfile, outfile, ids, cluster_pred, text_pred=None, k
         rec_id = node.text
         narr_node = child.find('narrative')
         # Add textrank key phrases for comparison
-        if narr_node is not None:
-            narr = narr_node.text
-            kw_textrank = textrank.extract_key_phrases(narr)
+        #if narr_node is not None:
+        #    narr = narr_node.text
+        #    kw_textrank = textrank.extract_key_phrases(narr)
             #print "kw_textrank: " + str(kw_textrank)
-            tr_node = etree.SubElement(child, 'textrank_keyphrases')
-            tr_node.text = str(kw_textrank)
+        #    tr_node = etree.SubElement(child, 'textrank_keyphrases')
+        #    tr_node.text = str(kw_textrank)
         keyword_text = ""
-	# Edit by Yoona. For keywords vector concatenation
-	# keyword_labels = ""
+        # Edit by Yoona. For keywords vector concatenation
+        keyword_labels = ""
         if rec_id in id_dict:
             keywords = id_dict[rec_id]
             kw_text = text_dict[rec_id]
             for kw in keywords:
                 keyword_text = keyword_text + "," + str(kw)
-	    # Edit by Yoona for Keyword concatenation
-	    #for kwlabels in kw_text: 
-	    #	keyword_labels = keyword_labels + " " + str(kwlabels)
-        newnode = etree.SubElement(child, kw_label)
-        newnode.text = keyword_text.strip(',')
-        newnode2 = etree.SubElement(child, kw_label + "_text")
-        newnode2.text = str(kw_text)
-	#newnode2.text = str(keyword_labels)
+            # Edit by Yoona for Keyword concatenation
+            for kwlabels in kw_text:
+                keyword_labels = keyword_labels + " " + str(kwlabels)
+            newnode = etree.SubElement(child, kw_label)
+            newnode.text = keyword_text.strip(',')
+            newnode2 = etree.SubElement(child, kw_label + "_text")
+            #newnode2.text = str(kw_text)
+            newnode2.text = str(keyword_labels)
     # Write tree to file
     tree.write(outfile)
 
@@ -539,5 +543,5 @@ def get_cluster_centers(filename):
     #else:
     #    print "WARNING: cluster centers file not found: " + filename
     return cluster_centers
-    
+
 if __name__ == "__main__":main()
