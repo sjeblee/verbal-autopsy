@@ -9,7 +9,7 @@ import data_util
 import extract_features
 import heidel_tag
 import medttk_tag
-import model_symp as model
+import model
 #import rebalance
 import results_stats
 import spellcorrect
@@ -215,7 +215,7 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
             data = {}
             datasets = []
             total = 0
-	    
+
             with open(filename, 'r') as f:
                 for line in f:
                     #print "line: " + line
@@ -301,8 +301,8 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
                     trainname = arg_train + "_" + str(z)
                 #trainfile = datapath + "/train_" + trainname +  "_cat.xml"
                 #testfile = datapath + "/test_" + trainname + "_cat.xml"
-		trainfile = datapath + "/train_"+  trainname + "_cat_spell.xml"
-		testfile = datapath + "/test_" + trainname + "_cat_spell.xml"  
+                trainfile = datapath + "/train_"+ trainname + "_cat_spell.xml"
+                testfile = datapath + "/test_" + trainname + "_cat_spell.xml"
                 outfile = open(trainfile, 'w')
                 outfile.write(xml_header + "\n")
                 for item in trainset:
@@ -342,7 +342,7 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
                 data_util.xml_to_txt(adult_xml)
                 data_util.xml_to_txt(child_xml)
                 data_util.xml_to_txt(neonate_xml)
-                
+
                 filenames = [adult_file, child_file, neonate_file]
                 with open(trainfile, 'w') as outfile:
                     outfile.write(xml_header + "\n")
@@ -353,7 +353,7 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
                     outfile.write(xml_footer + "\n")
             else:
                 #trainfile = datapath + "/train_" + trainname +  "_cat.xml"
-		trainfile = datapath + "/train_"+ trainname + "_cat_spell.xml" 
+                trainfile = datapath + "/train_"+ trainname + "_cat_spell.xml"
 
             #TEMP for keyphrase crossval
             #trainfile = datapath + "/train_all_" + str(z) + "_cat.txt"
@@ -391,7 +391,7 @@ def crossval(arg_models, arg_train, arg_features, arg_featurename, arg_name, arg
                     anova = "chi2"
                 else:
                     n_feats = 350
-            
+
             run(m, modelname, trainname, trainname, arg_features, arg_featurename, name, arg_preprocess, arg_labels, arg_dev=False, arg_hyperopt=False, arg_dataset=dset, arg_n_feats=n_feats, arg_anova=anova, arg_nodes=nodes, arg_dataloc=dataloc, arg_vecfile=vecfile, arg_crossval_num=z, arg_prefix = arg_prefix,arg_sympfile=arg_sympfile, arg_chvfile=arg_chvfile)
 
 def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev, arg_dataloc, arg_vecfile, crossval_num=None, arg_prefix="/u/sjeblee/research/va/data", arg_sympfile=None, arg_chvfile=None):
@@ -411,6 +411,7 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
     features = arg_features # type, checklist, narr_bow, narr_tfidf, narr_count, narr_vec, kw_bow, kw_tfidf, symp_train
     #modeltype = arg_model # svm, knn, nn, lstm, nb, rf
     modelname = arg_modelname
+    query_vectors = None
 
     # Location of data files
     dataloc = arg_dataloc
@@ -447,7 +448,7 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
     if "spell" in pre:
         print "Running spelling correction..."
         #trainsp = dataloc + "/train_" + trainname + "_" + spname + ".xml"
-	trainsp = dataloc + "/train_" + trainname + "_" + spname + ".xml"
+        trainsp = dataloc + "/train_" + trainname + "_" + spname + ".xml"
         devsp = ""
         if arg_dev:
             devsp = dataloc + "/dev_" + devname + "_" + spname + ".xml"
@@ -471,7 +472,7 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
             trainh = dataloc + "/train_" + trainname + "_ht.xml"
             if not os.path.exists(trainh):
                 heidel_tag.run(trainset, trainh)
-	        fixtags(trainh)
+                fixtags(trainh)
             trainset = trainh
             devh = ""
             if arg_dev:
@@ -480,7 +481,7 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
                 devh = dataloc + "/test_" + devname + "_ht.xml"
             if not os.path.exists(devh):
                 heidel_tag.run(devset, devh)
-	        fixtags(devh)
+                fixtags(devh)
             devset = devh
         devname = devname + "_ht"
         trainname = trainname + "_ht"
@@ -490,7 +491,7 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
         trainh = dataloc + "/train_" + trainname + "_medttk.xml"
         if not os.path.exists(trainh):
             medttk_tag.run(trainset, trainh)
-	    fixtags(trainh)
+            fixtags(trainh)
         trainset = trainh
         devh = ""
         if arg_dev:
@@ -499,20 +500,20 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
             devh = dataloc + "/test_" + devname + "_medttk.xml"
         if not os.path.exists(devh):
             medttk_tag.run(devset, devh)
-	    fixtags(devh)
+            fixtags(devh)
         devset = devh
         devname = devname + "_medttk"
         trainname = trainname + "_medttk"
         element = "narr_medttk"
 
     if "symp" in pre:
-	if (arg_sympfile == None or arg_chvfile == None):
-	    print "Symptom files are not provided."
+        if (arg_sympfile is None or arg_chvfile is None):
+            print "Symptom files are not provided."
         print "Tagging symptoms..."
         sympname = "symp"
         tagger_name = "tag_symptoms"
         #trainsp = dataloc + "/train_" + trainname + "_" + sympname + ".xml"
-	trainsp = dataloc + "/train_" + trainname + "_" + sympname + ".xml"
+        trainsp = dataloc + "/train_" + trainname + "_" + sympname + ".xml"
         devsp = ""
         if arg_dev:
             devsp = dataloc + "/dev_" + devname + "_" + sympname + ".xml"
@@ -538,7 +539,7 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
         print "Extract keywords using textrank"
         textrankname = "textrank"
         tagger_name = "textrank"
-        
+
         trainsp = dataloc + "/train_" + trainname + "_" + textrankname + ".xml"
         devsp = ""
         if arg_dev:
@@ -559,7 +560,7 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
         element.append("narr_textrank")
 
     if "kwc" in pre:
-        numc = "300"
+        numc = "50"
         kwname = "kwkm" + str(numc)
         # TODO: move this setup to a function
         trainkw = dataloc + "/train_" + trainname + "_" + kwname + ".xml"
@@ -571,12 +572,15 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
         if not os.path.exists(trainkw and devkw):
             print "Keyword clustering..."
             #clusterfile = trainkw + ".clusters"
-            clusterfile = dataloc + "/train_" + trainname + ".clusters_km100"
+            clusterfile = dataloc + "/train_" + trainname + "_" + kwname + ".clusters"
             cluster_keywords.run(trainkw, clusterfile, arg_vecfile, trainset, devset, devkw, num_clusters=numc)
         trainset = trainkw
         devset = devkw
         devname = devname + "_" + kwname
         trainname = trainname + "_" + kwname
+        #query_vectors = eval(open(clusterfile + '.centers', 'r').read())
+        #print('Loaded query vectors:', type(query_vectors))
+
     print("Elements: ")
     print(element)
     # Feature Extraction
@@ -606,6 +610,7 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
             extract_features.run(trainset, trainfeatures, devset, devfeatures, features, labels, stem, lemma, element)
     return trainfeatures, devfeatures, devresults
 
+
 def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg_name, arg_preprocess, arg_labels, arg_dev=True, arg_hyperopt=False, arg_dataset="mds", arg_n_feats=398, arg_anova="f_classif", arg_nodes=297, arg_dataloc="/u/sjeblee/research/va/data/datasets", arg_rebalance="", arg_vecfile=None, arg_crossval_num=None, arg_prefix="/u/sjeblee/research/va/data",arg_sympfile=None,arg_chvfile=None):
 
     print "run prefix: " + arg_prefix
@@ -630,7 +635,7 @@ def run(arg_model, arg_modelname, arg_train, arg_test, arg_features, arg_feature
     labels = arg_labels
     modeltype = arg_model # svm, knn, nn, lstm, nb, rf
     modelname = arg_modelname
-        
+
     # Model
     if arg_hyperopt:
         print "Running hyperopt..."

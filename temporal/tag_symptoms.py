@@ -290,7 +290,7 @@ def tag_symptoms(tree, arg_sympfile, arg_chvfile):
         for row in mycsv:
             if row[1] not in symptoms:
                 symptoms.append(row[1])
-                #print(row[1])
+                print(row[1])
 
     # Open tsv file.
     if use_symptom2:
@@ -302,7 +302,7 @@ def tag_symptoms(tree, arg_sympfile, arg_chvfile):
             symp_word = row[1]
             if symp_word not in symptoms:
                 symptoms.append(symp_word)
-                #print(symp_word)
+                print(symp_word)
 
         # For standarized symptoms, replace "<" & ">" to ","
         # Creaete a dictionary (Key: unstandarized -  Value: standarized)
@@ -313,6 +313,14 @@ def tag_symptoms(tree, arg_sympfile, arg_chvfile):
             if ">" in stand_word:
                 stand_word = stand_word.replace(">", "")
             dict_symp[symp_word] = stand_word
+
+
+    # HARD-CODED - load child symptoms from file
+    print "loading child keywords from file..."
+    kw_file = '/u/sjeblee/research/data/va/resources/mds_child_keywords_and.txt'
+    with open(kw_file, 'r') as kwfile:
+        for line in kwfile.readlines():
+            symptoms.append(line)
 
     # Collect physican-generated keywords and append to the symptom list.
     if use_keywords:
@@ -337,6 +345,7 @@ def tag_symptoms(tree, arg_sympfile, arg_chvfile):
     max_word_count = count_max_len_symptoms(symptoms)
 
     root = tree.getroot()
+    counter = 0
 
     for child in root:
         node = child.find("narrative")
@@ -362,6 +371,8 @@ def tag_symptoms(tree, arg_sympfile, arg_chvfile):
                 ngrams = get_substrings_with_limit(narr, max_word_count)
                 ngrams = filter(None, ngrams)
                 # Find all phrases that contains words in the list of symptoms.
+                counter += 1
+                print(counter, 'find possible phrases in:', narr)
                 possible_phrases = find_possible_phrases(ngrams, symptoms, narr)
 
                 # Remove duplicates in possible phrases
@@ -407,7 +418,7 @@ def tag_symptoms(tree, arg_sympfile, arg_chvfile):
                         else: # negated
                             narr_symp = narr_symp + "no " + narr[start:end] + " "
                     else: # Not using negation
-                        narr_symp = narr_symp + narr[start:end] + " "
+                        narr_symp = narr_symp + ', ' + narr[start:end]
 
                     lastindex = end
 
