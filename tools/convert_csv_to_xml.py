@@ -46,11 +46,15 @@ def main():
     ageunit_tag = "ageunit"
     deathdate_tag = "DeathDate"
     gender_tag = "DeceasedSex"
+    interview_tag = "InterviewDate"
+    state_name = "StateCode"
 
     # Parse CSV file
-    id_name = "id"
-    age_name = "age_value"
-    ageunit_name = "age_unit"
+    #id_name = "id"
+    id_name = "uniq_no"
+    #age_name = "age_value"
+    age_name = "death_age"
+    #ageunit_name = "age_unit"
     gender_name = "sex"
     icd_name = "final_icd"
     narr_name = "translated_eva_narrative"
@@ -58,18 +62,29 @@ def main():
     # Anand
     #if "anand" in args.infile:
         #print "Anand"
-    keywords1_name = "physician_one_coding_comments"
-    keywords2_name = "physician_two_coding_comments"
+    #keywords1_name = "physician_one_coding_comments"
+    #keywords2_name = "physician_two_coding_comments"
+    keywords1_name = "p1_keywords"
+    keywords2_name = "p2_keywords"
     adj_icd_name = "adjudication_icd"
-    rec1_icd_name = "physician_one_reconciliation_icd"
-    rec2_icd_name = "physician_two_reconciliation_icd"
+    #rec1_icd_name = "physician_one_reconciliation_icd"
+    #rec2_icd_name = "physician_two_reconciliation_icd"
     rec1_keywords_name = "physician_one_reconciliation_comments"
     rec2_keywords_name = "physician_two_reconciliation_comments"
-    phys1_icd_name = "physician_one_coding_icd"
-    phys2_icd_name = "physician_two_coding_icd"
-    death_day_name = "dod_day"
-    death_month_name = "dod_month"
-    death_year_name = "dod_year"
+    #phys1_icd_name = "physician_one_coding_icd"
+    #phys2_icd_name = "physician_two_coding_icd"
+    #death_day_name = "dod_day"
+    #death_month_name = "dod_month"
+    #death_year_name = "dod_year"
+    phys1_icd_name = "p1_icd"
+    phys2_icd_name = "p2_icd"
+    rec1_icd_name = "p1_recon_icd"
+    rec2_icd_name = "p2_recon_icd"
+    adj_icd_name = "adj_icd"
+    final_icd_name = "final_code"
+    death_name = "death_date"
+    interview_name = "interview_date"
+    state_name = 'state_code'
 
     if "amravati" in args.infile:
         print "Amravati"
@@ -108,8 +123,10 @@ def main():
             age_str = row[age_name]
             if not age_str == "NULL":
                 age = int(age_str)
-                ageunit = row[ageunit_name]
-                print "age: " + str(age) + " " + ageunit
+                ageunit = "Years"
+                #ageunit = row[ageunit_name]
+                print "age: " + str(age)# + " " + ageunit
+                '''
                 if (age < 1 and ageunit == "Months") or (ageunit == "Days"):
                     print "neonate"
                     tag = neonate_tag
@@ -118,6 +135,7 @@ def main():
                     print "child"
                     tag = child_tag
                     root = child_root
+                '''
             child = etree.SubElement(root, tag)
             id_node = etree.SubElement(child, id_tag)
             id_node.text = row[id_name]
@@ -125,7 +143,8 @@ def main():
             age_node.text = str(age)
             ageunit_node = etree.SubElement(child, ageunit_tag)
             ageunit_node.text = ageunit
-            gender = row[gender_name]
+            gender = "Female"
+            #gender = row[gender_name]
             #print "gender: " + gender
             if gender == "Female":
                 gender = 2
@@ -135,6 +154,8 @@ def main():
             gender_node.text = str(gender)
             death_node = etree.SubElement(child, deathdate_tag)
             deathdate = ""
+            deathdate = row[death_name]
+            '''
             if death_year_name in row:
                 deathdate = row[death_year_name]
             else:
@@ -150,6 +171,7 @@ def main():
                 deathdate = deathdate + "-" + row[death_day_name]
             else:
                 deathdate = deathdate + "-?"
+            '''
             death_node.text = deathdate
 
             # Get keywords and fix the commas
@@ -161,8 +183,8 @@ def main():
             keywords2_node.text = fix_keywords(keywords2)
 
             # Get narrative
-            narr_node = etree.SubElement(child, narr_tag)
-            narr_node.text = fix_narr(row[narr_name])
+            #narr_node = etree.SubElement(child, narr_tag)
+            #narr_node.text = fix_narr(row[narr_name])
             #print "narr: " + narr_node.text
 
             # Get ICD codes and reconciliation keywords
@@ -183,10 +205,12 @@ def main():
                     icd1_rec_node.text = rec_icd1
                     icd2_rec_node = etree.SubElement(child, rec2_icd_tag)
                     icd2_rec_node.text = rec_icd2
+                    '''
                     rec1_keywords_node = etree.SubElement(child, rec1_keywords_tag)
                     rec1_keywords_node.text = fix_keywords(row[rec1_keywords_name])
                     rec2_keywords_node = etree.SubElement(child, rec2_keywords_tag)
                     rec2_keywords_node.text = fix_keywords(row[rec2_keywords_name])
+                    '''
                     if rec_icd1.upper() != rec_icd2.upper():
                         icd = row[adj_icd_name]
                     elif len(rec_icd1) > 0 and len(rec_icd2) > 0 and rec_icd1[0] == rec_icd2[0]:
@@ -195,7 +219,9 @@ def main():
                 icd = icd1
             if icd_name in row: # Always take the final_icd if it's there
                 icd = row[icd_name]
-                
+
+            icd = row[final_icd_name]
+
             if icd == "":
                 print "Error: no ICD code found for " + row[id_name]
                 root.remove(child)
@@ -219,7 +245,7 @@ def main():
     data_util.fix_line_breaks(adult_file + ".clean", "adult")
     data_util.fix_line_breaks(child_file + ".clean", "child")
     data_util.fix_line_breaks(neonate_file + ".clean", "neonate")
-    
+
     print "Dropped " + str(dropped) + " records because of missing or mismatched ICD codes"
 
 def fix_keywords(text):
@@ -237,5 +263,6 @@ def month_to_num(text):
         return str(abbr_to_num[text])
     else:
         return "?"
+
 
 if __name__ == "__main__":main()

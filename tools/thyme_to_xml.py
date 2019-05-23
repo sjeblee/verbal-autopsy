@@ -12,7 +12,7 @@ import os
 import subprocess
 
 # Parameters
-add_dct_links = True
+add_dct_links = False
 
 class ElementTag:
     def __init__(self, start, end, element):
@@ -77,7 +77,7 @@ def run(arg_outfile, arg_textdir, arg_anndir):
     #out = open(arg_outfile, 'w')
     #out.write(output)
     #out.close()
-                                
+
     #subprocess.call(["sed", "-i", "-e", 's/&lt;/ </g', arg_outfile])
     #subprocess.call(["sed", "-i", "-e", 's/&gt;/> /g', arg_outfile])
     #subprocess.call(["sed", "-i", "-e", 's/  / /g', arg_outfile])
@@ -120,7 +120,7 @@ def convert_spans_to_xml(raw_text, xml_tree):
 
         # Process EVENT and TIMEX3 tags
         if entity.tag == "entity":
-            span = entity.find('span').text.replace(';',',').split(',')
+            span = entity.find('span').text.replace(';', ',').split(',')
             span_start = int(span[0])
             span_end = int(span[1])
             entity_type = entity.find('type').text
@@ -139,7 +139,7 @@ def convert_spans_to_xml(raw_text, xml_tree):
                 entity_id = 'e' + entity_id
             else:
                 print("WARNING: unknown entity type!", entity_type)
-                
+
             # Get entity attributes
             properties = entity.find('properties')
             xml_element = etree.Element(entity_type)
@@ -246,6 +246,25 @@ def convert_spans_to_xml(raw_text, xml_tree):
         doc_text = doc_text + etree.tostring(element).decode('utf-8')
 
     return doc_text + tlink_text
+
+
+def remove_duplicate_ann_files(folder):
+    rel_suffix = '.Temporal-Relation.gold.completed.xml'
+    entity_suffix = '.Temporal-Entity.gold.completed.xml'
+    umls_suffix = '.UMLS-Entity.gold.completed.xml'
+    for filename in os.listdir(folder):
+        dotindex = filename.index('.')
+        record_name = filename[0:dotindex]
+        print(record_name)
+        if os.path.exists(os.path.join(folder, record_name + rel_suffix)): # If the relation file exists
+            filepath = os.path.join(folder, record_name + entity_suffix)
+            if os.path.exists(filepath):
+                os.remove(filepath)
+                print('removed entity file')
+            filepath = os.path.join(folder, record_name + umls_suffix)
+            if os.path.exists(filepath):
+                os.remove(filepath)
+                print('removed umls file')
 
 
 if __name__ == "__main__": main()
