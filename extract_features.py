@@ -50,6 +50,7 @@ def main():
     else:
         run(args.trainfile, args.trainoutfile, args.testfile, args.testoutfile, args.featurenames, arg_vecfile=vecfile)
 
+
 ''' Run feature extraction for the training and testing files
     This is the function that is called from pipeline.py
 '''
@@ -130,7 +131,7 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
     #            stopwords.append(line.strip())
 
     if kw_features or narr_features:
-        with codecs.open("./stopwords_small.txt", "r") as f:
+        with codecs.open("resources/stopwords_small.txt", "r") as f:
             for line in f:
                 stopwords.append(line.strip())
 
@@ -145,6 +146,7 @@ def run(arg_train_in, arg_train_out, arg_test_in, arg_test_out, arg_featurenames
     endtime = time.time()
     totaltime = endtime - starttime
     print "feature extraction took " + str(totaltime/60) + " mins"
+
 
 ''' Extract features from an xml file
 '''
