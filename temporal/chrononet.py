@@ -145,7 +145,7 @@ def run(model, trainfile, vecfile, testfile, outfile, relation_set='exact'):
         print("Pairwise accuracy:", str(iso_pa))
         print("GPR:", str(iso_gold_recall))
         '''
-        
+
         # Oracle scores
         #all_scores("Oracle", test_ranks, true_pairs, true_relations, test_ranks, true_pairs, true_relations, test_events)
 
@@ -382,7 +382,7 @@ def score_relation_pairs(pred_pairs, pred_labels, true_pairs, true_labels):
     for key in doc_class_recalls.keys():
         avg_class_recall = numpy.average(numpy.asarray(doc_class_recalls[key]))
         print('Recall', key, str(avg_class_recall), 'num=', str(doc_class_totals[key]))
-    
+
     return avg_recall
 
 def str_pair(event_pair):
@@ -422,4 +422,5 @@ def write_output(infile, outfile, ids, events, ranks):
                 list_node.append(event)
     tree.write(outfile)
 
-if __name__ == "__main__":main()
+
+if __name__ == "__main__": main()
