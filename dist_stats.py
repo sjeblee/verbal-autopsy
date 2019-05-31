@@ -1,11 +1,10 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # Generate distributional stats from xml
 
 from lxml import etree
 import argparse
 import numpy
-import string
 
 def main():
     argparser = argparse.ArgumentParser()
@@ -14,7 +13,7 @@ def main():
     args = argparser.parse_args()
 
     if not (args.infile and args.outfile):
-        print "usage: ./dist_stats.py --in [file.xml] --out [outfile.csv]"
+        print('usage: ./dist_stats.py --in [file.xml] --out [outfile.csv]')
         exit()
 
     icd_codes = {}
@@ -24,33 +23,32 @@ def main():
     # Get the xml from file
     tree = etree.parse(args.infile)
     root = tree.getroot()
-    
+
     for child in root:
-        icd = "R99"
+        icd = 'R99'
         node = child.find("Final_code")
-        if node != None:
+        if node is not None:
             icd = node.text
         count = 0
-        if icd_codes.has_key(icd):
+        if icd in icd_codes:
             count = icd_codes[icd]
         icd_codes[icd] = count+1
         node = child.find("cat_who")
         icdcat = node.text
         count = 0
-        if icd_cats.has_key(icdcat):
+        if icdcat in icd_cats:
             count = icd_cats[icdcat]
         icd_cats[icdcat] = count+1
         node = child.find("narrative")
-        narr = ""
-        if node != None:
+        narr = ''
+        if node is not None:
             narr = node.text
         words = len(narr.split(' '))
-        if narr_length.has_key(icdcat):
+        if icdcat in narr_length:
             narr_length[icdcat].append(words)
         else:
             narr_length[icdcat] = [words]
-        
-        
+
     # write the stats to file
     output = open(args.outfile, "w")
     #output.write("icd_code,num_records\n")
@@ -62,6 +60,6 @@ def main():
         avg_narr = numpy.mean(words)
         output.write(key + "," + str(icd_cats[key]) + "," + str(avg_narr) + "\n")
     output.close()
-    
 
-if __name__ == "__main__":main()
+
+if __name__ == "__main__": main()

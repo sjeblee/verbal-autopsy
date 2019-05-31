@@ -1,8 +1,7 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # Calculate CSMF accuracy over multiple runs with dirichlet sampling and random assignment
 
-from __future__ import division
 from numpy.random import dirichlet
 import argparse
 import numpy
@@ -16,23 +15,24 @@ def main():
     args = argparser.parse_args()
 
     if not args.type and args.num:
-        print "usage: ./dirichlet_simulation.py --in [infile.txt] --type [adult/child/neonate] --num [number of simulations]"
+        print('usage: ./dirichlet_simulation.py --in [infile.txt] --type [adult/child/neonate] --num [number of simulations]')
         exit(1)
 
     run(args.type, args.num)
 
+
 def run(arg_type, arg_num, arg_infile):
     arg_num = int(arg_num)
-    print str(arg_num) + " iterations: " + arg_type
+    print(str(arg_num), 'iterations:', arg_type)
 
     all_labels = model.get_labels(arg_infile, 'cat_who')
     num = len(all_labels)/10 # size of the test set
     cat_map = list(set(all_labels))
     num_classes = len(labels)
-    print "num classes: " + str(num_classes)
-    print "classes: " + str(cat_map)
+    print('num classes:', str(num_classes))
+    print('classes:', str(cat_map))
     prior = [1] * num_classes
-    
+
     #adult_map = ['1','3','4','5','6','7','8','9','10','11','13','14','15','16','17']
     #child_map = ['1','3','4','5','6','7','8','9','10','11','12','13','14','15','16']
     #neonate_map = ['1','3','5','6','8','11','13','14','15']
@@ -58,7 +58,7 @@ def run(arg_type, arg_num, arg_infile):
     #records = get_recs(arg_infile)
 
     # Generate distributions
-    s = numpy.random.dirichlet(prior, arg_num)#.transpose()
+    s = numpy.random.dirichlet(prior, arg_num) #.transpose()
     csmfs = []
     for dist in s:
         gen_labels = []
@@ -72,14 +72,16 @@ def run(arg_type, arg_num, arg_infile):
         correct_labels = random_assign.map_forward(gen_labels, cat_map)
         rand_labels = numpy.random.randint(0, len(prior), num)
         pred_labels = random_assign.map_back(rand_labels, cat_map)
-            #print "gen_labels: " + str(gen_labels)
-            #print "pred_labels: " + str(pred_labels)
-            # Calculate CSMF accuracy of pred_labels and gen_labels
+        #print "gen_labels: " + str(gen_labels)
+        #print "pred_labels: " + str(pred_labels)
+
+        # Calculate CSMF accuracy of pred_labels and gen_labels
         acc = calculate_csmfa(correct_labels, rand_labels, len(prior))
         csmfs.append(acc)
     # Calculate mean CSMF accuracy
     mean_csmfa = sum(csmfs)/len(csmfs)
-    print "mean CSMFA: " + str(mean_csmfa)
+    print('mean CSMFA:', str(mean_csmfa))
+
 
 def get_recs(filename):
     recs = []
@@ -89,6 +91,7 @@ def get_recs(filename):
     #del recs[len(recs)-1]
     #del recs[0]
     return recs
+
 
 def calculate_csmfa(correct, pred, num_classes):
     # Count the number of recs in each category
@@ -125,4 +128,5 @@ def calculate_csmfa(correct, pred, num_classes):
     csmf_accuracy = 1 - (csmf_sum / (2 * (1 - csmf_corr_min)))
     return csmf_accuracy
 
-if __name__ == "__main__":main()
+
+if __name__ == "__main__": main()
