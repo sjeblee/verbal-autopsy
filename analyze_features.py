@@ -1,11 +1,9 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # Get records that match a certain field
 
-from lxml import etree
 import argparse
 import getrecords
-import string
 import subprocess
 
 def main():
@@ -16,12 +14,12 @@ def main():
     args = argparser.parse_args()
 
     if not (args.infile and args.outfile and args.featfile):
-        print "usage: ./getrecords.py --in [file.xml] --out [outfile.csv] --features [feat.txt]"
+        print('usage: ./getrecords.py --in [file.xml] --out [outfile.csv] --features [feat.txt]')
         exit()
 
     icdcats = ["1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17"]
     cats = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,15,17]
-    field = "ICD_cat"
+    field = 'ICD_cat'
 
     with open(args.featfile, 'r') as f:
         feats = f.readlines()
@@ -66,14 +64,14 @@ def main():
 
     # Calculate sensitivity and specificity
     for feat in feats:
-        print "Analyzing feat: " + feat
+        print('Analyzing feat:', feat)
         featsum = 0
         for cat in cats:
             featsum = featsum + (recs[feat])[cat]
         for cat in cats:
             tp = (recs[feat])[cat]
             p = rectotals[cat]
-            print str(cat) + " tp: " + str(tp) + " p: " + str(p)
+            print(str(cat), 'tp:', str(tp), 'p:', str(p))
             sens = 0
             if p > 0:
                 sens = tp / p
@@ -97,4 +95,5 @@ def main():
         fileout.write("\n")
     fileout.close()
 
-if __name__ == "__main__":main()
+
+if __name__ == "__main__": main()
