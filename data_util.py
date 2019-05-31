@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # Util functions
 # @author sjeblee@cs.toronto.edu
@@ -11,22 +11,27 @@ import numpy
 import operator
 import subprocess
 
-def clean_file(filename):
+def clean_file(filename, outfile):
     # remove blank lines | remove extra spaces| remove leading and trailing spaces  | fix utf-8 chars
     command = r"sed '/^\s*$/d' $file | sed -e 's/  */ /g' | sed -e 's/^ //g' | sed -e 's/ $//g' | sed -e 's/&amp;/and/g' | sed -e 's/&#13;/ /g' | sed -e 's/&#8217;/\'/g' | sed -e 's/&#8221;/\"/g' | sed -e 's/&#8220;/\"/g' | sed -e 's/&#65533;//g' | sed -e 's/&#175\7;//g'| sed -e 's/&#1770;/\'/g'"
-    # TODO
+    ps = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
+    output = ps.communicate()[0]
+    out = open(outfile, 'w')
+    out.write(str(output))
+    out.close()
+
 
 ''' Convert arrows in text to non-arrows (for xml processing)
     filename: the file to fix (file will be overwritten)
 '''
 def fix_arrows(filename):
     sed_command = r"sed -e 's/-->/to/g' " + filename + r" | sed -e 's/->/to/g' | sed -e 's/ < / lt /g' | sed -e 's/ > / gt /g'"
-    print "sed_command: " + sed_command
+    print("sed_command: ", sed_command)
     #f = open("temp", 'wb')
     ps = subprocess.Popen(sed_command, shell=True, stdout=subprocess.PIPE)
     output = ps.communicate()[0]
     out = open(filename, 'w')
-    out.write(output)
+    out.write(str(output))
     out.close()
 
 def decode_ageunit(unit):
@@ -79,6 +84,7 @@ def fix_escaped_chars(filename):
     subprocess.call(["sed", "-i", "-e", "s/&#8217;/'/g", filename])
     subprocess.call(["sed", "-i", "-e", "s/&#8211;/,/g", filename])
 
+
 ''' Remove blank lines, convert \n to space, remove double spaces, insert a line break before each record
     filename: the file to fix (file will be overwritten)
     rec_type: the type of record: adult, child, or neonate
@@ -99,8 +105,9 @@ def fix_line_breaks(filename, rec_type):
     ps = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
     output = ps.communicate()[0]
     out = open(filename, 'w')
-    out.write(output)
+    out.write(str(output))
     out.close()
+
 
 ''' Read an icd category mapping from a csv file into a python dictionary
     filename: the name of the csv file (lines formatted as code,cat)
@@ -111,8 +118,9 @@ def get_icd_map(filename):
         for line in f:
             line = line.strip()
             parts = line.split(',')
-            icd_map[parts[0].upper()] = parts[1]
+            icd_map[parts[0]] = parts[1]
     return icd_map
+
 
 def load_word2vec(vecfile):
     # Create word2vec mapping
@@ -134,6 +142,7 @@ def load_word2vec(vecfile):
                 dim = len(vec)
     return word2vec, dim
 
+
 ''' Labels must be integers or the empty string!
     labels: [num_samples, seq_len]
     returns: [num_samples, num_classes]
@@ -151,7 +160,7 @@ def multi_hot_encoding(labels, max_label=None):
                     if val > max_label:
                         max_label = val
     dim = max_label+1
-    print "max_label: " + str(max_label) + ", dim: " + str(dim)
+    print('max_label:', str(max_label), ', dim:', str(dim))
 
     for seq in labels:
         encoded_seq = zero_vec(dim)
@@ -161,6 +170,7 @@ def multi_hot_encoding(labels, max_label=None):
                 encoded_seq[num] = 1
         encoded_labels.append(encoded_seq)
     return encoded_labels
+
 
 ''' Convert multi-hot labels back to a text list of cluster numbers
 '''
@@ -174,6 +184,7 @@ def decode_multi_hot(labels):
                 label_seq = label_seq + "," + str(x)
         decoded_labels.append(label_seq.strip(','))
     return decoded_labels
+
 
 ''' labels: [num_samples, num_clusters]
     returns: a list of multi-hot vectors
@@ -190,6 +201,7 @@ def map_to_multi_hot(labels, threshold=0.1):
         decoded_labels.append(label_seq)
     return decoded_labels
 
+
 def remove_no_narrs(infile, outfile):
     # Get the xml from file
     tree = etree.parse(infile)
@@ -198,17 +210,18 @@ def remove_no_narrs(infile, outfile):
 
     for child in root:
         node = child.find("narrative")
-        if node == None:
+        if node is None:
             root.remove(child)
             count = count+1
         else:
             narr = node.text
-            if narr == None or narr == "":
+            if narr is None or narr == "":
                 root.remove(child)
                 count = count+1
 
-    print "Removed " + str(count) + " missing or empty narratives"
+    print('Removed', str(count), 'missing or empty narratives')
     tree.write(outfile)
+
 
 def score_majority_class(true_labs):
     pred_labs = []
@@ -226,6 +239,7 @@ def score_majority_class(true_labs):
     recall = metrics.recall_score(true_labs, pred_labs, average="weighted")
     f1 = metrics.f1_score(true_labs, pred_labs, average="weighted")
     return precision, recall, f1
+
 
 ''' Scores vector labels with binary values
     returns: avg precision, recall, f1 of 1 labels (not 0s)
@@ -286,13 +300,18 @@ def score_vec_labels(true_labs, pred_labs):
         micro_f1 = 2*(micro_p*micro_r)/(micro_p+micro_r)
     return precision, recall, f1, micro_p, micro_r, micro_f1
 
+
 ''' Get content of a tree node as a string
     node: etree.Element
 '''
 def stringify_children(node):
-    parts = ([node.text] + list(chain(*([tostring(c)] for c in node.getchildren()))))
+    parts = ([str(node.text)] + list(chain(*([tostring(c)] for c in node.getchildren()))))
     # filter removes possible Nones in texts and tails
+    for x in range(len(parts)):
+        if type(parts[x]) != str:
+            parts[x] = str(parts[x])
     return ''.join(filter(None, parts))
+
 
 ''' Get contents of tags as a list of strings
     text: the xml-tagged text to process
@@ -308,15 +327,16 @@ def phrases_from_tags(text, tags, atts=[]):
     #print "phrases_from tags text: " + text
     for child in root:
         if child.tag.lower() in tags:
-            print "found tag: " + child.tag
+            print('found tag:', child.tag)
             phrase = {}
-            if child.text != None:
+            if child.text is not None:
                 phrase['text'] = child.text
             for att in atts:
                 if att in child.keys():
                     phrase[att] = child.get(att)
             phrases.append(phrase)
     return phrases
+
 
 ''' Get contents of tags as a list of strings
     text: the xml-tagged text to process
@@ -328,14 +348,15 @@ def text_from_tags(text, tags):
     text = "<root>" + text + "</root>"
     newtext = ""
     root = etree.fromstring(text)
-    print "text: " + text
+    print('text:', text)
     for child in root:
-        print "--child"
+        print('--child')
         if child.tag.lower() in tags:
-            print "found tag: " + child.tag
-            if child.text != None:
+            print('found tag:', child.tag)
+            if child.text is not None:
                 newtext = newtext + ' ' + child.text
     return newtext
+
 
 ''' matrix: a list of dictionaries
     dict_keys: a list of the dictionary keys
@@ -343,7 +364,7 @@ def text_from_tags(text, tags):
 '''
 def write_to_file(matrix, dict_keys, outfile):
     # Write the features to file
-    print "writing " + str(len(matrix)) + " feature vectors to file..."
+    print('writing', str(len(matrix)), 'feature vectors to file...')
     output = open(outfile, 'w')
     for feat in matrix:
         #print "ICD_cat: " + feat["ICD_cat"]
@@ -351,16 +372,18 @@ def write_to_file(matrix, dict_keys, outfile):
         output.write(feat_string + "\n")
     output.close()
 
-    key_output = open(outfile + ".keys", "w")
+    key_output = open(outfile + '.keys', 'w')
     key_output.write(str(dict_keys))
     key_output.close()
     return dict_keys
+
 
 def xml_to_txt(filename):
     name = filename.split(".")[0]
     sed_command = r"sed '$d' < " + filename + r" | sed '1d' > " + name + ".txt"
     ps = subprocess.Popen(sed_command, shell=True, stdout=subprocess.PIPE)
     ps.communicate()
+
 
 def zero_vec(dim):
     vec = []
