@@ -12,7 +12,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from statsmodels.stats.contingency_tables import mcnemar
 
 import word2vec
-from temporal import tag_symptoms
+#from temporal import tag_symptoms
 
 def main():
     argparser = argparse.ArgumentParser()
