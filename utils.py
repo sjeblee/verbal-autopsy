@@ -12,19 +12,14 @@ import re
 from io import open
 import os
 
-import sys
 from lxml import etree
-import argparse
-import calendar
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
-import subprocess
 import time
 import math 
 import numpy as np
-from word2vec import load
-from word2vec import get
-
+import data_util
+from gensim.models import KeyedVectors, Word2Vec
 
 ###########################################################
 #**********************Parameters************************
@@ -44,6 +39,36 @@ from word2vec import get
 
 # In[3]:
 
+def timeSince(since):
+   now = time.time()
+   s = now - since
+   m = math.floor(s / 60)
+   s -= m * 60
+   return '%dm %ds' % (m, s)
+
+def get(word, model):
+    dim = model.vector_size
+    if word in model: #.wv.vocab:
+        return list(model[word])
+    else:
+        return data_util.zero_vec(dim)
+    #return model[word]
+    #return model.get_vector(word)
+
+def load(filename):
+    if '.bin' in filename:
+        model = load_bin_vectors(filename, True)
+    elif 'fasttext' in filename:
+        model = FastText.load(filename)
+    elif '.wtv' in filename:
+        model = Word2Vec.load(filename)
+    else:
+        model = load_bin_vectors(filename, False)
+    dim = model.vector_size
+    return model, dim
+def load_bin_vectors(filename, bin_vecs=True):
+    word_vectors = KeyedVectors.load_word2vec_format(filename, binary=bin_vecs, unicode_errors='ignore')
+    return word_vectors
 # cuda = torch.device("cuda:0")
 #         
 # all_categories = []
@@ -133,10 +158,26 @@ from word2vec import get
 #             max_num_word = len(word_list)
 # shuffle(l)
 # print("max_num_word: %s; max_num_char:%s" %(max_num_word,max_num_char))
+#def get_dic(fname,vocab):
+#    '''
+#    #get the dictionary for character embedding from pretrained files
+#    '''
+#    with open(fname) as f:
+#        content = f.readlines()
+#    content = [x.strip() for x in content]
+#    emb_dic = {}
+#    for i in range(len(content)):
+#        temp = content[i].split()
+#        if temp:
+#            letter = temp[0]
+#            if len(letter) > 4: #indication of a letter of space
+#                letter = ' '
+#                temp = [letter] + temp
+#            if letter in vocab:
+#                emb = [float(i) for i in temp[1:]]
+#                emb_dic[letter] = emb 
+#    return emb_dic
 def get_dic(fname,vocab):
-    '''
-    #get the dictionary for character embedding from pretrained files
-    '''
     with open(fname) as f:
         content = f.readlines()
     content = [x.strip() for x in content]

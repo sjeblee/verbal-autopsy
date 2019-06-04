@@ -37,6 +37,7 @@ def main():
     global cuda
     global labelencoder
     global num_word
+    global rec_type
     labelencoder = preprocessing.LabelEncoder()
     cuda = torch.device("cuda:0")
     train_mode = True
@@ -51,48 +52,47 @@ def main():
     modelfile = rec_type+"_model.pt"
     options_file = "https://s3-us-west-2.amazonaws.com/allennlp/models/elmo/contributed/pubmed/elmo_2x4096_512_2048cnn_2xhighway_options.json"
 #    weight_file = 'D:/projects/zhaodong/research/elmo_pubMed_only.hdf5'
-    weight_file = '/u/yanzhaod/data/va/elmo_pubMed_only.hdf5'
+    weight_file = '/u/yanzhaod/data/elmo_pubMed_only.hdf5'
     elmo = Elmo(options_file, weight_file, 1, dropout=0)
     elmo = elmo.to(cuda)
     
 
-#    input_train = "D:/projects/zhaodong/research/va/data/dataset/train_"+rec_type+"_cat.xml"  #input train file for char_embeeding
-#    input_test = "D:/projects/zhaodong/research/va/data/dataset/test_"+rec_type+"_cat.xml"      #input test file for char_embedding
-    input_train = "/u/yanzhaod/data/va/mds+rct/train_"+rec_type+"_cat_spell.xml"
-    input_test = "/u/yanzhaod/data/va/mds+rct/test_"+rec_type+"_cat_spell.xml"
-    if train_mode== True:
-        X,Y,label,ID = preprocess(input_train)
-        print("X: " + str(X.size()) +" Y: " + str(Y.shape))
-        model = cnn_model(X,Y,elmo,batch_size=batch_size,num_epochs=num_epochs,learning_rate=learning_rate)
-        torch.save(model, modelfile)
-    else:
-        model = torch.load(modelfile)
-    etime = time.time()
-    print("training took " + str(etime - stime) + " s")
-    testids, testlabels, predictedlabels = test(model,input_test,elmo)
-    print("Real Labels shape: " + str(testlabels))
-    print("Predicted Labels shape: " + str(predictedlabels))
-
-    f1score = metrics.f1_score(testlabels, predictedlabels, average='weighted')
-    precision = metrics.precision_score(testlabels, predictedlabels, average='weighted')
-    result  =[]
-    for j in range(len(testids)):
-        result.append({'Correct_ICD':testlabels[j],'Predicted_ICD':predictedlabels[j],'MG_ID':testids[j]})
-    recall = metrics.recall_score(testlabels, predictedlabels, average='weighted')
-    csmf_accuracy = stats_from_result(result)
-    print('precision: '+str(precision))
-    print('recall: '+str(recall))
-    print('f1score: '+str(f1score))
-    print('csmf_accuracy: '+str(csmf_accuracy))
-    result  =[]
-    for j in range(len(testids)):
-        result.append(str({'Correct_ICD':testlabels[j],'Predicted_ICD':predictedlabels[j],'MG_ID':testids[j]}))
+    f1scores = []
+    precisions = []
+    recalls = []
+    csmf = []
+    #--------------------Build model and train-----------------
+    for i in range(10):
+        input_train = "/u/yanzhaod/data/small_dataset/train_"+rec_type+"_"+str(i)+"_cat_spell.xml"  #input train file for char_embeeding
+        input_test = "/u/yanzhaod/data/small_dataset/test_"+rec_type+"_"+str(i)+"_cat_spell.xml"    #input test file for char_embedding
+        if train_mode== True:
+            X,Y,label,ID = preprocess(input_train)
+            print("X: " + str(X.size()) +" Y: " + str(Y.shape))
+            model = cnn_model(X,Y,elmo,batch_size=batch_size,num_epochs=num_epochs,learning_rate=learning_rate)
+            torch.save(model, modelfile)
+        else:
+            model = torch.load(modelfile)
+        etime = time.time()
+        print("training took " + str(etime - stime) + " s")
+        testids, testlabels, predictedlabels = test(model,input_test,elmo)
+        print("Real Labels shape: " + str(testlabels))
+        print("Predicted Labels shape: " + str(predictedlabels))
     
-
-
-    f = open('result_for_confusion_mat.txt','w')
-    f.write('\n'.join(result))
-    f.close()
+        f1score = metrics.f1_score(testlabels, predictedlabels, average='weighted')
+        precision = metrics.precision_score(testlabels, predictedlabels, average='weighted')
+        result  =[]
+        for j in range(len(testids)):
+            result.append({'Correct_ICD':testlabels[j],'Predicted_ICD':predictedlabels[j],'MG_ID':testids[j]})
+        recall = metrics.recall_score(testlabels, predictedlabels, average='weighted')
+        csmf_accuracy = stats_from_result(result)
+        print('precision: '+str(precision))
+        print('recall: '+str(recall))
+        print('f1score: '+str(f1score))
+        print('csmf_accuracy: '+str(csmf_accuracy))
+        f1scores.append(f1score)
+        precisions.append(precision)
+        recalls.append(recall)
+        csmf.append(csmf_accuracy)
 def preprocess(input_file):        
     data,all_categories = get_data(input_file)
     ID = []
@@ -121,7 +121,11 @@ def preprocess(input_file):
     labenc = labelencoder
     label = numpy.array(label)
     real_label = ['1', '10', '11', '12', '13', '14', '15', '16', '17', '18', '2', '3', '4', '5', '6', '7', '8', '9']
-    labenc.fit(real_label)
+    if rec_type == 'adult':
+        
+        labenc.fit(real_label)
+    else:
+        labenc.fit(label)
     Y = labenc.transform(label)
     Y = to_categorical(Y)
     return X,Y,label,ID
