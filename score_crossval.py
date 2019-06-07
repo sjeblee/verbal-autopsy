@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # Get average scores from cross-validation
 from __future__ import division
@@ -17,10 +17,10 @@ def main():
     args = argparser.parse_args()
 
     if not (args.infile and args.outfile):
-        print "usage: ./score_crossval.py --in [.../crossval] --out [crossval_results.csv]"
+        print('usage: ./score_crossval.py --in [.../crossval] --out [crossval_results.csv]')
         exit()
 
-    models = "nb,rf,svm,nn"
+    models = 'nb,rf,svm,nn'
     if args.models:
         models = args.models
     run(args.infile, args.outfile, models)
@@ -40,7 +40,7 @@ def run(arg_infile, arg_outfile, arg_models):
     metrics = [p, r, f1, pccc, csmfa]
 
     for model in models:
-        print "Getting scores for " + model
+        print('Getting scores for', model)
         neonate_scores = []
         child_scores = []
         adult_scores = []
@@ -60,10 +60,10 @@ def run(arg_infile, arg_outfile, arg_models):
                 elif fnmatch.fnmatch(f, '*all.narrc.stats'):
                     all_scores.append(get_scores(prefix + "/" + f))
         # Average the scores
-        print "adult scores: " + str(len(adult_scores))
-        print "child scores: " + str(len(child_scores))
-        print "neonate scores: " + str(len(neonate_scores))
-        print "all scores: " + str(len(all_scores))
+        print('adult scores:', str(len(adult_scores)))
+        print('child scores:', str(len(child_scores)))
+        print('neonate scores:', str(len(neonate_scores)))
+        print('all scores:', str(len(all_scores)))
         scores = {}
         scores['adult'] = []
         scores['child'] = []
@@ -97,7 +97,7 @@ def run(arg_infile, arg_outfile, arg_models):
     output.write("adult\n")
     for model in models:
         output.write(model + ",")
-        for x in range(0,5):
+        for x in range(0, 5):
             output.write(str(final_scores[model]['adult'][x]) + ",")
         output.write("\n")
 
@@ -105,7 +105,7 @@ def run(arg_infile, arg_outfile, arg_models):
     output.write("child\n")
     for model in models:
         output.write(model + ",")
-        for x in range(0,5):
+        for x in range(0, 5):
             output.write(str(final_scores[model]['child'][x]) + ",")
         output.write("\n")
 
@@ -113,7 +113,7 @@ def run(arg_infile, arg_outfile, arg_models):
     output.write("neonate\n")
     for model in models:
         output.write(model + ",")
-        for x in range(0,5):
+        for x in range(0, 5):
             output.write(str(final_scores[model]['neonate'][x]) + ",")
         output.write("\n")
 
@@ -195,4 +195,5 @@ def median_CI(scores, metric):
     upper_val = values[upper_index]
     return lower_val, upper_val
 
-if __name__ == "__main__":main()
+
+if __name__ == "__main__": main()
