@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # Extract features from the xml data
 # Feature names: keyword_bow, keyword_tfidf, narr_bow, narr_tfidf
@@ -16,10 +16,10 @@ def main():
         args = argparser.parse_args()
 
         if not (args.infile and args.outfile):
-            print "usage: ./extract_features.py --in [file.features] --out [file.features.resampled]"
+            print('usage: ./extract_features.py --in [file.features] --out [file.features.resampled]')
             exit()
 
-        name = "adasyn"
+        name = 'adasyn'
         if args.name:
                 name = args.name
         run(args.infile, args.outfile, name)
@@ -35,7 +35,7 @@ def run(arg_in, arg_out, arg_labels, arg_name="adasyn"):
 
         # Write output to file
         data_util.write_to_file(new_matrix, dict_keys, arg_out)
-                                                        
+
 def rebalance_data(matrix, dict_keys, labelname, rebal_name):
         # Construct feature vectors and label vector
         features = []
@@ -78,7 +78,7 @@ def rebalance_data(matrix, dict_keys, labelname, rebal_name):
                         new_entry[key] = val
                 new_entry[labelname] = label
                 new_matrix.append(new_entry)
-        return new_matrix       
+        return new_matrix
 
 def rebalance(features, labels, name="adasyn"):
         # Count the number of samples for each label
@@ -90,7 +90,7 @@ def rebalance(features, labels, name="adasyn"):
                         resample_dist[lab] = 1
 
         # Print original distribution
-        print "original distribution:"
+        print('original distribution:')
         for key in resample_dist.keys():
                 print str(key) + " : " + str(resample_dist[key])
 
@@ -103,21 +103,21 @@ def rebalance(features, labels, name="adasyn"):
         for x in range(0, 3):
                 val = resample_dist[keys[x]]
                 new_val = val + (val*(1/(x+1)))
-                print "rebalance class " + str(keys[x]) + ": " + str(val) + " -> " + str(new_val)
+                print('rebalance class', str(keys[x]), ':', str(val), ' -> ', str(new_val))
                 resample_dist[keys[x]] = min(new_val, max_items)
 
         # Print new distribution
-        print "new distribution:"
+        print('new distribution:')
         for key in resample_dist.keys():
                 print str(key) + " : " + str(resample_dist[key])
 
         x_resampled = []
         y_resampled = []
         if name == "smote" or name == "SMOTE":
-                print "smote"
+                print('smote')
                 x_resampled, y_resampled = SMOTE(ratio=resample_dist, k_neighbors=3, kind='svm').fit_sample(features, labels)
         else:
-                print "adasyn"
+                print('adasyn')
                 x_resampled, y_resampled = ADASYN(ratio=resample_dist, n_neighbors=3).fit_sample(features, labels)
 
         class1 = keys[-1]
@@ -127,7 +127,7 @@ def rebalance(features, labels, name="adasyn"):
 
         x_final = []
         y_final = []
-        print "Rebalanced data:"
+        print('Rebalanced data:')
         for z in range(len(y_resampled)):
                 label = y_resampled[z]
                 if (label == class1) and remove1 > 0:

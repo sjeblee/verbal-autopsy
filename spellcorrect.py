@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # Correct spelling in narrative
 
@@ -20,7 +20,7 @@ def main():
     args = argparser.parse_args()
 
     if not (args.infile and args.outfile):
-        print "usage: ./spellcorrect.py --in [file.xml] --out [outfile.xml] (--lm)"
+        print('usage: ./spellcorrect.py --in [file.xml] --out [outfile.xml] (--lm)')
         exit()
 
     if args.lm:
@@ -30,7 +30,7 @@ def main():
 
 def run(infile, outfile, arg_lm=False, fix_keywords=True):
     d = enchant.DictWithPWL("en_CA", "dictionary.txt")
-    mapping = {'labor':'labour', 'laborer':'labourer', 'color':'colour', 'yeras':'years', 'elergies':'allergies', 'around12':'around 12', 'learnt':'learned', 'rigor':'rigour', 'couldn':'couldn\'t', 'didnt':'didn\'t', 'didn':'didn\'t', 'neighbor':'neighbour', 'enjury':'injury', 'h/o':'h/o'}
+    mapping = {'labor': 'labour', 'laborer': 'labourer', 'color': 'colour', 'yeras': 'years', 'elergies': 'allergies', 'around12': 'around 12', 'learnt': 'learned', 'rigor': 'rigour', 'couldn': 'couldn\'t', 'didnt': 'didn\'t', 'didn':'didn\'t', 'neighbor':'neighbour', 'enjury':'injury', 'h/o':'h/o'}
 
     # Language model
     #lmfile = None
@@ -42,12 +42,12 @@ def run(infile, outfile, arg_lm=False, fix_keywords=True):
     # Get the xml from file
     tree = etree.parse(infile)
     root = tree.getroot()
-    
+
     for child in root:
         narr = ""
         keywords = ""
         node = child.find("narrative")
-        if node != None:
+        if node is not None:
             narr = node.text
 
         if narr is None or len(narr) > 0:
@@ -59,7 +59,7 @@ def run(infile, outfile, arg_lm=False, fix_keywords=True):
 
         # Fix spelling, unless it's a number or it's capitalized
         narr_words = re.findall(r"[\w']+|[.,!?;]", narr)
-        print "narr_words: " + str(narr_words)
+        print('narr_words:', str(narr_words))
         narr_fixed = ""
         prevwords = []
         prevn = 4
@@ -84,7 +84,7 @@ def run(infile, outfile, arg_lm=False, fix_keywords=True):
                     ngram = get_ngram(word, prevwords)
                     bestp = lm.score(ngram, bos=False, eos=False)
                     bested = 3
-                    print "orig: " + ngram + " : " + str(bestp)
+                    print('orig:', ngram, ':', str(bestp))
 
                     if arg_lm:
                         for s in sugg:
@@ -95,7 +95,7 @@ def run(infile, outfile, arg_lm=False, fix_keywords=True):
                                     bested = ed
                                 ngram = get_ngram(s, prevwords)
                                 prob = lm.score(ngram, bos=False, eos=False)
-                                print "try: " + ngram + " : " + str(prob)
+                                print('try:', ngram, ':', str(prob))
                                 if prob > bestp:
                                     bestp = prob
                                     bestw = s
@@ -109,14 +109,14 @@ def run(infile, outfile, arg_lm=False, fix_keywords=True):
                     del prevwords[0]
 
         # Save corrected narrative
-        if node == None:
+        if node is None:
             node = etree.Element("narrative")
         node.text = narr_fixed.strip()
         #child.append(narr_spell)
 
         # Fix keyword spelling
         if fix_keywords:
-            keywords = extract_features.get_keywords(child).replace(';',',')
+            keywords = extract_features.get_keywords(child).replace(';', ',')
             keywords = keywords.replace('|', ',')
             keywords_fixed = []
             for kw_phrase in keywords.strip().split(','):
@@ -140,7 +140,7 @@ def run(infile, outfile, arg_lm=False, fix_keywords=True):
                             ngram = get_ngram(word, prevwords)
                             bestp = lm.score(ngram, bos=False, eos=False)
                             bested = 3
-                            print "orig: " + ngram + " : " + str(bestp)
+                            print('orig:', ngram, ':', str(bestp))
                             if len(sugg) > 0 and editdistance.eval(word, sugg[0]) < bested:
                                 bestw = sugg[0]
                             print word + " -> " + bestw
