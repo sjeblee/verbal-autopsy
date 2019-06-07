@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # Extract features from the xml data
 # Feature names: keyword_bow, keyword_tfidf, narr_bow, narr_tfidf
@@ -19,34 +19,34 @@ def main():
     args = argparser.parse_args()
 
     if not (args.infile and args.outfile):
-        print "usage: ./raw2vector.py --input [file.xml] --output [outfile] --labels [labelname] --features [f1,f2,f3]"
-        print "labels: Final_code, ICD_cat"
-        print "features: checklist, kw_bow, kw_tfidf, kw_phrase, narr_bow, narr_tfidf"
+        print('usage: ./raw2vector.py --input [file.xml] --output [outfile] --labels [labelname] --features [f1,f2,f3]')
+        print('labels: Final_code, ICD_cat')
+        print('features: checklist, kw_bow, kw_tfidf, kw_phrase, narr_bow, narr_tfidf')
         exit()
 
-    labelname = "Final_code"
+    labelname = 'Final_code'
     if args.labelname:
         labelname = args.labelname
 
     global featurenames
-    rec_type = "type"
-    checklist = "checklist"
-    dem = "dem"
-    kw_phrase = "kw_phrase"
-    kw_bow = "kw_bow"
-    kw_tfidf ="kw_tfidf"
-    narr_bow = "narr_bow"
-    narr_count = "narr_count"
-    narr_tfidf = "narr_tfidf"
+    rec_type = 'type'
+    checklist = 'checklist'
+    dem = 'dem'
+    kw_phrase = 'kw_phrase'
+    kw_bow = 'kw_bow'
+    kw_tfidf = 'kw_tfidf'
+    narr_bow = 'narr_bow'
+    narr_count = 'narr_count'
+    narr_tfidf = 'narr_tfidf'
     featurenames = [checklist, kw_bow]
     if args.featurenames:
         featurenames = args.featurenames.split(',')
-    print "Features: " + str(featurenames)
+    print('Features:', str(featurenames))
 
-     # Ngram feature params
-     global min_ngram, max_ngram
-     min_ngram = 1
-     max_ngram = 2
+    # Ngram feature params
+    global min_ngram, max_ngram
+    min_ngram = 1
+    max_ngram = 2
 
     # Read in feature keys
     global keys
@@ -86,23 +86,22 @@ def main():
         for child in root:
             keyword_string = get_keywords(child)
             add_keywords(keywords, keyword_string, translate_table, stopwords)
-
-        print "Keywords: " + str(len(keywords))
+        print('Keywords:', str(len(keywords)))
 
     # NARRATIVE setup
     if narr_features:
         for child in root:
             narr_string = ""
             node = child.find("narrative")
-            if node != None:
+            if node is not None:
                 narr_string = node.text.encode("utf-8")
-            words = narr_string.lower().translate(string.maketrans("",""), string.punctuation).split(' ')
+            words = narr_string.lower().translate(string.maketrans("", ""), string.punctuation).split(' ')
             for word in words:
                 if word not in stopwords:
                     narrwords.add(word.strip())
 
-        print "Words: " + str(len(narrwords))
-        
+        print('Words:', str(len(narrwords)))
+
     # Extract features
     matrix = []
     for child in root:
@@ -113,12 +112,12 @@ def main():
 
         # CHECKLIST features
         for key in dict_keys:
-#            print "- key: " + key
+            #print "- key: " + key
             if key[0:3] == "CL_":
                 key = key[3:]
             item = child.find(key)
             value = "0"
-            if item != None:
+            if item is not None:
                 value = item.text
             if key == "AlcoholD" or key == "ApplytobaccoD":
                 if value == 'N':
@@ -129,7 +128,7 @@ def main():
         if kw_features:
             keyword_string = get_keywords(child)
             # Remove punctuation and trailing spaces from keywords
-            words = [s.strip().translate(string.maketrans("",""), string.punctuation) for s in keyword_string.split(',')]
+            words = [s.strip().translate(string.maketrans("", ""), string.punctuation) for s in keyword_string.split(',')]
             # Split keyword phrases into individual words
             for word in words:
                 w = word.split(' ')
@@ -144,14 +143,14 @@ def main():
                     elif kw_tfidf in featurenames:
                         value = 1
                 features["KW_" + keyword] = value
-                
+
         # NARRATIVE features
         if narr_features:
             narr_string = ""
             item = child.find("narrative")
-            if item != None:
+            if item is not None:
                 narr_string = item.text.encode("utf-8")
-            narr_words = [w.strip() for w in narr_string.lower().translate(string.maketrans("",""), string.punctuation).split(' ')]
+            narr_words = [w.strip() for w in narr_string.lower().translate(string.maketrans("", ""), string.punctuation).split(' ')]
             #features["narr_length"] = len(narr_words)
             ngrams = {}
             for word in narrwords:
@@ -163,7 +162,7 @@ def main():
 
                 value = 0
                 if word in narr_words:
-                    if "narr_bow" in featurenames:
+                    if 'narr_bow' in featurenames:
                         value = 1
                     else:
                         value = narr_words.count(word)
@@ -181,17 +180,17 @@ def main():
 
     # Convert counts to TFIDF
     if (narr_tfidf in featurenames) or (kw_tfidf in featurenames):
-        print "converting to tfidf..."
+        print('converting to tfidf...')
         count_matrix = []
         matrix_keys = []
         if usekeys:
             for ky in keys:
-                if "CL_" not in ky:
+                if 'CL_' not in ky:
                     matrix_keys.append(ky)
         else:
             for w in narrwords:
                 matrix_keys.append(w)
-        print "matrix_keys: " + str(len(matrix_keys))
+        print('matrix_keys:', str(len(matrix_keys)))
 
         matrix_keys = sorted(matrix_keys)
 
@@ -204,14 +203,14 @@ def main():
         tfidfTransformer = sklearn.feature_extraction.text.TfidfTransformer()
 
         # Use the training count matrix for fitting
-        if ("train" in args.infile):
+        if 'train' in args.infile:
             outf = open("temp.countmatrix", "w")
             outf.write(str(count_matrix))
             outf.close()
             tfidfTransformer.fit(count_matrix)
         else:
             if not os.path.exists("./temp.countmatrix"):
-                print "ERROR: train features must be computed first for idf matrix"
+                print('ERROR: train features must be computed first for idf matrix')
                 exit(1)
             train_count_matrix = []
             with open("temp.countmatrix", "r") as inf:
@@ -220,9 +219,9 @@ def main():
 
         # Convert matrix to tfidf
         tfidf_matrix = tfidfTransformer.transform(count_matrix)
-        print "count_matrix: " + str(len(count_matrix))
-        print "tfidf_matrix: " + str(tfidf_matrix.shape)
-            
+        print('count_matrix:', str(len(count_matrix)))
+        print('tfidf_matrix:', str(tfidf_matrix.shape))
+
         # Replace features in matrix with tfidf
         for x in range(len(matrix)):
             feat = matrix[x]
@@ -230,17 +229,17 @@ def main():
             #print "values: " + str(values.shape[0])
             for i in range(len(matrix_keys)):
                 key = matrix_keys[i]
-                val = tfidf_matrix[x,i]
+                val = tfidf_matrix[x, i]
                 feat[key] = val
 
     # Write the features to file
-    print "writing " + str(len(matrix)) + " feature vectors to file..."
+    print('writing', str(len(matrix)), 'feature vectors to file...')
     output = open(args.outfile, 'w')
     for feat in matrix:
         #print "ICD_cat: " + feat["ICD_cat"]
         output.write(str(feat) + "\n")
     output.close()
-    
+
     # Save feature keys
     if kw_features:
         for kw in keywords:
@@ -252,15 +251,15 @@ def main():
 
     kw_output = open(args.outfile + ".keys", "w")
     kw_output.write(str(dict_keys))
-    kw_output.close() 
+    kw_output.close()
 
 def get_keywords(elem):
     keyword_string = ""
     keywords1 = elem.find('CODINGKEYWORDS1')
-    if keywords1 != None:
+    if keywords1 is not None:
         keyword_string = keyword_string + keywords1.text.encode("utf-8")
     keywords2 = elem.find('CODINGKEYWORDS2')
-    if keywords2 != None:
+    if keywords2 is not None:
         if keyword_string != "":
             keyword_string = keyword_string + ","
         keyword_string = keyword_string + keywords2.text.encode("utf-8")
@@ -268,9 +267,9 @@ def get_keywords(elem):
 
 def add_keywords(keywords, keyword_string, translate_table, stopwords):
     for word in keyword_string.split(','):
-        word = word.translate(string.maketrans("",""), string.punctuation)
+        word = word.translate(string.maketrans("", ""), string.punctuation)
         w0 = word.strip()
-        if "kw_phrase" in featurenames:
+        if 'kw_phrase' in featurenames:
             w1 = ""
             for w in w0.split(' '):
                 w2 = w.strip().strip('-')
@@ -283,4 +282,5 @@ def add_keywords(keywords, keyword_string, translate_table, stopwords):
                 if w2 not in stopwords:
                     keywords.add(w2)
 
-if __name__ == "__main__":main()
+
+if __name__ == "__main__": main()
