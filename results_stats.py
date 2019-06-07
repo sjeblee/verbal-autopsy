@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # Generate distributional stats from results
 from __future__ import division
@@ -21,7 +21,7 @@ def main():
     args = argparser.parse_args()
 
     if not (args.infile and args.outfile):
-        print "usage: ./results_stats.py --in [file.results] --out [outfile.csv]"
+        print('usage: ./results_stats.py --in [file.results] --out [outfile.csv]')
         exit()
 
     rank = 1
@@ -56,12 +56,12 @@ def run(arg_infile, arg_outfile, arg_rank=1, arg_dist=False, arg_top=False):
             correct.append(cor)
             print('pred:', pred, 'cor:', cor)
 
-            if labels_correct.has_key(cor):
+            if cor in labels_correct:
                 labels_correct[cor] = labels_correct[cor] + 1
             else:
                 labels_correct[cor] = 1
 
-            if labels_pred.has_key(pred):
+            if pred in labels_pred:
                 labels_pred[pred] = labels_pred[pred] + 1
             else:
                 labels_pred[pred] = 1
@@ -70,8 +70,8 @@ def run(arg_infile, arg_outfile, arg_rank=1, arg_dist=False, arg_top=False):
     fn = 0    # False negatives
     n = len(correct)
     num_classes = len(labels_correct.keys())
-    print "n: " + str(n)
-    print "num_classes: " + str(num_classes)
+    print('n:', str(n))
+    print('num_classes:', str(num_classes))
 
     # Calculate tp
     for x in range(n):
@@ -81,7 +81,7 @@ def run(arg_infile, arg_outfile, arg_rank=1, arg_dist=False, arg_top=False):
             tp = tp +1
 
             # Compute True Positive for each class
-            if true_pos.has_key(cor):
+            if cor in true_pos:
                 true_pos[cor] = true_pos[cor] + 1
             else:
                 true_pos[cor] = 1
@@ -89,24 +89,24 @@ def run(arg_infile, arg_outfile, arg_rank=1, arg_dist=False, arg_top=False):
             fn = fn +1
 
             # Computer False Positive and False Negative for each class
-            if false_pos.has_key(pred):
+            if pred in false_pos:
                 false_pos[pred] = false_pos[pred] + 1
             else:
                 false_pos[pred] = 1
 
-            if false_neg.has_key(cor):
+            if cor in false_neg:
                 false_neg[cor] = false_neg[cor] + 1
             else:
                 false_neg[cor] = 1
 
     for key in true_pos.keys():
-        print "True positive for class " + str(key) + " is " + str(true_pos[key])
+        print('True positive for class', str(key), 'is', str(true_pos[key]))
 
     for key in false_pos.keys():
-        print "False positive for class " + str(key) + " is " + str(false_pos[key])
+        print('False positive for class', str(key), 'is', str(false_pos[key]))
 
     for key in false_neg.keys():
-        print "False negative for class " + str(key) + " is " + str(false_neg[key])
+        print('False negative for class', str(key), 'is', str(false_neg[key]))
 
     # Calculate CSMF accuracy
     csmf_pred = {}
@@ -114,7 +114,7 @@ def run(arg_infile, arg_outfile, arg_rank=1, arg_dist=False, arg_top=False):
     csmf_corr_min = 1
     csmf_sum = 0
     for key in labels_correct.keys():
-        if not labels_pred.has_key(key):
+        if key not in labels_pred:
             labels_pred[key] = 0
         num_corr = labels_correct[key]
         num_pred = labels_pred[key]
@@ -135,14 +135,14 @@ def run(arg_infile, arg_outfile, arg_rank=1, arg_dist=False, arg_top=False):
     dist_corr = []
     keys = labels_correct.keys()
 
-    print "Probability Distribution: "
+    print('Probability Distribution:')
     for key in keys:
         pred_prob = labels_pred[key] / n
         corr_prob = labels_correct[key] / n
         dist_pred.append(pred_prob)
         dist_corr.append(corr_prob)
-        print "Correct probabilty for class " + str(key) + " is" + str(corr_prob)
-        print "Predicted probabilty for class " + str(key) + " is" + str(pred_prob)
+        print('Correct probabilty for class', str(key), 'is', str(corr_prob))
+        print('Predicted probabilty for class', str(key), 'is', str(pred_prob))
 
     kl_divergence_f = stats.entropy(dist_corr, dist_pred)
     kl_divergence_r = stats.entropy(dist_pred, dist_corr)
@@ -161,9 +161,9 @@ def run(arg_infile, arg_outfile, arg_rank=1, arg_dist=False, arg_top=False):
         #temp_precision = metrics.precision_score(correct, predicted, labels = key, average='weighted')
         #temp_recall = metrics.recall_score(correct, predicted, labels = key, average='weighted')
         #temp_f1 = metrics.f1_score(correct, predicted, labels = key, average='weighted')
-        this_tp = true_pos[key] if true_pos.has_key(key) else 0
-        this_fp = false_pos[key] if false_pos.has_key(key) else 0
-        this_fn = false_neg[key] if false_neg.has_key(key) else 0
+        this_tp = true_pos[key] if key in true_pos else 0
+        this_fp = false_pos[key] if key in false_pos else 0
+        this_fn = false_neg[key] if key in false_neg else 0
         if (this_tp + this_fp != 0):
             this_precision = this_tp / (this_tp + this_fp)
         else:
@@ -179,16 +179,16 @@ def run(arg_infile, arg_outfile, arg_rank=1, arg_dist=False, arg_top=False):
         else:
             this_f1 = 0
 
-        print "----------------------------------------------------------"
-        print "Accuracy for class " + str(key) + ":"
-        print "		Precision : " + str(this_precision)
-        print "		Recall : " + str(this_recall)
-        print "		F1 : " + str(this_f1)
-        print "		Total Correct : " + str(labels_correct[key])
-        print "		Total Predict : " + str(labels_pred[key])
-        print "		True Positive : " + str(this_tp)
-        print "		False Positive : " + str(this_fp)
-        print "		False Negative : " + str(this_fn)
+        print('----------------------------------------------------------')
+        print('Accuracy for class', str(key), ':')
+        print('		Precision :', str(this_precision))
+        print('		Recall :', str(this_recall))
+        print('		F1 :', str(this_f1))
+        print('		Total Correct :', str(labels_correct[key]))
+        print('		Total Predict :', str(labels_pred[key]))
+        print('		True Positive :', str(this_tp))
+        print('		False Positive :', str(this_fp))
+        print('		False Negative :', str(this_fn))
 
     # PCCC
     pccc = ((tp/n) - (k/num_classes)) / (1 - (k/num_classes))
@@ -211,27 +211,27 @@ def run(arg_infile, arg_outfile, arg_rank=1, arg_dist=False, arg_top=False):
         confusion_percent.append(row_percent)
 
     # Print metrics to terminal
-    print "Per class metrics:"
-    print "P, R, F1"
+    print('Per class metrics:')
+    print('P, R, F1')
     for x in range(len(p_scores)):
-        print str(p_scores[x]) + "," + str(r_scores[x]) + "," + str(f1_scores[x]) + "\n"
+        print(str(p_scores[x]), ",", str(r_scores[x]), ",", str(f1_scores[x]), "\n")
 
-    print "Metrics:\n"
-    print "p: " + str(precision) + "\n"
-    print "r: " + str(recall) + "\n"
+    print('Metrics:\n')
+    print('p:', str(precision), '\n')
+    print('r:', str(recall), "\n")
     #print "total_r: " + str(total_recall) + "\n"
-    print "f1: " + str(f1) + "\n"
-    print "pccc: " + str(pccc) + "\n"
-    print "csmf accuracy: " + str(csmf_accuracy) + "\n"
+    print('f1:', str(f1), '\n')
+    print('pccc:', str(pccc), "\n")
+    print('csmf accuracy:', str(csmf_accuracy), "\n")
 
-    print "KL divergence forward: " + str(kl_divergence_f) + "\n"
-    print "KL divergence reverse: " + str(kl_divergence_r) + "\n"
+    print('KL divergence forward:', str(kl_divergence_f), "\n")
+    print('KL divergence reverse:', str(kl_divergence_r), "\n")
 
     # write the stats to file
     output = open(arg_outfile, "w")
     output.write("precision," + str(precision) + "\nrecall," + str(recall) + "\nf1," + str(f1) + "\npccc," + str(pccc) + "\ncsmf_accuracy," + str(csmf_accuracy) + "\n")
 
-    output.write("confusion_matrix")
+    output.write('confusion_matrix')
     keys = sorted(labels_correct.keys())
     for key in keys:
         output.write("," + key)
@@ -245,7 +245,7 @@ def run(arg_infile, arg_outfile, arg_rank=1, arg_dist=False, arg_top=False):
         output.write("\n")
 
     # Percentage confusion matrix
-    output.write("confusion_matrix_percent")
+    output.write('confusion_matrix_percent')
     for key in keys:
         output.write("," + key)
     output.write("\n")
@@ -267,4 +267,5 @@ def run(arg_infile, arg_outfile, arg_rank=1, arg_dist=False, arg_top=False):
         output.write(key + "," + str(labels_correct[key]) + "\n")
     output.close()
 
-if __name__ == "__main__":main()
+
+if __name__ == "__main__": main()
