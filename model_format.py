@@ -207,123 +207,375 @@ class CNN_ELMO(nn.Module):
         etime = time.time()
         print("testing took " + str(etime - stime) + " s")
         return y_pred
-class CNN_Text(nn.Module):
-    def __init__(self, embed_dim, class_num, kernel_num=200, kernel_sizes=5, dropout=0.0, hidden_size = 100, USE_SERVER=False):
-        super(CNN_Text, self).__init__()
-#          if USE_SERVER:
-#              wmodel,dim = load('/u/yanzhaod/data/va/mds+rct/narr+ice+medhelp.vectors.100')
-#          else:
-#              wmodel,dim = load('D:/projects/zhaodong/research/va/data/dataset/narr+ice+medhelp.vectors.100')
-#          self.wmodel = wmodel
-        D = embed_dim
-        C = class_num
-        Ci = 1
-        Co = kernel_num
-        Ks = kernel_sizes
-        self.conv11 = nn.Conv2d(Ci, Co, (1, D))
-        self.conv12 = nn.Conv2d(Ci, Co, (2, D))
-        self.conv13 = nn.Conv2d(Ci, Co, (3, D))
-        self.conv14 = nn.Conv2d(Ci, Co, (4, D))
-        self.conv15 = nn.Conv2d(Ci, Co, (5, D))
+
+#class CNN_CONC(nn.Module):
+#     def __init__(self, embed_dim, class_num, kernel_num=200, kernel_sizes=5, dropout=0.0, ensemble=False, hidden_size=100,USE_SERVER=False):
+#          super(CNN_CONC, self).__init__()
+#          D = embed_dim
+#          C = class_num
+#          Ci = 1
+#          Co = kernel_num
+#          Ks = kernel_sizes
+#          self.ensemble = ensemble
+#          self.conv11 = nn.Conv2d(Ci, Co, (1, D))
+#          self.conv12 = nn.Conv2d(Ci, Co, (2, D))
+#          self.conv13 = nn.Conv2d(Ci, Co, (3, D))
+#          self.conv14 = nn.Conv2d(Ci, Co, (4, D))
+#          self.conv15 = nn.Conv2d(Ci, Co, (5, D))
+#          #self.conv16 = nn.Conv2d(Ci, Co, (6, D))
+#          #self.conv17 = nn.Conv2d(Ci, Co, (7, D))
+#          #self.conv18 = nn.Conv2d(Ci, Co, (8, D))
+#
+#          self.dropout = nn.Dropout(dropout)
+#          self.kernel_sizes = kernel_sizes
+#          self.fc1 = nn.Linear(Co*Ks, C) # Use this layer when train with only CNN model, i.e. No ensemble 
+#	  
+#     def conv_and_pool(self, x, conv):
+#          x = F.relu(conv(x)).squeeze(3)  # (N, Co, W)
+#          x = F.max_pool1d(x, x.size(2)).squeeze(2)
+#          return x
+#	  
+#
+#     def forward(self, x):
+#          x = x.unsqueeze(1)  # (N, Ci, W, D)] 
+#          x1 = self.conv_and_pool(x,self.conv11) #(N,Co)
+#          x2 = self.conv_and_pool(x,self.conv12) #(N,Co)
+#          x3 = self.conv_and_pool(x,self.conv13) #(N,Co)
+#          x4 = self.conv_and_pool(x,self.conv14) #(N,Co)
+#          x5 = self.conv_and_pool(x,self.conv15) #(N,Co)
+#          #x6 = self.conv_and_pool(x,self.conv16) #(N,Co)
+#          #x7 = self.conv_and_pool(x,self.conv17) 
+#          #x8 = self.conv_and_pool(x,self.conv18)
+#          x = torch.cat((x1, x2, x3, x4, x5), 1)
+#          
+#          x = self.dropout(x)  # (N, len(Ks)*Co)
+#          return x
+#     def fit(self, X, Y,batch_size=16,num_epochs=12,learning_rate=0.001,DEBUG=False):
+#         st=time.time()
+#         Xarray = X
+#         Yarray = Y.astype('int') 
+#         print("X numpy shape: ", str(Xarray.shape), "Y numpy shape:", str(Yarray.shape))
+#         X_len = Xarray.shape[0]
+#         num_epochs = num_epochs
+#         steps = 0
+#         batch_size = 100
+##         num_batches = math.ceil(X_len/batch_size)
+#         learning_rate = 0.001
+#
+#         if use_cuda:
+#         	self = self.cuda()
+#    
+#        # Train
+#         optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
+#         steps = 0
+#         self.train()
+#         for epoch in range(num_epochs):
+#             print("epoch", str(epoch))
+#             i = 0
+#             numpy.random.seed(seed=1)
+#             permutation = torch.from_numpy(numpy.random.permutation(X_len)).long()
+#             Xiter = Xarray[permutation]
+#             Yiter = Yarray[permutation]
+#     
+#             while i+batch_size < X_len:
+#                  batchX = Xiter[i:i+batch_size]
+#                  batchY = Yiter[i:i+batch_size]
+#                  Xtensor = torch.from_numpy(batchX).float()
+#                  Ytensor = torch.from_numpy(batchY).long()
+#                  if use_cuda:
+#                       Xtensor = Xtensor.cuda()
+#                       Ytensor = Ytensor.cuda()
+#                  feature = Variable(Xtensor)
+#                  target = Variable(Ytensor)
+#                  i = i+batch_size
+#     
+#                  optimizer.zero_grad() 
+#                  logit = self(feature)
+#     
+#                  loss = F.cross_entropy(logit, torch.max(target,1)[1])
+#                  loss.backward()
+#                  optimizer.step()
+#    
+#                  steps += 1
+#     
+#            # Print epoch time
+#             ct = time.time() - st
+#             unit = "s"
+#             if ct > 60:
+#                 ct = ct/60
+#                 unit = "m"
+#             print("time so far: ", str(ct), unit)
+#
+#     def predict(self, testX, batch_size=16, keep_list=True, return_encodings=False,num_word=200):
+##        testX = numpy.asarray(testX).astype('float')
+#        y_pred = []
+#        logsoftmax = nn.LogSoftmax(dim=1)
+#        for x in range(len(testX)):
+#           input_row = testX[x]
+#           icd = None
+#           if icd is None:
+#               input_tensor = torch.from_numpy(numpy.asarray([input_row]).astype('float')).float()
+#               input_tensor = input_tensor.contiguous().cuda()
+#               icd_var = self.forward(Variable(input_tensor))
+#               # Softmax and log softmax values
+#               icd_vec = logsoftmax(icd_var)
+#    #           icd_vec_softmax = softmax(icd_var)
+#               icd_code = torch.max(icd_vec, 1)[1].data[0]
+#           icd_code = icd_code.item()
+#           y_pred.append(icd_code)
+#        return y_pred  # Comment this line out if threshold is not in used. 
+        
+#import math
+#import numpy
+#import os
+#import random
+#import time
+#import torch
+#import torch.nn as nn
+#from torch.autograd import Variable
+#from torch import optim
+#import torch.nn.functional as F
+##import matplotlib.pyplot as plt
+##import matplotlib.ticker as ticker
+#
+#import pickle
+#
+#numpy.set_printoptions(threshold=numpy.inf)
+#use_cuda = torch.cuda.is_available()
+#class CNN_CONC(nn.Module):
+#     def __init__(self, embed_dim, class_num, kernel_num=200, kernel_sizes=5, dropout=0.0, ensemble=False, hidden_size=100,USE_SERVER=False):
+#          super(CNN_CONC, self).__init__()
+#          D = embed_dim
+#          C = class_num
+#          Ci = 1
+#          Co = kernel_num
+#          Ks = kernel_sizes
+#          self.ensemble = ensemble
+#          self.conv11 = nn.Conv2d(Ci, Co, (1, D))
+#          self.conv12 = nn.Conv2d(Ci, Co, (2, D))
+#          self.conv13 = nn.Conv2d(Ci, Co, (3, D))
+#          self.conv14 = nn.Conv2d(Ci, Co, (4, D))
+#          self.conv15 = nn.Conv2d(Ci, Co, (5, D))
+#
+#          self.dropout = nn.Dropout(dropout)
+#          self.kernel_sizes = kernel_sizes
+#          self.fc1 = nn.Linear(Co*Ks, C) # Use this layer when train with only CNN model, i.e. No ensemble 
+#	  
+#     def conv_and_pool(self, x, conv):
+#          x = F.relu(conv(x)).squeeze(3)  # (N, Co, W)
+#          x = F.max_pool1d(x, x.size(2)).squeeze(2)
+#          return x
+#      
+#     def forward(self, x):
+#          x = x.unsqueeze(1)  # (N, Ci, W, D)] 
+#          x1 = self.conv_and_pool(x,self.conv11) #(N,Co)
+#          x2 = self.conv_and_pool(x,self.conv12) #(N,Co)
+#          x3 = self.conv_and_pool(x,self.conv13) #(N,Co)
+#          x4 = self.conv_and_pool(x,self.conv14) #(N,Co)
+#          x5 = self.conv_and_pool(x,self.conv15) #(N,Co)
+#          x = torch.cat((x1, x2, x3, x4, x5), 1)
+#          x = self.dropout(x)  # (N, len(Ks)*Co)
+#          return x
+#      
+#     def fit(self, X, Y,batch_size=16,num_epochs=12,learning_rate=0.001,DEBUG=False):
+#        st = time.time()
+#        Xarray = numpy.asarray(X).astype('float')
+#        Yarray = Y.astype('int') 
+#        print("X numpy shape: ", str(Xarray.shape), "Y numpy shape:", str(Yarray.shape))
+#    
+#        # Params
+#        X_len = Xarray.shape[0]
+#        num_epochs = num_epochs
+#        num_labels = Yarray.shape[-1]
+#        steps = 0
+#        self.cuda()
+#    #    print(Xarray.shape,X2array.shape,Yarray.shape,11111)  #(1580, 200, 100) (1580, 1484, 30) (1580, 9)
+#        # Train
+#        optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
+#    
+#        steps = 0
+#       # cnn.train()
+#        for epoch in range(num_epochs):
+#            print("epoch", str(epoch))
+#            i = 0
+#            numpy.random.seed(seed=1)
+#            permutation = torch.from_numpy(numpy.random.permutation(X_len)).long()
+#            Xiter = Xarray[permutation]
+#            Yiter = Yarray[permutation]
+#    
+#            while i+batch_size < X_len:
+#                 batchX = Xiter[i:i+batch_size]
+#                 batchY = Yiter[i:i+batch_size]
+#                 Xtensor = torch.from_numpy(batchX).float()
+#                 Xtensor.contiguous()
+#    
+#                 Ytensor = torch.from_numpy(batchY).long()
+#    #             print("Ytensorsize",Ytensor.size())
+#                 Xtensor = Xtensor.cuda()
+#                 Ytensor = Ytensor.cuda()
+#    
+#                 target = Variable(Ytensor)
+#                 i = i+batch_size
+#    
+#                 optimizer.zero_grad() 
+#                 logit = self(Variable(Xtensor))
+#    #             print(logit.size())  #[100,9]
+#                 loss = F.cross_entropy(logit, torch.max(target,1)[1])
+#                 print(loss)
+#                 loss.backward()
+#                 optimizer.step()
+#    
+#                 steps += 1
+#     
+#            # Print epoch time
+#            ct = time.time() - st
+#            unit = "s"
+#            if ct > 60:
+#                ct = ct/60
+#                unit = "m"
+#            print("time so far: ", str(ct), unit)
+#     def predict(self, testX, batch_size=16, keep_list=True, return_encodings=False,num_word=200):
+##        testX = numpy.asarray(testX).astype('float')
+#        y_pred = []
+#        logsoftmax = nn.LogSoftmax(dim=1)
+#        for x in range(len(testX)):
+#           input_row = testX[x]
+#           icd = None
+#           if icd is None:
+#               input_tensor = torch.from_numpy(numpy.asarray([input_row]).astype('float')).float()
+#               input_tensor = input_tensor.contiguous().cuda()
+#               icd_var = self.forward(Variable(input_tensor))
+#               # Softmax and log softmax values
+#               icd_vec = logsoftmax(icd_var)
+#    #           icd_vec_softmax = softmax(icd_var)
+#               icd_code = torch.max(icd_vec, 1)[1].data[0]
+#           icd_code = icd_code.item()
+#           y_pred.append(icd_code)
+#        return y_pred  # Comment this line out if threshold is not in used. 
+class CNN_TEXT(nn.Module):
+
+     def __init__(self, embed_dim, class_num, kernel_num=200, kernel_sizes=6, dropout=0.25, ensemble=False, hidden_size = 100):
+          super(CNN_TEXT, self).__init__()
+          D = embed_dim
+          C = class_num
+          Ci = 1
+          Co = kernel_num
+          Ks = kernel_sizes
+          self.ensemble = ensemble
+          self.conv11 = nn.Conv2d(Ci, Co, (1, D))
+          self.conv12 = nn.Conv2d(Ci, Co, (2, D))
+          self.conv13 = nn.Conv2d(Ci, Co, (3, D))
+          self.conv14 = nn.Conv2d(Ci, Co, (4, D))
+          self.conv15 = nn.Conv2d(Ci, Co, (5, D))
           #self.conv16 = nn.Conv2d(Ci, Co, (6, D))
           #self.conv17 = nn.Conv2d(Ci, Co, (7, D))
           #self.conv18 = nn.Conv2d(Ci, Co, (8, D))
 
-        self.dropout = nn.Dropout(dropout)
-        self.fc1 = nn.Linear(Co*Ks, C) # Use this layer when train with only CNN model, i.e. No ensemble 
+          self.dropout = nn.Dropout(dropout)
+          self.fc1 = nn.Linear(Co*Ks, C) # Use this layer when train with only CNN model, i.e. No ensemble 
 	  
-    def conv_and_pool(self, x, conv):
-         x = F.relu(conv(x)).squeeze(3)  # (N, Co, W)
-         x = F.max_pool1d(x, x.size(2)).squeeze(2)
-         return x
-     
+     def conv_and_pool(self, x, conv):
+#          print(x.size(),555555)
+#          print(conv(x).size(),22222) #torch.Size([16, 1, 1000, 37])
+          x = F.relu(conv(x)).squeeze(3)  # (N, Co, W)
+#          print(x.size(),333333) #torch.Size([16, 1, 1000, 37])
+          x = F.max_pool1d(x, x.size(2)).squeeze(2)
+#          print(x.size(),11111) #torch.Size([16, 1, 1000, 37])
+          return x
+	  
 
-    def forward(self, x):
-        x = x.unsqueeze(1)  # (N, Ci, W, D)] 
-        x1 = self.conv_and_pool(x,self.conv11) #(N,Co)
-        x2 = self.conv_and_pool(x,self.conv12) #(N,Co)
-        x3 = self.conv_and_pool(x,self.conv13) #(N,Co)
-        x4 = self.conv_and_pool(x,self.conv14) #(N,Co)
-        x5 = self.conv_and_pool(x,self.conv15) #(N,Co)
-        x = torch.cat((x1, x2, x3, x4, x5), 1)
-        x = self.dropout(x)  # (N, len(Ks)*Co)
-        return x
-    def fit(self, X, Y,batch_size=16,num_epochs=12,learning_rate=0.001):
-        st = time.time()
-        Y = to_categorical(Y)
-        if debug: 
-            print("X numpy shape: ", str(X.shape), "Y numpy shape:", str(Y.shape))
-        X_len = X.shape[0]
-        dim = X.shape[-1]
-        num_labels = Y.shape[-1]
-        num_epochs = num_epochs
-        steps = 0
-#          best_acc = 0
-#          last_step = 0
-#          log_interval = 1000
-#          num_batches = math.ceil(X_len/batch_size)
-        if use_cuda:
-            self.to(cuda)
+     def forward(self, x):
+#          print(a.size(),b.size(),51) #torch.Size([1, 200, 100]) torch.Size([1, 1484, 30])
+          x = x.unsqueeze(1)  # (N, Ci, W, D)] 
+          x1 = self.conv_and_pool(x,self.conv11) #(N,Co)
+          x2 = self.conv_and_pool(x,self.conv12) #(N,Co)
+          x3 = self.conv_and_pool(x,self.conv13) #(N,Co)
+          x4 = self.conv_and_pool(x,self.conv14) #(N,Co)
+          x5 = self.conv_and_pool(x,self.conv15) #(N,Co)
+          #x6 = self.conv_and_pool(x,self.conv16) #(N,Co)
+          #x7 = self.conv_and_pool(x,self.conv17) 
+          #x8 = self.conv_and_pool(x,self.conv18)
+          x = torch.cat((x1, x2, x3, x4, x5), 1)
+          
+          x = self.dropout(x)  # (N, len(Ks)*Co)
+          if self.ensemble == False: # Train CNN with no ensemble  
+              logit = self.fc1(x)  # (N, C)
+          else: # Train CNN with ensemble. Output of CNN will be input of another model
+              logit = x
+          return logit
+     def fit(self,X,Y,emb_dim,batch_size=100,learning_rate=0.001,n_hidden=100,num_epochs=10, loss_func='categorical_crossentropy',dropout=0.0, kernel_sizes=5):
+            st = time.time()
+            Xarray = numpy.asarray(X).astype('float')
+            Yarray = Y.astype('int') 
+            print("X numpy shape: ", str(Xarray.shape), "Y numpy shape:", str(Yarray.shape))
         
-    # Train
-        optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
-
-        steps = 0
-        for epoch in range(num_epochs):
-            print("epoch", str(epoch))
-            i = 0
-            numpy.random.seed(seed=1)
-            permutation = torch.from_numpy(numpy.random.permutation(X_len)).long()
-            Xiter = X[permutation]
-            Yiter = Y[permutation]
-
-            while i+batch_size < X_len:
-                batchX = Xiter[i:i+batch_size]
-                batchY = Yiter[i:i+batch_size]
-                Xtensor = torch.from_numpy(batchX).float()
-                Ytensor = torch.from_numpy(batchY).long()
-                if use_cuda:
-                    Xtensor = Xtensor.cuda()
-                    Ytensor = Ytensor.cuda()
-                feature = Variable(Xtensor)
-                target = Variable(Ytensor)
-                i = i+batch_size
-                optimizer.zero_grad() 
-                logit = self(feature)
-    
-                loss = F.cross_entropy(logit, torch.max(target,1)[1])
-                loss.backward()
-                optimizer.step()
-    
-            steps += 1
-            print(timeSince(st))
-    def predict(self, testX, batch_size=16, keep_list=True, return_encodings=False,num_word=200):
+            # Params
+            X_len = Xarray.shape[0]
+            num_epochs = num_epochs
+            num_labels = Yarray.shape[-1]
+            steps = 0
+#            model = CNN_Comb_Text(emb_dim, num_labels,dropout=dropout, kernel_sizes=kernel_sizes)
+            self.cuda()
+        #    print(Xarray.shape,X2array.shape,Yarray.shape,11111)  #(1580, 200, 100) (1580, 1484, 30) (1580, 9)
+            # Train
+            optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
+        
+            steps = 0
+           # cnn.train()
+            for epoch in range(num_epochs):
+                print("epoch", str(epoch))
+                i = 0
+                numpy.random.seed(seed=1)
+                permutation = torch.from_numpy(numpy.random.permutation(X_len)).long()
+                Xiter = Xarray[permutation]
+                Yiter = Yarray[permutation]
+        
+                while i+batch_size < X_len:
+                     batchX = Xiter[i:i+batch_size]
+                     batchY = Yiter[i:i+batch_size]
+                     Xtensor = torch.from_numpy(batchX).float()
+                     Xtensor.contiguous()
+        
+                     Ytensor = torch.from_numpy(batchY).long()
+        #             print("Ytensorsize",Ytensor.size())
+                     Xtensor = Xtensor.cuda()
+                     Ytensor = Ytensor.cuda()
+        
+                     target = Variable(Ytensor)
+                     i = i+batch_size
+        
+                     optimizer.zero_grad() 
+                     logit = self(Variable(Xtensor))
+        #             print(logit.size())  #[100,9]
+                     loss = F.cross_entropy(logit, torch.max(target,1)[1])
+                     print(loss)
+                     loss.backward()
+                     optimizer.step()
+        
+                     steps += 1
+         
+                # Print epoch time
+                ct = time.time() - st
+                unit = "s"
+                if ct > 60:
+                    ct = ct/60
+                    unit = "m"
+                print("time so far: ", str(ct), unit)
+     def predict(self,testX):
         y_pred = []
         logsoftmax = nn.LogSoftmax(dim=1)
-        i = 0
-        while True: 
-            Xtensor = torch.from_numpy(testX).float()
-            if i+batch_size<Xtensor.size(0):
-#        print(i)
-                Xtensor = Xtensor[i:i+batch_size]
-            else: 
-                Xtensor = Xtensor[i:]
-#            print(type(Xtensor))
-            if use_cuda:
-                Xtensor = Xtensor.to(cuda)
-            Xtensor.contiguous()
-
-            icd_var = self(Variable(Xtensor))   
-            icd_vec = logsoftmax(icd_var)
-            for j in range(icd_vec.size(0)):
-#            print('icd_vec',icd_vec[i,:].size())
-                icd_code = torch.max(icd_vec[j:j+1,:], 1)[1].data[0]
-                icd_code = icd_code.item()
-                y_pred.append(icd_code)
-            i = i+batch_size
-            if i >= testX.shape[0]:
-                break
-            
-        return y_pred
-         
-     
+        for x in range(len(testX)):
+           input_row = testX[x]
+           icd = None
+           if icd is None:
+               input_tensor = torch.from_numpy(numpy.asarray([input_row]).astype('float')).float()
+               input_tensor = input_tensor.contiguous().cuda()
+#               self.cuda()
+               icd_var = self(Variable(input_tensor))
+               # Softmax and log softmax values
+               icd_vec = logsoftmax(icd_var)
+    #           icd_vec_softmax = softmax(icd_var)
+               icd_code = torch.max(icd_vec, 1)[1].data[0]
+           icd_code = icd_code.item()
+           y_pred.append(icd_code)
+        return y_pred  # Comment this line out if threshold is not in used. 

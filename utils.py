@@ -20,7 +20,11 @@ import math
 import numpy as np
 import data_util
 from gensim.models import KeyedVectors, Word2Vec
-
+from sklearn import metrics
+from sklearn.metrics import precision_score
+from sklearn.metrics import recall_score
+from sklearn.metrics import precision_score
+from sklearn.metrics import f1_score
 ###########################################################
 #**********************Parameters************************
 #cuda -> the selected gpu
@@ -177,6 +181,75 @@ def load_bin_vectors(filename, bin_vecs=True):
 #                emb = [float(i) for i in temp[1:]]
 #                emb_dic[letter] = emb 
 #    return emb_dic
+def save_numpy(variables,filenames):
+    '''input:
+        variables: a list of numpy arrays
+        filenames: list of paths corresponds to the path of the np arrays
+        variables and filenames shares the same length
+    '''
+    for i in range(len(variables)):
+        np.save(filenames[i],variables[i])
+    return
+def load_numpy(filenames):
+    l = []
+    for file in filenames:
+        l.append(np.load(file))
+    return tuple(l) 
+def stats_from_results(testlabels,predictedlabels,testids,PRINT=True):
+    f1score = metrics.f1_score(testlabels, predictedlabels, average='weighted')
+    precision = metrics.precision_score(testlabels, predictedlabels, average='weighted')
+    recall = metrics.recall_score(testlabels, predictedlabels, average='weighted')
+    result  =[]
+    for j in range(len(testids)):
+        result.append({'Correct_ICD':testlabels[j],'Predicted_ICD':predictedlabels[j],'MG_ID':testids[j]})
+    csmf_accuracy = get_csmf_acc(result)
+    if PRINT:
+        print('precision: '+str(precision))
+        print('recall: '+str(recall))
+        print('f1score: '+str(f1score))
+        print('csmf_accuracy: '+str(csmf_accuracy))
+    return precision, recall, f1score, csmf_accuracy
+def get_csmf_acc(result):
+    labels_correct = {}
+    labels_pred = {}
+    correct = []
+    predicted = []
+    for res in result:
+        pred = res['Predicted_ICD']
+        predicted.append(pred)
+        cor = res['Correct_ICD']
+        correct.append(cor)
+#            print(labels_correct.keys())
+        if cor in labels_correct:
+            labels_correct[cor] = labels_correct[cor] + 1
+        else:
+            labels_correct[cor] = 1
+
+        if pred in labels_pred:
+            labels_pred[pred] = labels_pred[pred] + 1
+        else:
+            labels_pred[pred] = 1
+    n = len(correct)
+    csmf_pred = {}
+    csmf_corr = {}
+    csmf_corr_min = 1
+    csmf_sum = 0
+    for key in labels_correct.keys():
+        if key not in labels_pred:
+            labels_pred[key] = 0
+        num_corr = labels_correct[key]
+        num_pred = labels_pred[key]
+        csmf_c = num_corr/n
+        csmf_p = num_pred/n
+        csmf_corr[key] = csmf_c
+        csmf_pred[key] = csmf_p
+        #print "csmf for " + key + " corr: " + str(csmf_c) + ", pred: " + str(csmf_p)
+        if csmf_c < csmf_corr_min:
+            csmf_corr_min = csmf_c
+        csmf_sum = csmf_sum + abs(csmf_c - csmf_p)
+
+    csmf_accuracy = 1 - (csmf_sum / (2 * (1 - csmf_corr_min)))
+    return csmf_accuracy
 def get_dic(fname,vocab):
     with open(fname) as f:
         content = f.readlines()
@@ -214,6 +287,26 @@ def get_data(input_train):
             data[cghr_cat.text].append((MG_ID.text,text))
         except AttributeError:
             continue
+    return data,all_categories
+
+def get_data_phmrc(input_train,label_dic):
+    data={} 
+    tree = etree.parse(input_train)
+    root = tree.getroot()
+    for child in root:
+        MG_ID = child.find('MG_ID')
+        narrative = child.find('narrative')
+        phmrc_cat = child.find('cat_phmrc')
+        text = narrative.text.lower()
+        text = re.sub('[^a-z0-9 ]','',text)           #Note:this steps removes all punctionations and symbols in text, which is optional
+        text = re.sub('[\t\n]','',text)
+        text = re.sub(' +', ' ', text)
+        label_text = label_dic[phmrc_cat.text]
+        if label_text in data:
+            data[label_text].append((MG_ID.text,text))
+        else:
+            data[label_text]=[(MG_ID.text,text)]
+    all_categories = list(set(data.keys()))
     return data,all_categories
 def letterToTensor(letter):
     tensor = torch.tensor(emb_dic[letter],device=cuda)
