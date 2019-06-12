@@ -1,18 +1,10 @@
 import model_format
 import sys
-
 import numpy as np
-
 import time
-
 from keras.utils.np_utils import to_categorical
 from sklearn import metrics
-
 from sklearn import preprocessing
-
-#import attention_utils
-import math
-#from layers import Attention
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
@@ -22,28 +14,22 @@ global anova_filter
 global labelencoder
 from allennlp.modules.elmo import Elmo, batch_to_ids
 np.set_printoptions(threshold=np.inf)
-import gc
-import re
 import utils
 from lxml import etree
 from word2vec import load
 from word2vec import get
-from sklearn.metrics import precision_score
-from sklearn.metrics import recall_score
-global labelname
-global cuda
-global max_num_word
-global rec_type
+
 import csv
+
 #global all_categories
 def main():
     global cuda
+    global labelname
     global TRAINING, USE_SERVER, DEBUG, PRE_DATA, CROSS_VAL
     global max_num_word,max_char_in_word,emb_dim_char,emb_dim_comb,max_num_char
     global embedding, model_type, rec_type, dataset
     labelencoder = preprocessing.LabelEncoder()
     cuda = torch.device("cuda:0")
-    
     #-----------------------mode----------------------------
     TRAINING = True        # To train the model; otherwise load existing model
     USE_SERVER = False      # To run in CSLab server, otherwise home computer
@@ -53,7 +39,7 @@ def main():
     embedding = 'conc'       # Choices: 'conc', 'elmo'
     model_type = 'cnn' 
     rec_type = "child"      # Choices: 'child','neonate','adult'
-    dataset = 'phmrc'       # Choices: 'mds','phmrc'
+    dataset = 'mds'       # Choices: 'mds','phmrc'
     #---------------------parameters-----------------------
     learning_rate = 0.003
     num_epochs = 12
@@ -65,7 +51,7 @@ def main():
     #---------------initialized variables----------------
     emb_dim_word = 100
     emb_dim_comb = max_char_in_word*emb_dim_char+emb_dim_word
-    stime = time.time()
+    total_start_time = time.time()
     prefix = '-'.join([embedding,model_type+rec_type])
     if dataset == 'phmrc':
         prefix += '_phmrc'
@@ -76,9 +62,8 @@ def main():
     data_testlabels = out_dir+prefix+'_testlabels.npy'
     data_testIDs = out_dir+prefix+'_testids.npy'
     data_ids = out_dir+prefix+'_ids.npy'
-    #---------------------------------
-    
     modelfile = prefix+'_model.pt'    # Filename of the saved model
+    #---------------------------------
     if USE_SERVER:
         if dataset == 'mds':
             input_train = "/u/yanzhaod/data/va/mds+rct/train"+rec_type+"_cat_spell.xml"  #input train file for char_embeeding
@@ -155,56 +140,8 @@ def main():
         predictedlabels = labenc.inverse_transform(y_pred)
         print('--------------Final results--------------------')
         precision, recall, f1score, csmf_accuracy = utils.stats_from_results(testlabels,predictedlabels,testIDs,PRINT=True)
-#        print("Overall it takes " + utils.timeSince(total_start_time))
-#    print('f1score: '+str(f1score)) 
-def get_data(input_train):
-    '''
-    INPUT:
-        input_train: path to the training xml file
-    OUTPUT:
-        data: a dictionary where keys are cghr_cat and values are lists of the input features
-        all_categories: a list containing all the categories
-    '''
-    all_categories = []
-    data={} 
-    tree = etree.parse(input_train)
-    for e in tree.iter("cghr_cat"):
-            text = e.text.lower()
-            if text not in data:
-                data[text]=[]
-                all_categories.append(text)
-    root = tree.getroot()
-    for child in root:
-        MG_ID = child.find('MG_ID')
-        narrative = child.find('narrative')
-        cghr_cat = child.find('cghr_cat')
-        cghr_cat2 = [child.find('CODINGKEYWORDS1'),child.find('CODINGKEYWORDS2')]
-        second_try = []
-        try:
-            text = narrative.text.lower()
-        except AttributeError:
-            for e in cghr_cat2:
-                try:
-                    second_try.append(child.find('CODINGKEYWORDS1').text.lower())
-                except AttributeError:
-                    continue
-            if len(second_try) == 2:
-                if second_try[0] == second_try[1]:
-                    second_try = second_try[0]
-                else:
-                    second_try = ' '.join(second_try)
-            elif len(second_try) == 1:
-                second_try = second_try[0]
-            else:
-                print("undetected mgid: "+MG_ID.text)
-        if second_try:
-            text = text + ' ' + second_try.lower()
-            #print(MG_ID.text)
-        text = re.sub('[^a-z0-9 ]','',text)           #Note:this steps removes all punctionations and symbols in text, which is optional
-        text = re.sub('[\t\n]','',text)
-        text = re.sub(' +', ' ', text)
-        data[cghr_cat.text].append((MG_ID.text,text))
-    return data,all_categories
+        print("Overall it takes " + utils.timeSince(total_start_time))
+
 def preprocess(input_train,ind=0):
     '''
     INPUT:
@@ -214,7 +151,6 @@ def preprocess(input_train,ind=0):
         ID: a list of strings, containing MG_IDs
         label: numpy array of string, containing the labels
     '''
-    print('1111111111111')
     if dataset == 'phmrc':
         def csv_to_dic(file):
             with open(file, mode='r') as infile:
@@ -225,7 +161,7 @@ def preprocess(input_train,ind=0):
         print('label dictionary: '+str(label_dic))
         data,all_categories = utils.get_data_phmrc(input_train,label_dic)
     else:
-        data,all_categories = get_data(input_train)
+        data,all_categories = utils.get_data(input_train)
     if embedding == 'elmo':
         ID = []
         label = []
@@ -253,7 +189,10 @@ def preprocess(input_train,ind=0):
         if CROSS_VAL:
             wmodel,dim = load('D:/projects/zhaodong/research/va/data/crossval_sets/ice+medhelp+narr_all_'+str(ind)+'.vectors.100')
         else:
-            wmodel,dim = load('D:/projects/zhaodong/research/va/data/dataset/narr+ice+medhelp.vectors.100')
+            if USE_SERVER:
+                wmodel,dim = load('/u/yanzhaod/data/narr+ice+medhelp.vectors.100')
+            else:
+                wmodel,dim = load('D:/projects/zhaodong/research/va/data/dataset/narr+ice+medhelp.vectors.100')
         def letterToNumpy(letter):
             return np.array(emb_dic[letter])
         def lettersToNumpy(word):
@@ -298,7 +237,7 @@ def preprocess(input_train,ind=0):
                 if i < len(line):
                     emb_line[i,:] = letterToNumpy(line[i])
             return emb_line
-        data,all_categories = get_data(input_train)
+        data,all_categories = utils.get_data(input_train)
         ID = []
         X,label = [],[]
         for k,v in data.items():
