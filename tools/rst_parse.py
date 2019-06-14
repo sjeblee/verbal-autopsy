@@ -1,11 +1,9 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # Add RST discourse parses to the narrative
 
 from lxml import etree
 import argparse
-import numpy
-import string
 import subprocess
 
 def main():
@@ -15,17 +13,17 @@ def main():
     args = argparser.parse_args()
 
     if not (args.infile and args.outfile):
-        print "usage: ./rst_parse.py --in [file.xml] --out [outfile.xml]"
+        print('usage: ./rst_parse.py --in [file.xml] --out [outfile.xml]')
         exit()
 
     # Get the xml from file
     tree = etree.parse(args.infile)
     root = tree.getroot()
-    
+
     for child in root:
         node = child.find("narrative")
         narr = ""
-        if node != None:
+        if node is not None:
             narr = node.text.encode('utf-8')
         if len(narr) > 0:
             tempname = "/u/sjeblee/research/va/data/temp.txt"
@@ -40,12 +38,13 @@ def main():
             with open(outname, 'r') as f:
                 lines = f.readlines()
             text = " ".join(lines)
-            print text + "\n"
+            print(text, "\n")
             newnode = etree.Element("narr_rstparse")
             newnode.text = text.decode('utf-8')
             child.append(newnode)
-        
+
     # write the new xml to file
     tree.write(args.outfile)
 
-if __name__ == "__main__":main()
+
+if __name__ == "__main__": main()

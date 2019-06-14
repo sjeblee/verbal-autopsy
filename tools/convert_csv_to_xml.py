@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # Convert the csv of the translated narratives to an xml tree
 
@@ -21,7 +21,7 @@ def main():
     args = argparser.parse_args()
 
     if not (args.infile and args.outfile):
-        print "usage: ./convert_csv_to_xml.py --in [file.xml] --out [outfile.txt]"
+        print('usage: ./convert_csv_to_xml.py --in [file.xml] --out [outfile.txt]')
         exit()
 
     # Create the xml root
@@ -86,8 +86,8 @@ def main():
     interview_name = "interview_date"
     state_name = 'state_code'
 
-    if "amravati" in args.infile:
-        print "Amravati"
+    if 'amravati' in args.infile:
+        print('Amravati')
         death_day_name = "dod"
         death_month_name = "monthod"
         death_year_name = "yod"
@@ -101,7 +101,7 @@ def main():
         phys1_icd_name = "physician1CodingICD"
         phys2_icd_name = "physician2CodingICD"
 
-    elif "punjab" in args.infile:
+    elif 'punjab' in args.infile:
         # death dates the same as Anand
         keywords1_name = "Phy1_CodingComments"
         keywords2_name = "Phy2_CodingComments"
@@ -125,7 +125,7 @@ def main():
                 age = int(age_str)
                 ageunit = "Years"
                 #ageunit = row[ageunit_name]
-                print "age: " + str(age)# + " " + ageunit
+                print('age:', str(age)) # + " " + ageunit
                 '''
                 if (age < 1 and ageunit == "Months") or (ageunit == "Days"):
                     print "neonate"
@@ -222,8 +222,8 @@ def main():
 
             icd = row[final_icd_name]
 
-            if icd == "":
-                print "Error: no ICD code found for " + row[id_name]
+            if icd == '':
+                print('Error: no ICD code found for', row[id_name])
                 root.remove(child)
                 dropped = dropped +1
             #icd = row[adj_icd_name]
@@ -246,7 +246,7 @@ def main():
     data_util.fix_line_breaks(child_file + ".clean", "child")
     data_util.fix_line_breaks(neonate_file + ".clean", "neonate")
 
-    print "Dropped " + str(dropped) + " records because of missing or mismatched ICD codes"
+    print('Dropped', str(dropped), 'records because of missing or mismatched ICD codes')
 
 def fix_keywords(text):
     # Replace | with comma
@@ -262,7 +262,7 @@ def month_to_num(text):
     if text in abbr_to_num:
         return str(abbr_to_num[text])
     else:
-        return "?"
+        return '?'
 
 
-if __name__ == "__main__":main()
+if __name__ == "__main__": main()

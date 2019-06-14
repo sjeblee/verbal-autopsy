@@ -28,7 +28,7 @@ def main():
     args = argparser.parse_args()
 
     if not (args.outfile and args.anndir and args.textdir):
-        print("usage: ./thyme_to_xml.py --textdir [path/to/dir] --anndir [path/to/dir] --out [file.xml]")
+        print('usage: ./thyme_to_xml.py --textdir [path/to/dir] --anndir [path/to/dir] --out [file.xml]')
         exit()
 
     run(args.outfile, args.textdir, args.anndir)
@@ -40,8 +40,8 @@ def run(arg_outfile, arg_textdir, arg_anndir):
     for filename in os.listdir(arg_anndir):
         dotindex = filename.index('.')
         record_name = filename[0:dotindex]
-        print("record_id: " + record_name)
-        rec_text = ""
+        print('record_id:', record_name)
+        rec_text = ''
         rec_xml = etree.parse(arg_anndir + '/' + filename)
         with open(arg_textdir + '/' + record_name, 'r') as f:
             rec_text = f.read()
@@ -63,7 +63,7 @@ def run(arg_outfile, arg_textdir, arg_anndir):
         narr_node.text = txt_narrs[rec_id]
         child.append(narr_node)
         narrt_node = etree.Element("narr_timeml_simple")
-        narrt_node.text = narr#unescape(narr)
+        narrt_node.text = narr #unescape(narr)
         #print(narrt_node.text)
         child.append(narrt_node)
         root.append(child)

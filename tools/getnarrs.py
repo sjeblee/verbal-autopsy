@@ -1,12 +1,9 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # Get the text of the narratives
 
 from lxml import etree
 import argparse
-import numpy
-import string
-import subprocess
 
 def main():
     argparser = argparse.ArgumentParser()
@@ -15,7 +12,7 @@ def main():
     args = argparser.parse_args()
 
     if not (args.infile and args.outfile):
-        print "usage: ./getnarrs.py --in [file.xml] --out [outfile.txt]"
+        print('usage: ./getnarrs.py --in [file.xml] --out [outfile.txt]')
         exit()
 
     # Get the xml from file
@@ -23,12 +20,12 @@ def main():
     root = tree.getroot()
 
     narratives = []
-    
+
     for child in root:
-        node = child.find("MG_ID")
-        narr = ""
-        if node != None:
-            narr = node.text#.encode('utf-8')
+        node = child.find('MG_ID')
+        narr = ''
+        if node is not None:
+            narr = node.text #.encode('utf-8')
         if len(narr) > 0:
             narratives.append(narr)
 
@@ -40,4 +37,5 @@ def main():
                 out.write(sen.strip().lower() + "\n")
     out.close()
 
-if __name__ == "__main__":main()
+
+if __name__ == "__main__": main()

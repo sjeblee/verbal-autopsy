@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # Add the general COD category to the xml file
 
@@ -12,7 +12,7 @@ def main():
     args = argparser.parse_args()
 
     if not (args.infile):
-        print "usage: ./create_icd_map.py --in [file.csv]"
+        print('usage: ./create_icd_map.py --in [file.csv]')
         exit()
 
     # Create the ICD mapping

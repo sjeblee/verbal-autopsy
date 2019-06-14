@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # Set up annotation files for calculating inter-annotator agreement
 
@@ -38,7 +38,7 @@ def main():
     args = argparser.parse_args()
 
     if not (args.outfile and args.ann_dir):
-        print "usage: ./tempeval_to_xml.py --dir [path/to/dir] --out [file.xml] --dev [number from 0 to 100]"
+        print('usage: ./tempeval_to_xml.py --dir [path/to/dir] --out [file.xml] --dev [number from 0 to 100]')
         exit()
 
     run(args.outfile, args.ann_dir, int(args.dev_percent))
@@ -49,7 +49,7 @@ def run(arg_outfile, arg_dir, devp=0):
     ann_narrs = {} # map from record id to annotated narrative
     for filename in os.listdir(arg_dir):
         record_name = filename.strip(".tml")
-        print "record_id: " + record_name
+        print('record_id:', record_name)
         with open(arg_dir + '/' + filename, 'r') as f:
             text = f.read()
             narr_text, xml_text = convert_spans_to_xml(text)
@@ -94,16 +94,17 @@ def run(arg_outfile, arg_dir, devp=0):
     if devp > 0:
         filename = arg_outfile + ".dev"
         devtree.write(filename)
-        print "dev records: " + str(devcount)
+        print('dev records:', str(devcount))
         subprocess.call(["sed", "-i", "-e", 's/&lt;/ </g', filename])
         subprocess.call(["sed", "-i", "-e", 's/&gt;/> /g', filename])
         subprocess.call(["sed", "-i", "-e", 's/  / /g', filename])
+
 
 def convert_spans_to_xml(text):
     lines = text.splitlines()
     lines = lines[1:] # ignore the xml header
     #root  = etree.fromstring("<root>" + ' '.join(lines) + "</root>")
-    root  = etree.fromstring("<root>" + '\n'.join(lines) + "</root>")
+    root = etree.fromstring("<root>" + '\n'.join(lines) + "</root>")
     timeml = root.find("TimeML")
     tags = []
 
@@ -114,7 +115,7 @@ def convert_spans_to_xml(text):
     # Get document text
     text_node = timeml.find("TEXT")
     text_text = dct_text + data_util.stringify_children(text_node)
-    print "text: " + text_text
+    print('text:', text_text)
 
     build_list = etree.XPath("//EVENT")
     events = build_list(text_node)
@@ -159,10 +160,11 @@ def convert_spans_to_xml(text):
 
     for tag in tags:
         xml_text = xml_text + etree.tostring(tag)
-    print "narr_text: " + narr_text
+    print('narr_text:', narr_text)
     #print "xml_text: " + xml_text
 
     return narr_text, xml_text
+
 
 def create_tag(line):
     timex = "<TIMEX3"
@@ -178,11 +180,9 @@ def create_tag(line):
     end = ""
     text = ""
     attributes = ""
-
-    print line
+    print(line)
 
     chunks = line.split(' ')
-
     x = 0
 
     while x<len(chunks):
@@ -202,7 +202,7 @@ def create_tag(line):
             parts = string.split('~')
             start = int(parts[0])
             end = int(parts[1])
-            print "start: " + str(start) + ", end: " + str(end)
+            print('start:', str(start), ', end:', str(end))
         elif "start=" in chunk:
             start = int(chunk[7:-1])
         elif "end=" in chunk:
@@ -222,14 +222,15 @@ def create_tag(line):
         x = x+1
 
     # TODO: process TLINKS?
-    print "name: " + name + ", tid: " + tid + ", text: " + text + ", atts: " + attributes
+    print('name:', name, ', tid:', tid, ', text:', text, ', atts:', attributes)
 
     tag = Tag(name, tid, text, attributes)
     return tag
 
+
 def text_to_list(text):
     chunks = []
-    string = ""
+    cstring = ''
     in_tag = False
     in_close_tag = False
     for char in text:
@@ -237,28 +238,28 @@ def text_to_list(text):
         if char == '<' and not in_tag:
             #print "in_tag"
             in_tag = True
-            chunks.append(string)
-            string = char
+            chunks.append(cstring)
+            cstring = char
         elif char == '<' and in_tag:
             #print "in_close_tag <"
             in_close_tag = True
-            string = string + char
+            cstring = cstring + char
         elif char == "/" and in_tag and not in_close_tag:
             #print "in_close_tag /"
             in_close_tag = True
-            string = string + char
+            cstring = cstring + char
         elif char == '>' and in_close_tag:
             #print "close tag"
-            string = string + char
+            cstring = cstring + char
             chunks.append(string)
-            string = ""
+            cstring = ""
             in_tag = False
             in_close_tag = False
         else:
-            string = string + char
-    if len(string) > 0:
-        chunks.append(string)
+            cstring = cstring + char
+    if len(cstring) > 0:
+        chunks.append(cstring)
     return chunks
 
 
-if __name__ == "__main__":main()
+if __name__ == "__main__": main()

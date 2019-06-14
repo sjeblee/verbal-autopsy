@@ -1,10 +1,10 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 import argparse
 import sys
 
-opentag = ""
-closetag = ""
+opentag = ''
+closetag = ''
 
 def main():
     argparser = argparse.ArgumentParser()
@@ -13,7 +13,7 @@ def main():
     args = argparser.parse_args()
 
     if len(args) < 2:
-        print "usage: ./oneline.py --input [file] --tag [tag] > [outfile]"
+        print('usage: ./oneline.py --input [file] --tag [tag] > [outfile]')
 
     global opentag
     global closetag
@@ -23,7 +23,7 @@ def main():
 
     with open(args.infile) as xmldata:
         for line in xmldata:
-            if not lastline == None:
+            if lastline is not None:
                 parse_line(lastline)
             lastline = line
         parse_line(lastline)
@@ -33,4 +33,5 @@ def parse_line(line):
     if line.strip() == closetag:
         sys.stdout.write('\n')
 
-if __name__ == "__main__":main()
+
+if __name__ == "__main__": main()

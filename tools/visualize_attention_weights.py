@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # Visualize the attention weights over a narrative and extract phrases?
 
@@ -12,11 +12,11 @@ def main():
     argparser.add_argument('--ids', action="store", dest="idfile")
     argparser.add_argument('--weights', action="store", dest="weightfile")
     argparser.add_argument('--out', action="store", dest="outfile")
-    
+
     args = argparser.parse_args()
 
     if not (args.infile and args.outfile):
-        print "usage: ./visualize_attention_weights.py --in [file.xml] --out [outfile.csv] --ids [file.ids] --weights [file.weights]"
+        print('usage: ./visualize_attention_weights.py --in [file.xml] --out [outfile.csv] --ids [file.ids] --weights [file.weights]')
         exit()
 
     # Get the xml from file
@@ -24,26 +24,25 @@ def main():
     root = tree.getroot()
 
     narratives = {}
-    
     for child in root:
         idnode = child.find("MG_ID")
         rec_id = idnode.text
         node = child.find("narrative")
         narr = ""
-        if node != None:
+        if node is not None:
             narr = node.text.encode('utf-8')
         narratives[rec_id] = narr
-    print "got narrs: " + str(len(narratives.keys()))
+    print('got narrs:', str(len(narratives.keys())))
 
     id_text = open(args.idfile, 'r').read()
     ids = ast.literal_eval(id_text)
-    print "got ids: " + str(len(ids))
+    print('got ids:', str(len(ids)))
 
     weight_text = open(args.weightfile, 'r').read()
     weights = ast.literal_eval(weight_text)
-    print "got weights: " + str(len(weights))
+    print('got weights:', str(len(weights)))
     output = []
-    
+
     for x in range(len(ids)):
         rec_id = ids[x]
         seq_weights = weights[x]
@@ -70,4 +69,5 @@ def main():
         out.write(item + "\n")
     out.close()
 
-if __name__ == "__main__":main()
+
+if __name__ == "__main__": main()
