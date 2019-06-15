@@ -1,11 +1,10 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # Set up annotation files for calculating inter-annotator agreement
 
 from lxml import etree
 import argparse
 import os
-import string
 import subprocess
 
 class Tag:
@@ -28,7 +27,7 @@ class Tag:
         if self.name == "TLINK":
             string = '<' + self.name + ' id="' + self.tid + '" ' + self.attributes + '/>'
         else:
-            string = '<' + self.name + ' id="' + self.tid + '" ' + self.attributes + '> ' + self.text + ' </' + self.name + '>'
+            string = '<' + self.name + ' id="' + self.tid + '" span="' + str(self.start) + ',' + str(self.end) + '" ' + self.attributes + '> ' + self.text + ' </' + self.name + '>'
         return string
 
 def main():
@@ -39,7 +38,7 @@ def main():
     args = argparser.parse_args()
 
     if not (args.outfile and args.ann_dir):
-        print "usage: ./mae_to_mae_in.py --dir [path/to/dir] --in [file.xml] --out [file.xml]"
+        print('usage: ./mae_to_xml.py --dir [path/to/dir] --in [file.xml] --out [file.xml]')
         exit()
 
     arg_infile = ""
@@ -48,8 +47,9 @@ def main():
 
     run(arg_infile, args.outfile, args.ann_dir)
 
-def run(arg_infile, arg_outfile, arg_dir):
 
+def run(arg_infile, arg_outfile, arg_dir):
+    txt_narrs = {}
     ann_narrs = {} # map from record id to annotated narrative
     for filename in os.listdir(arg_dir):
         temp = filename.split(".")[0]
@@ -60,27 +60,31 @@ def run(arg_infile, arg_outfile, arg_dir):
             record_name = parts[0]
         else:
             record_name = temp
-        print "record_id: " + record_name
+        print('record_id:', record_name)
         with open(arg_dir + '/' + filename, 'r') as f:
             text = f.read()
-            xml_text = convert_spans_to_xml(text)
-            ann_narrs[record_name] = xml_text
+            narr_text, xml_text = convert_spans_to_xml(text)
+            ann_narrs[record_name] = xml_text.replace('“', '"').replace('”', '"')
+            txt_narrs[record_name] = narr_text.replace('“', '"').replace('”', '"')
 
     # Add the annotated narrative to the xml file
     tree = None
     if arg_infile == "":
         root = etree.Element("Record")
         tree = etree.ElementTree(root)
-        for an in ann_narrs:
+        for rec_id in ann_narrs:
             child = etree.Element("Adult_Anonymous")
-            rec_id = an
-            narr = ann_narrs[an]
+            narr = ann_narrs[rec_id]
             id_node = etree.Element("MG_ID")
             id_node.text = rec_id
             child.append(id_node)
-            narr_node = etree.Element("narr_timeml_simple")
-            narr_node.text = narr.decode('utf-8')
+            narr_node = etree.Element("narrative")
+            print(txt_narrs[rec_id])
+            narr_node.text = txt_narrs[rec_id]
             child.append(narr_node)
+            narrt_node = etree.Element("narr_timeml_simple")
+            narrt_node.text = narr.decode('utf-8')
+            child.append(narrt_node)
             root.append(child)
     else:
         tree = etree.parse(arg_infile)
@@ -88,14 +92,18 @@ def run(arg_infile, arg_outfile, arg_dir):
         for child in root:
             id_node = child.find("MG_ID")
             rec_id = id_node.text
-            narr_node = etree.Element("narr_timeml_simple")
-            narr = ann_narrs[rec_id]
-            narr_node.text = narr.decode('utf-8')
-            child.append(narr_node)
+            print('rec_id:', rec_id)
+            narrt_node = child.find("narr_timeml_simple")
+            if narrt_node is not None:
+                child.remove(narrt_node)
+            narrt_node = etree.SubElement(child, "narr_timeml_simple")
+            narrt = ann_narrs[rec_id]
+            narrt_node.text = narrt.decode('latin-1')
+            #child.append(narrt_node)
 
     tree.write(arg_outfile)
-    subprocess.call(["sed", "-i", "-e", 's/&lt;/ </g', arg_outfile])
-    subprocess.call(["sed", "-i", "-e", 's/&gt;/> /g', arg_outfile])
+    #subprocess.call(["sed", "-i", "-e", 's/&lt;/ </g', arg_outfile])
+    #subprocess.call(["sed", "-i", "-e", 's/&gt;/> /g', arg_outfile])
     subprocess.call(["sed", "-i", "-e", 's/  / /g', arg_outfile])
 
 def convert_spans_to_xml(text):
@@ -112,7 +120,8 @@ def convert_spans_to_xml(text):
     in_tags = False
     x = 0
     while x<len(lines):
-        line = lines[x]#.strip()
+        line = lines[x] #.strip()
+        print('line:', line)
         if len(line) == 0:
             x = x+1
             continue
@@ -137,6 +146,7 @@ def convert_spans_to_xml(text):
                 tags.append(create_tag(line))
         # Find the start of the text
         elif cdata_start in line:
+            print('narr start')
             in_narr = True
             if len(line) > len(cdata_start):
                 if cdata_end in line: # Text is all on one line
@@ -148,11 +158,12 @@ def convert_spans_to_xml(text):
                     stuff = line[len(cdata_start):]
                     narr_text = narr_text + " " + stuff
         elif tag_start in line:
+            print('tag start')
             in_tags = True
             if len(line) > len(tag_start):
                 stuff = line[len(tag_start):]
                 tags.append(create_tag(stuff))
-        # Go to the next line        
+        # Go to the next line
         x = x+1
 
     # Sort tags by span start
@@ -175,7 +186,8 @@ def convert_spans_to_xml(text):
     for t in tlinks:
         xml_text = xml_text + " " + str(t)
 
-    return xml_text
+    return narr_text, xml_text
+
 
 def create_tag(line):
     timex = "<TIMEX3"
@@ -191,13 +203,11 @@ def create_tag(line):
     end = ""
     text = ""
     attributes = ""
-
-    print line
+    print(line)
 
     chunks = line.split(' ')
-
     x = 0
-    
+
     while x<len(chunks):
         chunk = chunks[x]
         if timex in chunk:
@@ -211,11 +221,11 @@ def create_tag(line):
         elif sectime in chunk:
             name = "SECTIME"
         elif "spans=" in chunk:
-            string = chunk[7:-1]
-            parts = string.split('~')
+            cstring = chunk[7:-1]
+            parts = cstring.split('~')
             start = int(parts[0])
             end = int(parts[1])
-            print "start: " + str(start) + ", end: " + str(end)
+            print('start:', str(start), ', end:', str(end))
         elif "start=" in chunk:
             start = int(chunk[7:-1])
         elif "end=" in chunk:
@@ -235,9 +245,14 @@ def create_tag(line):
         x = x+1
 
     # TODO: process TLINKS?
-    print "name: " + name + ", tid: " + tid + ", text: " + text + ", atts: " + attributes
-    
+    print('name:', name, ', tid:', tid, ', text:', text, ', atts:', attributes)
+
     tag = Tag(name, tid, start, end, text, attributes)
+    if tag.name == 'EVENT':
+        if 'rank' not in tag.attributes:
+            print('ERROR: no rank found!', str(tag))
+            exit(1)
     return tag
 
-if __name__ == "__main__":main()
+
+if __name__ == "__main__": main()

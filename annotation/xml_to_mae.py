@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # Set up annotation files for calculating inter-annotator agreement
 
@@ -13,16 +13,16 @@ def main():
     args = argparser.parse_args()
 
     if not (args.infile and args.ann_dir):
-        print "usage: ./xml_to_mae.py --in [file_ann.xml] --dir [path/to/dir]"
+        print('usage: ./xml_to_mae.py --in [file_ann.xml] --dir [path/to/dir]')
         exit()
 
     inname = args.infile
     temp = inname.split(".")[0]
-    print "temp: " + temp
+    print('temp:', temp)
     parts = temp.split("_")
-    print "parts: " + str(parts)
+    print('parts:', str(parts))
     ann_name = parts[len(parts)-1]
-    print "ann_name: " + ann_name
+    print('ann_name:', ann_name)
 
     # Get the xml from file
     tree = etree.parse(args.infile)
@@ -34,25 +34,31 @@ def main():
         narr_text = ""
         narr_tags = ""
         if narr_text_node is not None:
-            narr_text = narr_text_node.text
+            narr_text = narr_text_node.text.strip()
         narr_node = child.find("narr_timeml_simple")
         if narr_node is not None:
-            narr = etree.tostring(narr_node)
+            narr = etree.tostring(narr_node).strip()
             # Extract tags and spans
             narr = narr[20:(len(narr)-21)]
-            print "narr: " + narr
+            print('narr_text:', narr_text)
+            print('narr:', narr)
             x = 0
             index = 0
             narr_tags = ""
-            while x < len(narr):
-            
+            while x < len(narr) and index < len(narr_text):
+                #print "start loop"
                 char = narr[x]
+                #print "x=" + str(x) + " : " + char + ", i=" + str(index) + " : " + narr_text[index]
+                if char == ' ' and not narr_text[index] == ' ':
+                    x = x+1
+                    char = narr[x]
+                    print('skipped space in narr')
                 if char == '<':
                     startspan = index
                     x = x+1
                     if len(narr) > x+5:
                         tag = narr[x:x+6]
-                        print "found tag: " + tag
+                        print('found tag:', tag)
                         idnum = ""
                         # Fix longer tags
                         if tag == "TIMEX3" or tag == "SIGNAL":
@@ -72,17 +78,17 @@ def main():
                             char = narr[x]
                             if char != ">":
                                 restoftag = restoftag + char
-                        if tag != "TLINK" and index < len(narr_text):
+                        if tag != 'TLINK' and index < len(narr_text):
                             # Calcuate span
                             text = ""
                             # Skip initial space
                             x = x+1
-                            #print "narr_text[i]: " + narr_text[index]
+                            print('narr_text[i]:', narr_text[index])
                             if narr_text[index] == ' ':
                                 index = index+1
-                                print "skipped space"
-                            print "about to process tag"
-                            print "narr[x=" + str(x) + "]: '" + str(narr[x]) + "' narr[i=" + str(index) + "]: '" + str(narr_text[index]) + "'"
+                                print('skipped space')
+                            #print "about to process tag"
+                            print('narr[x=', str(x), "]: '", str(narr[x]), "' narr[i=", str(index), "]: '", str(narr_text[index]), "'")
                             while char != '<' and x < len(narr):
                                 x = x+1
                                 index = index+1
@@ -91,10 +97,10 @@ def main():
                             endspan = index-2
                             index = index-2 # remove trailing space
                             text = text[:-2]
-                            print "text from x: '" + text + "'"
+                            print("text from x: '", text, "'")
                             text = narr_text[startspan:endspan].strip()
-                            print "text from i: '" + text + "'"
-                            print "x: " + str(x) + " i: " + str(index)
+                            print("text from i: '", text, "'")
+                            print('x:', str(x), 'i:', str(index))
                             #narr_text = narr_text + text + " "
                             narr_tags = narr_tags + '<' + tag + ' id="' + idnum + '" spans="' + str(startspan) + '~' + str(endspan) + '" text="' + text + '" ' + restoftag + "/>\n"
                             # Skip over end tag
@@ -111,20 +117,25 @@ def main():
                         #    to_id = restoftag[to_start:to_end]
                         #    print "TLINK from: " + from_id + " to: " + to_id
                         #    narr_tags = narr_tags + '<' + tag + ' id="' + idnum + '" from="' + from_id + '" to="' + to_id + '" ' + restoftag + ">\n"
-                        x = x+1 #Skip the space after the tag
-                        print "end of loop"
+
+                        x = x+1 # Skip the space after the tag
+                        print('end of loop')
                         if x < len(narr):
                             char = narr[x]
-                            if char == ' ':
+                            while char == ' ':
                                 x = x+1
-                                #char = narr[x]
-                            print "x=" + str(x) + " : " + char + ", i=" + str(index) + " : " + narr_text[index]
+                                char = narr[x]
+                        if index < len(narr_text):
+                            while narr_text[index] == ' ':
+                                index = index+1
+                        #print "x=" + str(x) + " : " + char + ", i=" + str(index) + " : " + narr_text[index]
                 else:
+                    #print "x=" + str(x) + " : " + char + ", i=" + str(index) + " : " + narr_text[index]
                     x = x+1
                     index = index+1
-                
+
         filename = args.ann_dir + "/" + rec_id + "_" + ann_name + ".xml"
-        print "writing " + filename
+        print('writing', filename)
         outfile = open(filename, 'w')
         outfile.write('<?xml version="1.0" encoding="UTF-8" ?>\n<simpleTimeML>\n')
         outfile.write('<TEXT><![CDATA[')
@@ -135,4 +146,4 @@ def main():
         #outfile.write("</root>\n")
 
 
-if __name__ == "__main__":main()
+if __name__ == "__main__": main()
