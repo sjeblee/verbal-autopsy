@@ -16,18 +16,18 @@ def main():
     args = argparser.parse_args()
 
     if not args.infile and args.outfile:
-        print "usage: proprocessing.py --in [file.txt] --out [file.txt] (--stem or --lemma)"
+        print("usage: proprocessing.py --in [file.txt] --out [file.txt] (--stem or --lemma)")
         exit(1)
 
     text = []
-    print "reading file..."
+    print("reading file...")
     with open(args.infile, 'r') as f:
         for line in f.readlines():
             text.append(unicode(line, errors='ignore'))
     newtext = []
 
     if args.stem:
-        print "stem"
+        print("stem")
         for t in text:
             newtext.append(stem(t))
     elif args.lemma:
@@ -36,7 +36,7 @@ def main():
 
     outfile = open(args.outfile, 'w')
     for line in newtext:
-        print line
+        print(line)
         outfile.write(line + "\n")
     outfile.close()
 

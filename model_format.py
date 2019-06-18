@@ -486,6 +486,7 @@ class CNN_TEXT(nn.Module):
 
      def forward(self, x):
 #          print(a.size(),b.size(),51) #torch.Size([1, 200, 100]) torch.Size([1, 1484, 30])
+#          print(x.size())
           x = x.unsqueeze(1)  # (N, Ci, W, D)] 
           x1 = self.conv_and_pool(x,self.conv11) #(N,Co)
           x2 = self.conv_and_pool(x,self.conv12) #(N,Co)
@@ -572,6 +573,139 @@ class CNN_TEXT(nn.Module):
                input_tensor = input_tensor.contiguous().cuda()
 #               self.cuda()
                icd_var = self(Variable(input_tensor))
+               # Softmax and log softmax values
+               icd_vec = logsoftmax(icd_var)
+    #           icd_vec_softmax = softmax(icd_var)
+               icd_code = torch.max(icd_vec, 1)[1].data[0]
+           icd_code = icd_code.item()
+           y_pred.append(icd_code)
+        return y_pred  # Comment this line out if threshold is not in used. 
+
+class CNN_STRUCT(nn.Module):
+
+     def __init__(self, emb_dim,emb_dim_feat, class_num, kernel_num=200, kernel_sizes=6, dropout=0.25, ensemble=False, hidden_size = 100):
+          super(CNN_STRUCT, self).__init__()
+          D = emb_dim
+          C = class_num
+          Ci = 1
+          Co = kernel_num
+          Ks = kernel_sizes
+          self.ensemble = ensemble
+          self.conv11 = nn.Conv2d(Ci, Co, (1, D))
+          self.conv12 = nn.Conv2d(Ci, Co, (2, D))
+          self.conv13 = nn.Conv2d(Ci, Co, (3, D))
+          self.conv14 = nn.Conv2d(Ci, Co, (4, D))
+          self.conv15 = nn.Conv2d(Ci, Co, (5, D))
+          #self.conv16 = nn.Conv2d(Ci, Co, (6, D))
+          #self.conv17 = nn.Conv2d(Ci, Co, (7, D))
+          #self.conv18 = nn.Conv2d(Ci, Co, (8, D))
+
+          self.dropout = nn.Dropout(dropout)
+          self.fc1 = nn.Linear(Co*Ks+emb_dim_feat, C) # Use this layer when train with only CNN model, i.e. No ensemble 
+          self.linear = nn.Linear(emb_dim_feat,emb_dim_feat)
+     def conv_and_pool(self, x, conv):
+          x = F.relu(conv(x)).squeeze(3)  # (N, Co, W)
+#          print(x.size(),333333) #torch.Size([16, 1, 1000, 37])
+          x = F.max_pool1d(x, x.size(2)).squeeze(2)
+#          print(x.size(),11111) #torch.Size([16, 1, 1000, 37])
+          return x
+	  
+
+     def forward(self, a, b):
+#          print(a.size(),b.size(),51) #torch.Size([1, 200, 100]) torch.Size([1, 1484, 30])
+          a = a.unsqueeze(1)  # (N, Ci, W, D)] 
+          a1 = self.conv_and_pool(a,self.conv11) #(N,Co)
+          a2 = self.conv_and_pool(a,self.conv12) #(N,Co)
+          a3 = self.conv_and_pool(a,self.conv13) #(N,Co)
+          a4 = self.conv_and_pool(a,self.conv14) #(N,Co)
+          a5 = self.conv_and_pool(a,self.conv15) #(N,Co)
+          a = torch.cat((a1, a2, a3, a4, a5), 1)
+          
+          a = self.dropout(a)  # (N, len(Ks)*Co)
+          b = self.linear(b)
+          b = F.relu(b)
+          input = torch.cat((a,b),1) 
+          
+          logit = self.fc1(input)  # (N, C)
+          
+#          input = torch.cat((logit,b),1)
+#          print('input.size:'+str(input.size()))
+          return logit
+     def fit(self,X,X2,Y,emb_dim,batch_size=100,learning_rate=0.001,n_hidden=100,num_epochs=10, loss_func='categorical_crossentropy',dropout=0.0, kernel_sizes=5):
+            st = time.time()
+            Yarray = Y.astype('int') 
+            print("X numpy shape: ", str(X.shape), "Y numpy shape:", str(Yarray.shape))
+#            print('embeded dimension: '+str(emb_dim))
+            # Params
+            X_len = X.shape[0]
+            num_epochs = num_epochs
+            num_labels = Yarray.shape[-1]
+            steps = 0
+#            model = CNN_Comb_Text(emb_dim, num_labels,dropout=dropout, kernel_sizes=kernel_sizes)
+            self.cuda()
+        #    print(Xarray.shape,X2array.shape,Yarray.shape,11111)  #(1580, 200, 100) (1580, 1484, 30) (1580, 9)
+            # Train
+            optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
+        
+            steps = 0
+           # cnn.train()
+            for epoch in range(num_epochs):
+                print("epoch", str(epoch))
+                i = 0
+                numpy.random.seed(seed=1)
+                permutation = torch.from_numpy(numpy.random.permutation(X_len)).long()
+                Xiter = X[permutation]
+                X2iter = X2[permutation]
+                Yiter = Yarray[permutation]
+        
+                while i+batch_size < X_len:
+                     batchX = Xiter[i:i+batch_size]
+                     batchX2 = X2iter[i:i+batch_size]
+                     batchY = Yiter[i:i+batch_size]
+                     Xtensor = torch.from_numpy(batchX).float()
+                     Xtensor.contiguous()
+                     X2tensor = torch.from_numpy(batchX2).float()
+                     X2tensor.contiguous()        
+                     Ytensor = torch.from_numpy(batchY).long()
+        #             print("Ytensorsize",Ytensor.size())
+                     Xtensor = Xtensor.cuda()
+                     X2tensor = X2tensor.cuda()
+                     Ytensor = Ytensor.cuda()
+        
+                     target = Variable(Ytensor)
+                     i = i+batch_size
+        
+                     optimizer.zero_grad() 
+                     logit = self(Variable(Xtensor),Variable(X2tensor))
+        #             print(logit.size())  #[100,9]
+                     loss = F.cross_entropy(logit, torch.max(target,1)[1])
+#                     print(loss)
+                     loss.backward()
+                     optimizer.step()
+        
+                     steps += 1
+         
+                # Print epoch time
+                ct = time.time() - st
+                unit = "s"
+                if ct > 60:
+                    ct = ct/60
+                    unit = "m"
+                print("time so far: ", str(ct), unit)
+     def predict(self,testX,testX2):
+        y_pred = []
+        logsoftmax = nn.LogSoftmax(dim=1)
+        for x in range(len(testX)):
+           input_row = testX[x]
+           input_row2 = testX2[x]
+           icd = None
+           if icd is None:
+               input_tensor = torch.from_numpy(numpy.asarray([input_row]).astype('float')).float()
+               input_tensor = input_tensor.contiguous().cuda()
+               input_tensor2 = torch.from_numpy(numpy.asarray([input_row2]).astype('float')).float()
+               input_tensor2 = input_tensor2.contiguous().cuda()
+#               self.cuda()
+               icd_var = self(Variable(input_tensor),Variable(input_tensor2))
                # Softmax and log softmax values
                icd_vec = logsoftmax(icd_var)
     #           icd_vec_softmax = softmax(icd_var)

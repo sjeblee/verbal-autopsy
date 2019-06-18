@@ -272,3 +272,94 @@ def timeSince(since):
    m = math.floor(s / 60)
    s -= m * 60
    return '%dm %ds' % (m, s)
+def combineFeat(X2,testX2,feat):
+    from keras.utils.np_utils import to_categorical
+    '''
+    X2 and testX2 are the numpy array with type float
+    '''
+    if type(feat) == list:
+        i = 0 
+        limit = 0
+        while i < len(feat):
+#            print(X2[:,i],limit,100101)
+            X2[:,i] = np.add(X2[:,i],limit)
+            testX2[:,i] = np.add(testX2[:,i],limit)
+            combinedX2 = np.concatenate([X2[:,i],testX2[:,i]])
+            limit = np.amax(combinedX2)
+            i += 1
+        X2 = X2.flatten('F')
+        testX2 = testX2.flatten('F')
+        return combineFeat(X2,testX2,'singlefeat')
+            
+    else:
+        lenX2 = X2.shape[0]
+        combinedX2 = np.concatenate([X2,testX2])
+        combinedX2 = to_categorical(combinedX2)
+        return combinedX2[:lenX2,:],combinedX2[lenX2:,:]
+def get_data_struct(input_train,feature):
+    '''
+    INPUT:
+        input_train: path to the training xml file
+    OUTPUT:
+        data: a dictionary where keys are cghr_cat and values are lists of the input features
+        all_categories: a list containing all the categories
+    '''
+    all_categories = []
+    data={} 
+    tree = etree.parse(input_train)
+    for e in tree.iter("cghr_cat"):
+            text = e.text.lower()
+            if text not in data:
+                data[text]=[]
+                all_categories.append(text)
+    root = tree.getroot()
+    for child in root:
+        MG_ID = child.find('MG_ID')
+        narrative = child.find('narrative')
+        cghr_cat = child.find('cghr_cat')
+        cghr_cat2 = [child.find('CODINGKEYWORDS1'),child.find('CODINGKEYWORDS2')]
+        if type(feature) == list:
+            dic = {}
+            for f in feature:
+                try:
+                    dic[f] = child.find(f).text
+                except AttributeError:
+                    dic[f] = None
+                
+        else:
+            try:
+                feature_val = child.find(feature).text
+            except AttributeError:
+                feature_val = None
+        second_try = []
+        try:
+            text = narrative.text.lower()
+        except AttributeError:
+            for e in cghr_cat2:
+                try:
+                    second_try.append(child.find('CODINGKEYWORDS1').text.lower())
+                except AttributeError:
+                    continue
+            if len(second_try) == 2:
+                if second_try[0] == second_try[1]:
+                    second_try = second_try[0]
+                else:
+                    second_try = ' '.join(second_try)
+            elif len(second_try) == 1:
+                second_try = second_try[0]
+            else:
+                print("undetected mgid: "+MG_ID.text)
+        if second_try:
+            text = text + ' ' + second_try.lower()
+            #print(MG_ID.text)
+        text = re.sub('[^a-z0-9 ]','',text)           #Note:this steps removes all punctionations and symbols in text, which is optional
+        text = re.sub('[\t\n]','',text)
+        text = re.sub(' +', ' ', text)
+        if type(feature) == list:
+            data[cghr_cat.text].append((MG_ID.text,text,dic))
+        else:
+            data[cghr_cat.text].append((MG_ID.text,text,feature_val))
+    return data,all_categories
+
+
+
