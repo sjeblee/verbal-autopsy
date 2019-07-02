@@ -1,0 +1,15 @@
+models_experimental.py
+    + SingleNet (basic NN)
+    + CNNText:
+        + CNNText (CNN)
+        + RNNClassifier (RNN Classifier)
+        (these are separated)
+    + RNN
+
+train_experimental.py
+
+evaluate_experimental.py
+
+dataloaders_experimental.py
+
+pipeline_experimental.py
