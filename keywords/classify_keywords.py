@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 # Classify the keywords into categories using word embeddings
 
+from nltk.tokenize import WordPunctTokenizer
 from random import shuffle
 from sklearn.metrics import classification_report
 import argparse
@@ -11,90 +12,50 @@ import os
 import pandas
 
 # Local imports
-from pytorch_models import LinearNN
+from pytorch_models import LinearNN, ElmoCNN
 import kw_tools
 
 def main():
-    #argparser = argparse.ArgumentParser()
-    #argparser.add_argument('--train', action="store", dest="trainfile")
-    #argparser.add_argument('--test', action="store", dest="testfile")
-    #argparser.add_argument('--out', action="store", dest="outfile")
-    #argparser.add_argument('--vectors', action="store", dest="vecfile")
-    #argparser.set_default('testfile', None)
-    #args = argparser.parse_args()
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument('--train', action="store", dest="trainfile")
+    argparser.add_argument('--categories', action="store", dest="catfile")
+    argparser.add_argument('--kw_map', action="store", dest="kwfile")
+    argparser.add_argument('--out', action="store", dest="outfile")
+    argparser.add_argument('--vectors', action="store", dest="vecfile")
+    argparser.add_argument('--model_type', action="store", dest="model_type")
+    argparser.add_argument('--eval', action="store", dest="should_eval")
+    argparser.set_default('model_type', 'pubmed')
+    argparser.set_default('should_eval', False)
+    args = argparser.parse_args()
 
-    #if not (args.trainfile and args.vecfile and args.outfile):
-    #    print('usage: ./classify_keywords.py --train [file.csv] --test [file.csv] --out [file.txt] --vectors [file.vectors]')
-    #    exit()
+    if not (args.trainfile and args.vecfile and args.outfile):
+        print('usage: ./classify_keywords.py --train [file.csv] --test [file.csv] --out [file.txt] --vectors [file.vectors]')
+        exit()
 
-    #supervised_classify(args.trainfile, args.testfile, args.outfile, args.vecfile)
-    #run(args.trainfile, args.testfile, args.outfile, args.vecfile)
-    filepath = '/u/sjeblee/research/data/va/child_keywords'
-    supervised_classify(trainfile=os.path.join(filepath, 'full_keywords_19Jun2019.csv'),
-                        cat_file=os.path.join(filepath, 'categories_fouo.csv'),
-                        kw_file=os.path.join(filepath, 'kw_map_all.csv'),
-                        outfile=os.path.join(filepath, 'kw_map_pred_june19.csv'),
-                        vecfile='/u/sjeblee/research/vectors/wikipedia-pubmed-and-PMC-w2v.bin')
+    supervised_classify(trainfile=args.trainfile,
+                        cat_file=args.catfile,
+                        kw_file=args.kwfile,
+                        outfile=args.outfile,
+                        vecfile=args.vecfile, model_type=args.model_type, eval=args.should_eval)
 
 
+''' Classify keywords using a neural network
+    trainfile: the file containing a mapping of keywords to the correct keyword category number (kw_map_all.csv)
+    cat_file: the file containing a mapping of category numbers to names (categories_fouo.csv)
+    kw_file:
+    outfile: give the output mapping file a name (kw_map_pred.csv)
+    eval: True to split off 10% of the training data to evaluate on, False to train on the whole data
+    model: 'pubmed' to use the PubMed word2vec embeddings with a linear nn, 'elmo' to use Elmo embeddings with a CNN
 '''
-def run(trainfile, testfile, outfile, vecfile):
-    starttime = time.time()
-
-    # Load word2vec vectors
-    print "loading vectors..."
-    word2vec, dim = extract_features.load_word2vec(vecfile)
-
-    # Extract keywords
-    train_keywords, train_clusters, train_vecs, cluster_names = cluster_keywords.read_cluster_file(trainfile, word2vec, dim)
-    test_keywords, test_clusters, test_vecs, test_cluster_names = cluster_keywords.read_cluster_file(testfile, word2vec, dim, cluster_names)
-    num_clusters = len(cluster_names)
-
-    print "train_keywords: " + str(len(train_keywords))
-    print "num_clusters: " + str(num_clusters)
-    print "dim: " + str(dim)
-
-    # Generate clusters
-    print "generating clusters..."
-    nn = Sequential([Dense(200, input_dim=dim),
-                     Activation('relu'),
-                     #Dense(num_nodes, input_dim=num_feats),
-                     #Activation(activation),
-                     Dense(num_clusters),
-                     Activation('softmax'),])
-
-    nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
-    print "train shape: vecs: " + str(numpy.array(train_vecs).shape) + "clusters: " + str(numpy.array(train_clusters).shape)
-    nn.fit(numpy.array(train_vecs), to_categorical(train_clusters))
-    nn.summary()
-
-    results = nn.predict(numpy.array(test_vecs))
-    pred_clusters = map_back(results, cluster_names)
-
-    # Score clusters
-    print "scoring clusters..."
-    purity_score = cluster_keywords.purity(test_keywords, test_clusters, pred_clusters)
-    print "purity: " + str(purity_score)
-
-    # Write results to file
-    cluster_keywords.write_clusters_to_file(outfile, cluster_keywords.get_cluster_map(test_keywords, pred_clusters))
-
-    totaltime = time.time() - starttime
-    print "Total time: " + str(totaltime) + " s"
-'''
-
-def supervised_classify(trainfile, cat_file, kw_file, outfile, vecfile):
+def supervised_classify(trainfile, kw_file, outfile, vecfile, model_type='pubmed', eval=False):
     print('Training keyword classifier')
     num_categories = 43
-    cat_map = kw_tools.load_category_map(cat_file)
+    #cat_map = kw_tools.load_category_map(cat_file)
     kw_map = kw_tools.load_keyword_map(kw_file)
     keywords, labels, kw_test = keywords_from_csv(trainfile, kw_map, remove_stopwords=True)
     print('keywords:', len(keywords), 'labels:', len(labels), 'kw_test:', len(kw_test))
     labels = [int(x) for x in labels]
-    dataset = zip(keywords, labels)
-    #print('dataset:', len(dataset))
-
-    eval = False
+    dataset = list(zip(keywords, labels))
 
     # Split data into train and testfile
     if eval:
@@ -114,23 +75,47 @@ def supervised_classify(trainfile, cat_file, kw_file, outfile, vecfile):
         test_labels = []
 
     # Encode keywords as word embeddings
-    vec_model, dim = kw_tools.load_w2v(vecfile)
+    if vecfile is not None:
+        vec_model, dim = kw_tools.load_w2v(vecfile)
     print('train_keywords:', str(len(train_keywords)), 'train_labels:', str(len(train_labels)))
     print('test_keywords:', str(len(test_keywords)), 'test_labels:', str(len(test_labels)))
 
-    print('train_keywords:', str(train_keywords))
-    train_X = to_embeddings(train_keywords, vec_model)
-    test_X = to_embeddings(test_keywords, vec_model)
+    # Tokenize the keyword phrases
+    train_X = tokenize_keywords(train_keywords)
+    test_X = tokenize_keywords(test_keywords)
+    print('train keywords tokenized:', len(train_X))
+
+    # Filter empty keywords
+    train_X, train_labels = filter_empty(train_X, train_labels)
+    test_X, test_keywords = filter_empty(test_X, test_keywords)
+
+    # Convert labels to arrays
     train_Y = numpy.asarray(train_labels)
     test_Y = numpy.asarray(test_labels)
-    print('train_x: ', str(train_X.shape), ' train_y: ', str(train_Y.shape))
-    print('test_x: ' + str(test_X.shape) + ' test_y: ' + str(test_Y.shape))
-    dim = train_X.shape[-1]
+
+    print('test_Y[0:10]:', str(test_Y[0:10]))
+    print('train_x:', len(train_X), 'train_y:', str(train_Y.shape))
+    print('test_x:', len(test_X), 'test_y: ', str(test_Y.shape))
     #num_labels = train_Y.shape[-1]
 
     # pytorch nn model
-    model = LinearNN(input_size=dim, hidden_size=100, num_classes=num_categories)
-    model.fit(train_X, train_Y, 100, 'relu', num_epochs=20)
+    if model_type == 'pubmed':
+        train_X = to_embeddings(train_X, vec_model)
+        test_X = to_embeddings(test_X, vec_model)
+        dim = train_X.shape[-1]
+        model = LinearNN(input_size=dim, hidden_size=100, num_classes=num_categories, num_epochs=20)
+
+    # CNN model with Elmo embeddings
+    elif model_type == 'elmo':
+        dim = 1024 # For ELMo
+        model = ElmoCNN(input_size=dim, num_classes=num_categories)
+
+    else:
+        print('ERROR: unrecognized model type:', model_type, ' - should be "elmo" or "pubmed"')
+        exit(1)
+
+    # Train the model
+    model.fit(train_X, train_Y)
     pred_y = model.predict(test_X)
     print('pred_y:', str(len(pred_y)), pred_y)
 
@@ -161,6 +146,10 @@ def supervised_classify(trainfile, cat_file, kw_file, outfile, vecfile):
         df.to_csv(outfile)
 
 
+''' Convert phrases to embeddings (if multiple words, average their embeddings)
+    keywords: a list of keywords to convert to embeddings
+    vectors: the word embedding model
+'''
 def to_embeddings(keywords, vectors):
     x = []
     for kw in keywords:
@@ -180,6 +169,11 @@ def map_back(clusters, cluster_names):
     return cluster_vals
 
 
+''' Get keywords from csv file
+    filename: the csv file
+    kw_map: the mapping of keywords to category numbers
+    remove_stopwords: True to remove stopwords
+'''
 def keywords_from_csv(filename, kw_map, remove_stopwords=False):
     df = pandas.read_csv(filename)
     stopwords = []
@@ -223,7 +217,9 @@ def keywords_from_csv(filename, kw_map, remove_stopwords=False):
                 filt_kw = kw
 
             if len(filt_kw) > 0 and filt_kw in kw_map:
-                cat = kw_map[filt_kw] # Check for the filtered version, but save the original
+                cat = int(kw_map[filt_kw]) # Check for the filtered version, but save the original
+                if cat == 43:
+                    cat = 0
                 if kw not in keywords:
                     keywords.append(kw)
                     labels.append(int(cat))
@@ -232,7 +228,42 @@ def keywords_from_csv(filename, kw_map, remove_stopwords=False):
                 kw_test.append(kw)
         #keywords = kw_map.keys()
         #labels = kw_map.values()
+    for x in range(len(labels)):
+        if labels[x] == 43:
+            labels[x] = 0
     return keywords, labels, kw_test
+
+
+''' Tokenize a list of keywords
+    keywords: the list of keywords to tokenize
+'''
+def tokenize_keywords(keywords):
+    kw_tok = []
+    tokenizer = WordPunctTokenizer()
+    for kw in keywords:
+        tok = tokenizer.tokenize(kw)
+        #if len(tok) > 0:
+        kw_tok.append(tok)
+    print('tokenized keywords:')
+    for i in range(0, 10):
+        print(kw_tok[i])
+    return kw_tok
+
+
+''' Remove empty keyword phrases
+    x: the list of keyword phrases
+    y: the corresponding list of category labels, so we can keep them matched up
+'''
+def filter_empty(x, y):
+    new_x = []
+    new_y = []
+    print('filter empty: x:', len(x), 'y:', len(y))
+    for i in range(len(x)):
+        if len(x[i]) > 0:
+            new_x.append(x[i])
+            if len(y) > 0:
+                new_y.append(y[i])
+    return new_x, new_y
 
 
 if __name__ == "__main__": main()

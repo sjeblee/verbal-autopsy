@@ -63,7 +63,7 @@ def create_binary_csv(rec_file, cat_file, out_file):
     tag_neg: True to detect negations and set values to -1, False for binary features
     include_other: True to include the 'Other' keyword class and corresponding features, False to exclude it
 '''
-def create_csv_from_csv(csv_file, kw_file, cat_file, out_file, tag_neg=False, include_other=False):
+def create_csv_from_csv(csv_file, kw_file, cat_file, out_file, tag_neg=False, include_other=False, use_criteria=False, num_cats=43):
     print('create csv from csv')
     #mapfile = '/home/sjeblee/Documents/Research/VerbalAutopsy/data/category_maps/cghr_code_map_child.csv'
     #icdmap = data_util.get_icd_map(mapfile)
@@ -73,36 +73,38 @@ def create_csv_from_csv(csv_file, kw_file, cat_file, out_file, tag_neg=False, in
     df = df.fillna('')
 
     cat_names = load_category_map(cat_file)
-    cat_names[0] = 'other'
+    #cat_names[0] = 'other'
 
     # Load negex rules
     if tag_neg:
-        rfile = open('negex.python/negex_triggers.txt', 'r')
+        rfile = open('negex/negex_triggers.txt', 'r')
         irules = sortRules(rfile.readlines())
 
     # Set default values
     df['COD_CATEGORY'] = ''
     df['keywords_fixed'] = ''
-    df['criteria_diarrhea'] = '0'
-    df['criteria_fouo'] = '0'
-    df['criteria_malaria'] = '0'
-    df['criteria_meningitis_encephalitis'] = '0'
-    df['criteria_pneumonia'] = '0'
-    df['criteria_tb'] = '0'
+    if use_criteria:
+        df['criteria_diarrhea'] = '0'
+        df['criteria_fouo'] = '0'
+        df['criteria_malaria'] = '0'
+        df['criteria_meningitis_encephalitis'] = '0'
+        df['criteria_pneumonia'] = '0'
+        df['criteria_tb'] = '0'
 
-    for num in range(1, 43):
+    for num in range(1, num_cats):
         kw_name = 'kw_' + cat_names[int(num)]
         df[kw_name] = '0'
     if include_other:
-        kw_name = 'kw_' + cat_names[43]
+        kw_name = 'kw_' + cat_names[0]
         df[kw_name] = '0'
 
     # Add keyword pairs
-    max_num = 43
+    max_num = num_cats
+    min_num = 1
     if include_other:
-        max_num = 44
-    for num in range(1, max_num):
-        for num2 in range(1, max_num):
+        min_num = 0
+    for num in range(min_num, max_num):
+        for num2 in range(min_num, max_num):
             if num < num2:
                 name1 = cat_names[int(num)]
                 name2 = cat_names[int(num2)]
@@ -162,24 +164,26 @@ def create_csv_from_csv(csv_file, kw_file, cat_file, out_file, tag_neg=False, in
             df.at[i, kw_name] = val
         df.at[i, 'keywords_fixed'] = ','.join(keywords_fixed)
 
-        # Add diagnostic criteria
         v = {}
         for num in range(1, max_num):
             kw_name = 'kw_' + cat_names[int(num)]
             v[num] = (int(df.at[i, kw_name]) == 1)
 
-        if v[1] or v[2] or v[3]:
-            df.at[i, 'criteria_fouo'] = '1'
-        if v[7] and (v[1] or v[2] or v[3]) and (v[13] or v[14] or v[6] or v[20] or v[40]):
-            df.at[i, 'criteria_tb'] = '1'
-        if v[7] and v[2] and (v[6] or v[9] or v[8] or v[14] or v[13]) and not (v[11] or v[27] or v[25]):
-            df.at[i, 'criteria_pneumonia'] = '1'
-        if v[24] and (v[31] or v[28] or v[1] or v[2] or v[3]):
-            df.at[i, 'criteria_diarrhea'] = '1'
-        if v[2] and v[19] and (v[26] or v[17] or v[18] or v[31] or v[6]):
-            df.at[i, 'criteria_malaria'] = '1'
-        if ((v[1] or v[2] or v[3]) and v[19] and not (v[6] or v[7] or v[8] or v[9] or v[10] or v[11] or v[12])) or (v[37] or ((v[17] or v[36]) and (v[31] or v[18] or v[19]))):
-            df.at[i, 'criteria_meningitis_encephalitis'] = '1'
+        # Add diagnostic criteria
+        if use_criteria:
+
+            if v[1] or v[2] or v[3]:
+                df.at[i, 'criteria_fouo'] = '1'
+            if v[7] and (v[1] or v[2] or v[3]) and (v[13] or v[14] or v[6] or v[20] or v[40]):
+                df.at[i, 'criteria_tb'] = '1'
+            if v[7] and v[2] and (v[6] or v[9] or v[8] or v[14] or v[13]) and not (v[11] or v[27] or v[25]):
+                df.at[i, 'criteria_pneumonia'] = '1'
+            if v[24] and (v[31] or v[28] or v[1] or v[2] or v[3]):
+                df.at[i, 'criteria_diarrhea'] = '1'
+            if v[2] and v[19] and (v[26] or v[17] or v[18] or v[31] or v[6]):
+                df.at[i, 'criteria_malaria'] = '1'
+            if ((v[1] or v[2] or v[3]) and v[19] and not (v[6] or v[7] or v[8] or v[9] or v[10] or v[11] or v[12])) or (v[37] or ((v[17] or v[36]) and (v[31] or v[18] or v[19]))):
+                df.at[i, 'criteria_meningitis_encephalitis'] = '1'
 
         # Add keyword pairs
         for num in range(1, max_num):
@@ -200,7 +204,7 @@ def create_csv_from_csv(csv_file, kw_file, cat_file, out_file, tag_neg=False, in
 '''
 def clean_keywords(keywords):
     keywords = keywords.lower()
-    keywords = keywords.replace('  ', ',').replace(';', ',').replace('|', ',')
+    keywords = keywords.replace('  ', ',').replace(';', ',').replace('|', ',').replace('.', ',').replace('/', ',')
     keywords = keywords.replace('&', ',').replace(' and ', ',') # Fix and separators
     return keywords
 
@@ -218,6 +222,25 @@ def extract_keyword_list(csvfile, outfile):
     for kw in keywords:
         outf.write(kw + '\n')
     outf.close()
+
+
+def get_keywords_from_csv(csvfile):
+    df = pandas.read_csv(csvfile)
+    keywords_fixed = []
+    for i, row in df.iterrows():
+        # Get the keywords and normalize them
+        kw1 = str(df.at[i, 'p1_keywords'])
+        kw2 = str(df.at[i, 'p2_keywords'])
+        #print('kw1:', kw1, 'kw2:', kw2)
+        keywords = kw1 + kw2
+        #keywords = df.at[i, 'Terms']
+        keywords = clean_keywords(keywords)
+        print('keywords:', keywords)
+
+        for kw_phrase in keywords.strip().split(','):
+            kw_phrase = kw_phrase.strip()
+            keywords_fixed.append(kw_phrase)
+    return keywords_fixed
 
 
 '''
@@ -265,12 +288,13 @@ def load_keyword_map(filename, include_other=False):
             kw = row['terms'].strip().lower()
             clust = row['category']
             if str(clust) == '45':
-                clust = '43'
+                clust = 43
             if clust == '' or int(clust) > 43: # Check for empty category
                 if include_other:
-                    clust = '0'
+                    clust = 0
                 else:
                     continue
+            clust = int(clust)
             if kw not in keyword_map or keyword_map[kw] == '0':
                 keyword_map[kw] = clust
     print(str(len(keyword_map.keys())), ' keywords loaded')
