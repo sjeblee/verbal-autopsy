@@ -34,8 +34,10 @@ prepared_data = dte.prepare_data(full_data)
 # map class labels to indices
 
 class_label_set = [data_combo[1] for data_combo in prepared_data]
-unique_labels = list(set(class_label_set))
-# print(len(unique_labels))
+base_labels = list(set(class_label_set))
+max_label = max(base_labels)
+unique_labels = list(range(0, max_label+1))
+print(unique_labels)
 
 
 # create the embedding matrix
@@ -79,8 +81,9 @@ if use_cuda:
 print('all ready.')
 # train 
 
-'''
+
 for i in range(epoch_num):
+    print('current epoch: {}'.format(str(i)))
     for index_chunk in index_chunk_list:
 
         X_batch = input_matrix[index_chunk, :]
@@ -88,17 +91,23 @@ for i in range(epoch_num):
 
         print(X_batch.shape, y_batch.shape)
 
-        features = nn.Variable(X_batch)
-        target = nn.Variable(y_batch)
+        features = torch.LongTensor(X_batch)
+        target = torch.LongTensor(y_batch)
+
+        # print(type(features), type(target))
 
         optimizer.zero_grad()
 
-        basernn_out = rnn(features)
+        basernn_out = base_rnn(features)
+        print(target.shape)
+        print(basernn_out.shape)
+        # pred_labels_tuple = torch.max(basernn_out, dim=1)
+        # pred_labels = pred_labels_tuple[1] 
+        # print(target)
+        # print(pred_labels)
         loss = criterion(basernn_out, target)
         loss.backward()
         optimizer.step()
-'''
-
 
 
 # train and save the models 

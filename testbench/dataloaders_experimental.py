@@ -6,7 +6,7 @@ import string
 import numpy as np 
 import pandas as pd 
 
-hi_model = FastText.load_fasttext_format('wiki.hi.bin')
+hi_model = FastText.load_fasttext_format('../wiki.hi.bin')
 
 pp = pprint.PrettyPrinter(indent=4)
 

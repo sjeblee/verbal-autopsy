@@ -316,28 +316,30 @@ class BaseRNN(nn.Module):
 
         self.batch_normalization = nn.BatchNorm1d(hidden_size * 2)
         self.fully_connected = nn.Linear(hidden_size * 2, output_num)
-        self.out_softmax = nn.Softmax(output_num)
+        self.out_softmax = nn.Softmax(dim=0)
         
     def forward(self, x):
 
         # x : (batch, word num in sentence, vector size)
-
         x_embedded = self.embedding(x)
         x_embedded = self.dropout_emb(x_embedded)
+        x_embed = x_embedded.float()
         
-        gru_out, _ = nn.gru(x_embedded, None)
+        gru_out, _ = self.gru(x_embed, None)
 
         row_idx = torch.arange(0, x.size(0)).long()
-        
+
         bn_tensor = torch.mean(gru_out[row_idx, :, :], dim=1)
 
         batch_norm = self.batch_normalization(bn_tensor)
-        fc_out = self.out_softmax(self.fully_connected(batch_norm))
 
-        return fc_out
+        fc_out = self.fully_connected(batch_norm)
+        soft_out = self.out_softmax(fc_out)
+
+        return soft_out
 
     def init_hidden(self, batch_size):
-        return Variable(torch.zeros(self.num_layers, batch_size, self.hidden_size)) 
+        return nn.Variable(torch.zeros(self.num_layers, batch_size, self.hidden_size)) 
 
 # ##
 
