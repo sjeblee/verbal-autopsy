@@ -1,5 +1,170 @@
 from models_experimental import * 
 
+
+def train_model(model_type, X, Y, param_dict=None):
+    # call different trainer functions based off of the input arguments
+    # parameter_dict:
+    #   epochs, steps, batch_size, lr, loss, dropout, kernel_num, kernel_sizes (cnntext)
+    if model_type is not None and parameter_dict is None:
+        raise #error of some kind
+    if model_type == 'cnntext':
+        # X -> cnntext_data
+        cnn_model = mdl.CNNText(300, len(param_dict['unique_labels']), dropout=param_dict['dropout_rate'], ensemble=False)
+        cnn_opt = torch.optim.Adam(cnn_model.parameters(), lr=param_dict['lr'])
+        batch_size = param_dict['batch_size']
+        epoch_num = param_dict['epoch_num']
+        index_chunk_list = list(chunks(list(range(0, X.shape[0])), batch_size))
+        return train_cnntext(cnn_model, X, Y, epoch_num, index_chunk_list, cnn_opt)
+    elif model_type == 'cnnrnn':
+        # X -> cnntext_data 
+        cnn_model = mdl.CNNText(300, len(param_dict['unique_labels']), dropout=param_dict['dropout_rate'], ensemble=True)
+        rnn_model = mdl.TextRNNClassifier(param_dict['kernel_num'] * param_dict['kernel_sizes'], hidden_size = param_dict['hidden_size'], output_size = len(param_dict['unique_labels']))
+        cnn_opt = torch.optim.Adam(cnn_model.parameters(), lr=param_dict['lr'])
+        rnn_opt = torch.optim.Adam(rnn_model.parameters(), lr=param_dict['lr'])
+        batch_size = param_dict['batch_size']
+        epoch_num = param_dict['num_epochs']
+        index_chunk_list = list(chunks(list(range(0, X.shape[0])), batch_size))
+        return train_cnnrnn([cnn_model, rnn_model], X, Y, epoch_num, index_chunk_list, [cnn_opt, rnn_opt])
+    elif model_type == 'basernn':
+        # X -> input_matrix 
+        base_rnn = mdl.BaseRNN(len(list(param_dict['deva_index'].keys())), 300, param_dict['embed_mat'], len(param_dict['unique_labels']))
+        optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, base_rnn.parameters()), lr=param_dict['lr'], weight_decay=param_dict['weight_decay'])
+        batch_size = param_dict['batch_size']
+        epoch_num = param_dict['num_epochs']
+        index_chunk_list = list(chunks(list(range(0, X.shape[0])), batch_size))
+        return train_basernn(base_rnn, X, Y, epoch_num, index_chunk_list, optimizer)
+    else:
+        raise # error 
+
+def train_cnntext(model, X, Y, epoch_num, index_chunk_list, cnn_opt):
+    # use_cuda = 0
+    criterion = nn.CrossEntropyLoss()
+
+    cnn_model.train()
+
+    for i in range(epoch_num):
+        print('current epoch: {}'.format(str(i)))
+        for index_chunk in index_chunk_list:
+
+            X_batch = X[index_chunk, :, :, :]
+            y_batch = Y[index_chunk]
+
+            print(X_batch.shape, y_batch.shape)
+
+            features = torch.FloatTensor(X_batch)
+            target = torch.LongTensor(y_batch)
+
+            # print(type(features), type(target))
+
+            cnn_opt.zero_grad()
+
+            cnn_out = model(features)
+            # print(target.shape)
+            # print(cnn_out.shape)
+
+            print(cnn_out.shape)
+            # checker = [j for j in range(batch_size) if z + j < cnntext_data.shape[0]]
+            # print(checker)
+            # pred_labels_tuple = torch.max(basernn_out, dim=1)
+            # pred_labels = pred_labels_tuple[1] 
+            # print(target)
+            # print(pred_labels)
+            # one at a time ...
+            loss = criterion(cnn_out, target)
+            loss.backward()
+            cnn_opt.step()
+
+    return model
+
+def train_cnnrnn(model_ensemble_list, X, Y, epoch_num, opt_list):
+    # use_cuda = 0
+    criterion = nn.CrossEntropyLoss()
+
+    cnn_model = model_ensemble_list[0]
+    rnn_model = model_ensemble_list[1]
+
+    cnn_opt = opt_list[0]
+    rnn_opt = opt_list[1]
+
+    cnn_model.train()
+    rnn_model.train()
+
+    for i in range(epoch_num):
+        print('current epoch: {}'.format(str(i)))
+        for index_chunk in index_chunk_list:
+
+            X_batch = cnntext_data[index_chunk, :, :, :]
+            y_batch = labels[index_chunk]
+
+            print(X_batch.shape, y_batch.shape)
+
+            features = torch.FloatTensor(X_batch)
+            target = torch.LongTensor(y_batch)
+
+            # print(type(features), type(target))
+
+            cnn_opt.zero_grad()
+
+            cnn_out = cnn_model(features)
+            # print(target.shape)
+            # print(cnn_out.shape)
+
+            print(cnn_out.shape)
+            # checker = [j for j in range(batch_size) if z + j < cnntext_data.shape[0]]
+            # print(checker)
+            # pred_labels_tuple = torch.max(basernn_out, dim=1)
+            # pred_labels = pred_labels_tuple[1] 
+            # print(target)
+            # print(pred_labels)
+            # one at a time ...
+            for j in range(cnn_out.shape[0]):
+                rnn_out = rnn_model(cnn_out[j], 1)
+                loss = F.cross_entropy(rnn_out, torch.argmax(target[j]).reshape((1,)))
+            # loss = criterion(cnn_out, target)
+            loss.backward()
+            cnn_opt.step()
+            rnn_opt.step()
+    return cnn_model, rnn_model
+
+def train_basernn(model, X, Y, epoch_num, optimizer):
+    use_cuda = 0
+    criterion = nn.CrossEntropyLoss()
+    model.train()
+    for i in range(epoch_num):
+        print('current epoch: {}'.format(str(i)))
+        for index_chunk in index_chunk_list:
+
+            X_batch = X[index_chunk, :]
+            y_batch = Y[index_chunk]
+
+            print(X_batch.shape, y_batch.shape)
+
+            features = torch.LongTensor(X_batch)
+            target = torch.LongTensor(y_batch)
+
+            # print(type(features), type(target))
+
+            optimizer.zero_grad()
+
+            basernn_out = model(features)
+            print(target.shape)
+            print(basernn_out.shape)
+            # pred_labels_tuple = torch.max(basernn_out, dim=1)
+            # pred_labels = pred_labels_tuple[1] 
+            # print(target)
+            # print(pred_labels)
+            loss = criterion(basernn_out, target)
+            loss.backward()
+            optimizer.step()
+    return model
+
+def save_model(model, location):
+    # https://pytorch.org/tutorials/beginner/saving_loading_models.html
+    print('saving model state_dict to: {}'.format(str(location)))
+    torch.save(model.state_dict(), location)
+    print('saved.')
+    return 
+    
 '''
 def train_model(model_type, X, Y, parameter_dict=None):
     # call different trainer functions based off of the input arguments
@@ -116,8 +281,8 @@ def train_basicrnn(X, Y, parameter_dict):
 def train_attnrnn(X, Y, parameter_dict):
     return
 '''
-
-def train_textcnnrnn(X, Y, loss, parameter_dict):
+'''
+def train_textcnnrnn(X, Y, parameter_dict):
 
     X_a = np.asarray(X).astype('float')
     Y_a = Y.astype('int')
@@ -135,7 +300,7 @@ def train_textcnnrnn(X, Y, loss, parameter_dict):
     num_labels = Y_a.shape[-1]
 
     steps = 0
-    batch_size = 1
+    batch_size = parameter_dict['batch_size']
     num_batches = match.ceil(X_a.shape[0] / batch_size)
     num_epochs = parameter_dict['num_epochs']
     learning_rate = parameter_dict['lr']
@@ -158,7 +323,7 @@ def train_textcnnrnn(X, Y, loss, parameter_dict):
     rnn = TextRNNClassifier(
         kernel_num * kernel_sizes,
         hidden_size = hidden_num,
-        output_size = num_labels
+        output_size = parameter_dict['num_labels']
     )
 
     if parameter_dict['use_cuda']:
@@ -185,8 +350,8 @@ def train_textcnnrnn(X, Y, loss, parameter_dict):
         X_t = torch.from_numpy(batch_X).float()
         Y_t = torch.from_numpy(batch_Y).long()
 
-        feature = Variable(X_t)
-        target = Variable(Y_t)
+        feature = X_t
+        target = Y_t
 
         cnn_opt.zero_grad()
         rnn_opt.zero_grad()
@@ -196,7 +361,7 @@ def train_textcnnrnn(X, Y, loss, parameter_dict):
 
         # train TextRNNClassifier one by one
         for j in range(batch_size):
-            if i + j < X_len:
+            if i + j < X_a.shape[0]:
                 rnn_output = rnn(cnn_output[j], 1)
                 loss = F.cross_entropy(rnn_output, torch.argmax(target[j]).reshape((1,)))
 
@@ -256,3 +421,5 @@ def save_model(model, location):
     torch.save(model.state_dict(), location)
     print('saved.')
     return 
+
+'''

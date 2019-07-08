@@ -91,6 +91,38 @@ def sentence_vectorize_data(data, ft_model):
     # N x 300 sentence vector collection with N x 1 categories 
     return
 
+def sentence_block_data(data, embed_dim=300):
+    '''
+    input:
+        data =>
+            [
+                [devanagari, final_code] 
+            ]
+        ft_model => fasttext model for hindi
+
+    output:
+        (N, 1, MAX_LEN, EMBED_DIM)
+    '''
+
+    N = len(data) # num setences
+    max_len = max([len(data_tuple[0].split()) for data_tuple in data])
+
+    X = np.zeros((N, 1, max_len, embed_dim))
+
+    for i in range(N):
+        tokenized_sentence = data[i][0].split()
+        padding_amount = max_len - len(tokenized_sentence)
+        embed_set = []
+        for token in tokenized_sentence:
+            try:
+                embed_set.append(hi_model[token])
+            except KeyError:
+                embed_set.append(np.zeros(embed_dim, dtype=np.int))
+        embed_set = embed_set + [np.zeros(embed_dim, dtype=np.int) for x in range(padding_amount)]
+        X[i,0,:,:] = np.matrix(embed_set)
+
+    return X 
+
 def word_vectorize_data(data):
     '''
     input:

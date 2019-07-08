@@ -37,13 +37,89 @@ class_label_set = [data_combo[1] for data_combo in prepared_data]
 base_labels = list(set(class_label_set))
 max_label = max(base_labels)
 unique_labels = list(range(0, max_label+1))
-print(unique_labels)
 
 
 # create the embedding matrix
 deva_index, embed_mat = dte.word_vectorize_data(prepared_data)
 # print(embed_mat[:3,:])
 
+'''
+CNN stuff
+'''
+
+labels = np.array([data_combo[1] for data_combo in prepared_data]) # resize as (num_sentences, 1)
+
+cnntext_data = dte.sentence_block_data(prepared_data)
+print(cnntext_data.shape)
+# print(len(class_label_set))
+
+param_dict = {
+    'batch_size': 16,
+    'num_epochs': 3,
+    'lr': 0.03,
+    'kernel_num': 200,
+    'kernel_sizes': 5,
+    'hidden_size': 100,
+    'dropout_rate': 0.0,
+    'use_cuda': False
+}
+
+
+cnn_model = mdl.CNNText(300, len(unique_labels), dropout=0.0, ensemble=True)
+rnn_model = mdl.TextRNNClassifier(param_dict['kernel_num'] * param_dict['kernel_sizes'], hidden_size = param_dict['hidden_size'], output_size = len(unique_labels))
+
+cnn_opt = torch.optim.Adam(cnn_model.parameters(), lr=param_dict['lr'])
+rnn_opt = torch.optim.Adam(rnn_model.parameters(), lr=param_dict['lr'])
+# divide into batches
+batch_size = param_dict['batch_size']
+epoch_num = param_dict['num_epochs']
+index_chunk_list = list(chunks(list(range(0, cnntext_data.shape[0])), batch_size))
+# print(index_chunk_list)
+
+# cuda, loss criterion, and optimizer
+use_cuda = 0
+criterion = nn.CrossEntropyLoss()
+
+cnn_model.train()
+rnn_model.train()
+for i in range(epoch_num):
+    print('current epoch: {}'.format(str(i)))
+    for index_chunk in index_chunk_list:
+
+        X_batch = cnntext_data[index_chunk, :, :, :]
+        y_batch = labels[index_chunk]
+
+        print(X_batch.shape, y_batch.shape)
+
+        features = torch.FloatTensor(X_batch)
+        target = torch.LongTensor(y_batch)
+
+        # print(type(features), type(target))
+
+        cnn_opt.zero_grad()
+
+        cnn_out = cnn_model(features)
+        # print(target.shape)
+        # print(cnn_out.shape)
+
+        print(cnn_out.shape)
+        # checker = [j for j in range(batch_size) if z + j < cnntext_data.shape[0]]
+        # print(checker)
+        # pred_labels_tuple = torch.max(basernn_out, dim=1)
+        # pred_labels = pred_labels_tuple[1] 
+        # print(target)
+        # print(pred_labels)
+        # one at a time ...
+        for j in range(cnn_out.shape[0]):
+            rnn_out = rnn_model(cnn_out[j], 1)
+            loss = F.cross_entropy(rnn_out, torch.argmax(target[j]).reshape((1,)))
+        # loss = criterion(cnn_out, target)
+        loss.backward()
+        cnn_opt.step()
+        rnn_opt.step()
+
+'''
+RNN STUFF 
 # construct the models
 base_rnn = mdl.BaseRNN(len(list(deva_index.keys())), 300, embed_mat, len(unique_labels))
 print('all good so far.')
@@ -52,7 +128,7 @@ print('all good so far.')
 # ---
 # turn data set into integer sequence (num_sentences, max_seq_length) and target sequence (num_sentences, 1)
 labels = np.array([data_combo[1] for data_combo in prepared_data]) # resize as (num_sentences, 1)
-max_seq_len = max([len(data_combo[0]) for data_combo in prepared_data])
+max_seq_len = max([len(data_combo[0].split()) for data_combo in prepared_data])
 feature_sequences = [convert_token_to_index_sequence(deva_index, data_combo[0], max_seq_len) for data_combo in prepared_data]
 input_matrix = np.matrix(feature_sequences)
 
@@ -81,7 +157,7 @@ if use_cuda:
 print('all ready.')
 # train 
 
-
+base_rnn.train()
 for i in range(epoch_num):
     print('current epoch: {}'.format(str(i)))
     for index_chunk in index_chunk_list:
@@ -111,3 +187,4 @@ for i in range(epoch_num):
 
 
 # train and save the models 
+'''

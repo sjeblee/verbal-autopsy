@@ -59,8 +59,8 @@ class SingleNet(nn.Module):
         return out
 
 class CNNText(nn.Module):
-    def __init__(self, embed_dim, class_num, kernel_num=200, kernel_sizes=6, dropout=0.0, ensemble=False, hidden_size=100):
-        super(CNN_Text, self).__init__()
+    def __init__(self, embed_dim, class_num, kernel_num=200, kernel_sizes=5, dropout=0.0, ensemble=False, hidden_size=100):
+        super(CNNText, self).__init__()
         D = embed_dim
         C = class_num
         Ci = 1
@@ -83,7 +83,7 @@ class CNNText(nn.Module):
         return x
 
     def forward(self, x):
-        x = x.unsqueeze(1)  # (N, Ci, W, D)]
+        # x = x.unsqueeze(1)  # (N, Ci, W, D)]
         x1 = self.conv_and_pool(x, self.conv11) # (N,Co)
         x2 = self.conv_and_pool(x, self.conv12) # (N,Co)
         x3 = self.conv_and_pool(x, self.conv13) # (N,Co)
