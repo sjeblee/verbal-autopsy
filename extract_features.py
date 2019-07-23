@@ -16,7 +16,7 @@ import re
 import data_util
 import preprocessing
 import rebalance
-import word2vec
+import word2vec3 as word2vec
 import codecs
 
 # Flag for using symptoms only for training. No narrative
