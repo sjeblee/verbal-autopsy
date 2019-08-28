@@ -573,7 +573,7 @@ def setup(arg_modelname, arg_train, arg_test, arg_features, arg_featurename, arg
             print "Keyword clustering..."
             #clusterfile = trainkw + ".clusters"
             clusterfile = dataloc + "/train_" + trainname + "_" + kwname + ".clusters"
-            cluster_keywords.run(trainkw, clusterfile, arg_vecfile, trainset, devset, devkw, num_clusters=numc)
+            cluster_keywords.run(trainkw, clusterfile, arg_vecfile, trainset, devset, devkw, num_clusters=int(numc))
         trainset = trainkw
         devset = devkw
         devname = devname + "_" + kwname
