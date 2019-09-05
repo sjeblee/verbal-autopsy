@@ -27,7 +27,7 @@ emb_dim_char= 24       #embedding dimension of character, other dimensions are t
 max_char_in_word = 7   #maximum number of characters counted in a word, which is used in input_conc model
 max_num_char = 1000    #maximum number of characters allowed in a text, which is used in character-embedding model
 dropout = 0.3
-feat = ['region','language']    #can be either a feature string or a list of feature strings
+feat = ['region','Language']    #can be either a feature string or a list of feature strings
                                 #current feature: 'region','Language','StateCode','DeathPlace','Religion','Education','Marital','DeathAge'
 #---------------------bert parameters-----------------------
 BERT_MODEL = 'pretrained_bert_tf/biobert_pretrain_output_all_notes_150000' 

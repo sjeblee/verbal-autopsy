@@ -21,7 +21,7 @@ def clean_file(filename):
 '''
 def fix_arrows(filename):
     sed_command = r"sed -e 's/-->/to/g' " + filename + r" | sed -e 's/->/to/g' | sed -e 's/ < / lt /g' | sed -e 's/ > / gt /g'"
-    print "sed_command: " + sed_command
+    print("sed_command: " + sed_command)
     #f = open("temp", 'wb')
     ps = subprocess.Popen(sed_command, shell=True, stdout=subprocess.PIPE)
     output = ps.communicate()[0]
@@ -111,7 +111,7 @@ def get_icd_map(filename):
         for line in f:
             line = line.strip()
             parts = line.split(',')
-            icd_map[parts[0].upper()] = parts[1]
+            icd_map[parts[0]] = parts[1]
     return icd_map
 
 def load_word2vec(vecfile):
@@ -151,7 +151,7 @@ def multi_hot_encoding(labels, max_label=None):
                     if val > max_label:
                         max_label = val
     dim = max_label+1
-    print "max_label: " + str(max_label) + ", dim: " + str(dim)
+    print("max_label: " + str(max_label) + ", dim: " + str(dim))
 
     for seq in labels:
         encoded_seq = zero_vec(dim)
@@ -207,7 +207,7 @@ def remove_no_narrs(infile, outfile):
                 root.remove(child)
                 count = count+1
 
-    print "Removed " + str(count) + " missing or empty narratives"
+    print("Removed " + str(count) + " missing or empty narratives")
     tree.write(outfile)
 
 def score_majority_class(true_labs):
@@ -308,7 +308,7 @@ def phrases_from_tags(text, tags, atts=[]):
     #print "phrases_from tags text: " + text
     for child in root:
         if child.tag.lower() in tags:
-            print "found tag: " + child.tag
+            print("found tag: " + child.tag)
             phrase = {}
             if child.text != None:
                 phrase['text'] = child.text
@@ -328,11 +328,11 @@ def text_from_tags(text, tags):
     text = "<root>" + text + "</root>"
     newtext = ""
     root = etree.fromstring(text)
-    print "text: " + text
+    print("text: " + text)
     for child in root:
-        print "--child"
+        print("--child")
         if child.tag.lower() in tags:
-            print "found tag: " + child.tag
+            print("found tag: " + child.tag)
             if child.text != None:
                 newtext = newtext + ' ' + child.text
     return newtext
@@ -343,7 +343,7 @@ def text_from_tags(text, tags):
 '''
 def write_to_file(matrix, dict_keys, outfile):
     # Write the features to file
-    print "writing " + str(len(matrix)) + " feature vectors to file..."
+    print("writing " + str(len(matrix)) + " feature vectors to file...")
     output = open(outfile, 'w')
     for feat in matrix:
         #print "ICD_cat: " + feat["ICD_cat"]
