@@ -14,7 +14,6 @@ from torch.autograd import Variable
 from word2vec import load
 from word2vec import get
 from utils import timeSince
-from pytorch_pretrained_bert import BertModel
 import statistics
 numpy.set_printoptions(threshold=numpy.inf)
 debug = True

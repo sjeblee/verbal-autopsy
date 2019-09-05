@@ -568,3 +568,72 @@ def get_data_struct(input_train,feature):
             data[MG_ID.text] = (cghr_cat.text,text,feature_val)
     
     return data,all_categories
+
+def buildConfusionMat(labels,preds,IDs,out_file):
+    labels_correct = {}
+    labels_pred = {}
+    for i in range(len(labels)):
+        pred = str(preds[i])
+        cor = str(labels[i])
+        if cor in labels_correct:
+            labels_correct[cor] += 1
+        else:
+            labels_correct[cor] = 1
+        if pred in labels_pred:
+            labels_pred[pred] += 1
+        else:
+            labels_pred[pred] = 1
+        
+    # Confusion matrix
+    confusion = metrics.confusion_matrix(labels, preds, sorted(labels_correct.keys()))
+    totals = []
+    confusion_percent = []
+    for row in confusion:
+        total = 0
+        for item in row:
+            total = total + item
+        row_percent = []
+        totals.append(total)
+        for item in row:
+            item_percent = 0.0
+            if total > 0:
+                item_percent = float(item)/float(total)
+            row_percent.append(item_percent)
+        confusion_percent.append(row_percent)
+    output = open(out_file, "w")
+    output.write("confusion_matrix")
+    keys = sorted(labels_correct.keys())
+    for key in keys:
+        output.write("," + key)
+    output.write("\n")
+    for i in range(len(keys)):
+        key = keys[i]
+        row = confusion[i]
+        output.write(key)
+        for j in range(len(row)):
+            output.write("," + str(row[j]))
+        output.write("\n")
+
+    # Percentage confusion matrix
+    output.write("confusion_matrix_percent")
+    for key in keys:
+        output.write("," + key)
+    output.write("\n")
+    for i in range(len(keys)):
+        key = keys[i]
+        row = confusion_percent[i]
+        output.write(key)
+        for j in range(len(row)):
+            output.write("," + str(row[j]))
+        output.write("," + str(totals[i]))
+        #print "totals[i]: " + str(totals[i])
+        output.write("\n")
+
+    output.write("predicted distribution\nicd_cat,num_records\n")
+    for key in labels_pred.keys():
+        output.write(key + "," + str(labels_pred[key]) + "\n")
+    output.write("correct distribution\nicd_cat,num_records\n")
+    for key in labels_correct.keys():
+        output.write(key + "," + str(labels_correct[key]) + "\n")
+    output.close()
+    return 
