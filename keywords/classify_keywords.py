@@ -5,6 +5,7 @@
 from nltk.tokenize import WordPunctTokenizer
 from random import shuffle
 from sklearn.metrics import classification_report
+from sklearn.preprocessing import LabelEncoder
 import argparse
 import math
 import numpy
@@ -12,7 +13,7 @@ import os
 import pandas
 
 # Local imports
-from pytorch_models import LinearNN, ElmoCNN
+from pytorch_models import LinearNN, ElmoCNN, ElmoRNN
 import kw_tools
 
 def main():
@@ -93,6 +94,14 @@ def supervised_classify(trainfile, kw_file, outfile, vecfile, model_type='pubmed
     train_Y = numpy.asarray(train_labels)
     test_Y = numpy.asarray(test_labels)
 
+    # Convert labels to binary
+    #lb = LabelBinarizer()
+    lb = LabelEncoder()
+    if model_type == 'elmo':
+        lb.fit(numpy.concatenate((train_Y, test_Y)))
+        train_Y = lb.transform(train_Y)
+        test_Y = lb.transform(test_Y)
+
     print('test_Y[0:10]:', str(test_Y[0:10]))
     print('train_x:', len(train_X), 'train_y:', str(train_Y.shape))
     print('test_x:', len(test_X), 'test_y: ', str(test_Y.shape))
@@ -108,7 +117,136 @@ def supervised_classify(trainfile, kw_file, outfile, vecfile, model_type='pubmed
     # CNN model with Elmo embeddings
     elif model_type == 'elmo':
         dim = 1024 # For ELMo
-        model = ElmoCNN(input_size=dim, num_classes=num_categories)
+        hidden_size = 256
+        #kernel_sizes=5
+        model = ElmoRNN(input_size=dim, hidden=hidden_size, num_classes=len(lb.classes_), num_epochs=15)
+        #model = ElmoCNN(input_size=dim, num_classes=len(lb.classes_), num_epochs=10, kernel_sizes=4)
+
+    else:
+        print('ERROR: unrecognized model type:', model_type, ' - should be "elmo" or "pubmed"')
+        exit(1)
+
+    # Train the model
+    model.fit(train_X, train_Y)
+    pred_y = model.predict(test_X)
+    if model_type == 'elmo':
+        pred_y = lb.inverse_transform(pred_y)
+        test_Y = lb.inverse_transform(test_Y)
+    print('pred_y:', str(len(pred_y)), pred_y)
+
+    # Print metrics
+    if eval:
+        print(classification_report(test_Y, pred_y))
+    else:
+        # Write the predicted keyword map to csv file
+        df = pandas.DataFrame(columns=['terms', 'category'])
+        assert(len(pred_y) == len(test_keywords))
+
+        # Add the original map
+        print('saving original map...')
+        for key in kw_map.keys():
+            df = df.append({'terms': key, 'category': kw_map[key]}, ignore_index=True)
+
+        # Add the predicted mappings
+        print('saving pred keywords')
+        for x in range(len(test_keywords)):
+            kw = test_keywords[x].strip()
+            category = int(pred_y[x])
+
+            if len(kw) > 0:
+                df = df.append({'terms': kw, 'category': category}, ignore_index=True)
+                if x % 1000 == 0:
+                    print(str(x), kw, str(category))
+
+        df.to_csv(outfile)
+
+
+''' Classify disease from keywords using a neural network
+    trainfile: the file containing a mapping of keywords to the correct keyword category number (kw_map_all.csv)
+    cat_file: the file containing a mapping of category numbers to names (categories_fouo.csv)
+    kw_file:
+    outfile: give the output mapping file a name (kw_map_pred.csv)
+    eval: True to split off 10% of the training data to evaluate on, False to train on the whole data
+    model: 'pubmed' to use the PubMed word2vec embeddings with a linear nn, 'elmo' to use Elmo embeddings with a CNN
+'''
+def classify_disease(trainfile, outfile, vecfile=None, model_type='elmo', eval=True, crossval=True):
+    print('Training disease classifier')
+    disease_classes = ['diar', 'fouo', 'pneum', 'mal', 'men', 'meas', 'tb']
+
+    # Get data and labels from csv
+    keywords = []
+    diseases = []
+    df = pandas.read_csv(trainfile)
+    for i, row in df.iterrows():
+        kw1 = str(df.at[i, 'p1_keywords'])
+        kw2 = str(df.at[i, 'p2_keywords'])
+        #print('kw1:', kw1, 'kw2:', kw2)
+        row_keywords = kw1 + kw2
+        row_keywords = kw_tools.clean_keywords(row_keywords)
+
+        # Get disease column
+        code = str(df.at[i, 'cod_orig'])
+        if code in disease_classes:
+            keywords.append(row_keywords)
+            diseases.append(code)
+
+    labelencoder = LabelEncoder()
+    labels = labelencoder.fit_transform(diseases)
+    num_categories = len(labelencoder.classes_)
+    print('classes:', labelencoder.classes_)
+
+    print('keywords:', len(keywords), 'labels:', len(labels))
+    labels = [int(x) for x in labels]
+    dataset = list(zip(keywords, labels))
+
+    # Split data into train and testfile
+    # TODO: 10-fold crossval
+    if eval:
+        shuffle(dataset)
+        num = len(dataset)
+        test_num = int(math.floor(0.1 * float(num))) # Use 10% of the data for testing
+        train_num = num - test_num
+        print('train:', str(train_num), 'test:', str(test_num))
+        train_dataset = dataset[0:train_num]
+        test_dataset = dataset[train_num:]
+        train_keywords, train_labels = zip(*train_dataset)
+        test_keywords, test_labels = zip(*test_dataset)
+
+    # Encode keywords as word embeddings
+    if vecfile is not None:
+        vec_model, dim = kw_tools.load_w2v(vecfile)
+    print('train_keywords:', str(len(train_keywords)), 'train_labels:', str(len(train_labels)))
+    print('test_keywords:', str(len(test_keywords)), 'test_labels:', str(len(test_labels)))
+
+    # Tokenize the keyword phrases
+    train_X = tokenize_keywords(train_keywords)
+    test_X = tokenize_keywords(test_keywords)
+    print('train keywords tokenized:', len(train_X))
+
+    # Filter empty keywords
+    train_X, train_labels = filter_empty(train_X, train_labels)
+    test_X, test_keywords = filter_empty(test_X, test_keywords)
+
+    # Convert labels to arrays
+    train_Y = numpy.asarray(train_labels)
+    test_Y = numpy.asarray(test_labels)
+
+    print('test_Y[0:10]:', str(test_Y[0:10]))
+    print('train_x:', len(train_X), 'train_y:', str(train_Y.shape))
+    print('test_x:', len(test_X), 'test_y: ', str(test_Y.shape))
+    #num_labels = train_Y.shape[-1]
+
+    # pytorch nn model
+    if model_type == 'pubmed':
+        train_X = to_embeddings(train_X, vec_model)
+        test_X = to_embeddings(test_X, vec_model)
+        dim = train_X.shape[-1]
+        model = LinearNN(input_size=dim, hidden_size=100, num_classes=num_categories, num_epochs=20)
+
+    # CNN model with Elmo embeddings
+    elif model_type == 'elmo':
+        dim = 1024 # For ELMo
+        model = ElmoCNN(input_size=dim, num_classes=num_categories, kernel_sizes=4, num_epochs=5)
 
     else:
         print('ERROR: unrecognized model type:', model_type, ' - should be "elmo" or "pubmed"')
@@ -119,9 +257,14 @@ def supervised_classify(trainfile, kw_file, outfile, vecfile, model_type='pubmed
     pred_y = model.predict(test_X)
     print('pred_y:', str(len(pred_y)), pred_y)
 
+    # Transform numerical labels back to text
+    pred_labels = labelencoder.inverse_transform(pred_y)
+    ref_labels = labelencoder.inverse_transform(test_Y)
+
     # Print metrics
     if eval:
-        print(classification_report(test_Y, pred_y))
+        print(classification_report(ref_labels, pred_labels))
+    '''
     else:
         # Write the predicted keyword map to csv file
         df = pandas.DataFrame(columns=['terms', 'category'])
@@ -144,6 +287,7 @@ def supervised_classify(trainfile, kw_file, outfile, vecfile, model_type='pubmed
                     print(str(x), kw, str(category))
 
         df.to_csv(outfile)
+    '''
 
 
 ''' Convert phrases to embeddings (if multiple words, average their embeddings)
@@ -257,12 +401,11 @@ def tokenize_keywords(keywords):
 def filter_empty(x, y):
     new_x = []
     new_y = []
-    print('filter empty: x:', len(x), 'y:', len(y))
     for i in range(len(x)):
-        if len(x[i]) > 0:
+        if len(x[i]) > 0 and len(y) > 0:
             new_x.append(x[i])
-            if len(y) > 0:
-                new_y.append(y[i])
+            new_y.append(y[i])
+    print('filter empty: x:', len(new_x), 'y:', len(new_y))
     return new_x, new_y
 
 

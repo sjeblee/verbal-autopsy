@@ -73,7 +73,8 @@ def create_csv_from_csv(csv_file, kw_file, cat_file, out_file, tag_neg=False, in
     df = df.fillna('')
 
     cat_names = load_category_map(cat_file)
-    #cat_names[0] = 'other'
+    if include_other:
+        cat_names[0] = 'other'
 
     # Load negex rules
     if tag_neg:
@@ -289,7 +290,7 @@ def load_keyword_map(filename, include_other=False):
             clust = row['category']
             if str(clust) == '45':
                 clust = 43
-            if clust == '' or int(clust) > 43: # Check for empty category
+            if str(clust) == '' or int(clust) > 43: # Check for empty category
                 if include_other:
                     clust = 0
                 else:

@@ -16,7 +16,10 @@ numpy.set_printoptions(threshold=numpy.inf)
 tdevice = 'cpu'
 use_cuda = torch.cuda.is_available()
 if use_cuda:
-    tdevice = torch.device('cuda:2')
+    tdevice = torch.device('cuda:0')
+
+options_file = "/u/sjeblee/research/data/elmo/weights/elmo_2x4096_512_2048cnn_2xhighway_options.json"
+weight_file = "/u/sjeblee/research/data/elmo/weights/elmo_2x4096_512_2048cnn_2xhighway_weights_PubMed_only.hdf5"
 
 #use_cuda = False
 
@@ -105,8 +108,6 @@ class LinearNN(nn.Module):
 
     def predict(self, testX, threshold=0.01):
         # Test the Model
-        #softmax = nn.Softmax(dim=1)
-        #logsoftmax = nn.LogSoftmax(dim=1)
         testX = testX.astype('float')
         pred = [] # Original prediction without using threshold for ill-defined.
         #new_pred = [] # New prediction by assigning to UNKNOWN class if below the threshold
@@ -161,8 +162,6 @@ class ElmoCNN(nn.Module):
 
     def __init__(self, input_size, num_classes, num_epochs=10, dropout_p=0.1, kernel_num=100, kernel_sizes=3, loss_func='crossentropy'):
         super(ElmoCNN, self).__init__()
-        options_file = "/u/sjeblee/research/data/elmo/weights/elmo_2x4096_512_2048cnn_2xhighway_options.json"
-        weight_file = "/u/sjeblee/research/data/elmo/weights/elmo_2x4096_512_2048cnn_2xhighway_weights_PubMed_only.hdf5"
         self.elmo = Elmo(options_file, weight_file, 1, dropout=0).to(tdevice)
 
         D = input_size
@@ -173,14 +172,9 @@ class ElmoCNN(nn.Module):
         self.epochs = num_epochs
         self.loss_func = loss_func
 
-        self.conv11 = nn.Conv2d(Ci, self.Co, (1, D))
-        self.conv12 = nn.Conv2d(Ci, self.Co, (2, D))
-        self.conv13 = nn.Conv2d(Ci, self.Co, (3, D))
-        #self.conv14 = nn.Conv2d(Ci, self.Co, (4, D))
-        #self.conv15 = nn.Conv2d(Ci, self.Co, (5, D))
-        #self.conv16 = nn.Conv2d(Ci, Co, (6, D))
-        #self.conv17 = nn.Conv2d(Ci, Co, (7, D))
-        #self.conv18 = nn.Conv2d(Ci, Co, (8, D))
+        self.convs = []
+        for kn in range(self.Ks):
+            self.convs.append(nn.Conv2d(Ci, self.Co, (kn+1, D)))
 
         self.dropout = nn.Dropout(dropout_p)
         self.fc1 = nn.Linear(self.Co*self.Ks, C) # Use this layer when train with only CNN model, i.e. No ensemble
@@ -208,15 +202,10 @@ class ElmoCNN(nn.Module):
 
         x = X.unsqueeze(1)  # (N, Ci, W, D)]
         #print('x size:', x.size())
-        x1 = self.conv_and_pool(x, self.conv11) # (N,Co)
-        x2 = self.conv_and_pool(x, self.conv12) # (N,Co)
-        x3 = self.conv_and_pool(x, self.conv13) # (N,Co)
-        #x4 = self.conv_and_pool(x, self.conv14) # (N,Co)
-        #x5 = self.conv_and_pool(x, self.conv15) # (N,Co)
-        #x6 = self.conv_and_pool(x,self.conv16) #(N,Co)
-        #x7 = self.conv_and_pool(x,self.conv17)
-        #x8 = self.conv_and_pool(x,self.conv18)
-        x = torch.cat((x1, x2, x3), 1)
+        x_list = []
+        for conv in self.convs:
+            x_list.append(self.conv_and_pool(x, conv))
+        x = torch.cat(x_list, 1)
         x = self.dropout(x)  # (N, len(Ks)*Co)
 
         logit = self.fc1(x)  # (N, C)
@@ -240,6 +229,8 @@ class ElmoCNN(nn.Module):
 
         if use_cuda:
             self = self.to(tdevice)
+            for conv in self.convs:
+                conv.to(tdevice)
 
         # Train final model
         self.train(X, Y, learning_rate, batch_size)
@@ -300,38 +291,145 @@ class ElmoCNN(nn.Module):
 
     def predict(self, testX, testids=None, labelencoder=None, collapse=False, threshold=0.1, probfile=None):
         y_pred = [] # Original prediction if threshold is not in used for ill-defined.
-        #y_pred_softmax = []
-        #y_pred_logsoftmax = []
-        #softmax = nn.Softmax(dim=1)
-        new_y_pred = [] # class prediction if threshold for ill-difined is used.
-        #if probfile is not None:
-        #    probs = []
 
         for x in range(len(testX)):
             input_row = testX[x]
 
             icd = None
             if icd is None:
-                #input_tensor = torch.from_numpy(input_row.astype('float')).float().unsqueeze(0)
-                #if use_cuda:
-                    #input_tensor = input_tensor.cuda()
-                #print('input_row:', len(input_row))
-                #print('input_row[0]:', input_row[0])
-                #icd_var, attn_maps = model(Variable(input_tensor))
                 icd_var = self([input_row])
                 # Softmax and log softmax values
                 icd_vec = self.logsoftmax(icd_var).squeeze()
-                #print('pred vector:', icd_vec.size(), icd_vec)
-                print('argmax:', torch.argmax(icd_vec))
-                #icd_vec_softmax = softmax(icd_var)
                 cat = torch.argmax(icd_vec).item()
                 if x == 0:
                     print('cat:', cat)
-                #icd_code = cat
 
             y_pred.append(cat)
 
-        #print "Probabilities: " + str(probs)
-
         return y_pred  # Uncomment this line if threshold is not in used.
-        #return new_y_pred  # Comment this line out if threshold is not in used.
+
+
+####################################
+# ELMo RNN model
+####################################
+
+class ElmoRNN(nn.Module):
+
+    def __init__(self, input_size, hidden, num_classes, num_epochs=10, dropout_p=0.1, loss_func='crossentropy', batch_size=1):
+        super(ElmoRNN, self).__init__()
+        self.elmo = Elmo(options_file, weight_file, 1, dropout=0).to(tdevice)
+
+        C = num_classes
+        self.epochs = num_epochs
+        self.loss_func = loss_func
+        self.batch_size = batch_size
+        self.hidden_size = hidden
+        print('GRU model: input:', input_size, 'hidden:', hidden, 'output:', C)
+
+        self.gru = nn.GRU(input_size=int(input_size), hidden_size=int(self.hidden_size/2), batch_first=True, bidirectional=True, dropout=dropout_p)
+        self.fc1 = nn.Linear(self.hidden_size, C)
+        self.logsoftmax = nn.LogSoftmax(dim=1)
+
+    def forward(self, x):
+        hn = None
+        batch_size = len(x)
+        character_ids = batch_to_ids(x).to(tdevice)
+        embeddings = self.elmo(character_ids)['elmo_representations']
+        #print('elmo embeddings:', embeddings[0].size())
+        X = embeddings[0].view(batch_size, -1, 1024) # (N, W, D)
+
+        output, hn = self.gru(X, hn)
+        output = output[:, -1, :].view(batch_size, -1) # Save only the last timestep
+        #print('output:', output.size())
+        out = self.fc1(output)
+        return out
+
+    ''' Create and train a CNN model
+        Hybrid features supported - pass structured feats as X2
+        Does NOT support joint training yet
+        returns: the CNN model
+    '''
+    def fit(self, X, Y):
+        # Train the CNN, return the model
+        #batch_size = 16
+        learning_rate = 0.001
+
+        if use_cuda:
+            self = self.to(tdevice)
+
+        # Train final model
+        self.train(X, Y, learning_rate)
+
+    def train(self, X, Y, learning_rate):
+        #Xarray = numpy.asarray(X).astype('float')
+        Yarray = Y.astype('int')
+        X_len = len(X)
+        print('X len:', X_len)
+        print('Y numpy shape:', str(Yarray.shape))
+        print('batch_size:', self.batch_size)
+        steps = 0
+        st = time.time()
+        optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate)
+
+        if self.loss_func == 'crossentropy':
+            loss = nn.CrossEntropyLoss()
+        else:
+            print('ERROR: unrecognized loss function name')
+
+        for epoch in range(self.epochs):
+            print('epoch', str(epoch))
+            i = 0
+            numpy.random.seed(seed=1)
+            perm = torch.from_numpy(numpy.random.permutation(X_len))
+            permutation = perm.long()
+            perm_list = perm.tolist()
+            Xiter = [X[i] for i in perm_list]
+            #Xiter = X[permutation]
+            Yiter = Yarray[permutation]
+
+            while i+self.batch_size < X_len:
+                batchX = Xiter[i:i+self.batch_size]
+                batchY = Yiter[i:i+self.batch_size]
+                #Xtensor = torch.from_numpy(batchX).float()
+                Ytensor = torch.from_numpy(batchY).long()
+                if use_cuda:
+                    Ytensor = Ytensor.to(tdevice)
+
+                optimizer.zero_grad()
+                logit = self(batchX)
+                #print('logit:', logit, 'ytensor:', Ytensor)
+
+                loss_val = loss(logit, Ytensor)
+                #print('loss: ', loss_val.data.item())
+                loss_val.backward()
+                optimizer.step()
+                steps += 1
+                i = i+self.batch_size
+
+            # Print epoch time
+            ct = time.time() - st
+            unit = "s"
+            if ct > 60:
+                ct = ct/60
+                unit = "m"
+            print("time so far: ", str(ct), unit)
+            print('loss: ', loss_val.data.item())
+
+    def predict(self, testX, testids=None, labelencoder=None, collapse=False, threshold=0.1, probfile=None):
+        y_pred = [] # Original prediction if threshold is not in used for ill-defined.
+
+        for x in range(len(testX)):
+            input_row = testX[x]
+
+            icd = None
+            if icd is None:
+                icd_var = self([input_row])
+                # Softmax and log softmax values
+                icd_vec = self.logsoftmax(icd_var).squeeze()
+                cat = torch.argmax(icd_vec).item()
+                if x == 0:
+                    print('cat:', cat)
+
+            y_pred.append(cat)
+
+        return y_pred

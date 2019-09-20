@@ -6,7 +6,7 @@
 import os
 
 # Local imports
-#import classify_keywords
+import classify_keywords
 import cluster_keywords
 import kw_tools
 
@@ -17,26 +17,36 @@ vectors = '/u/sjeblee/research/vectors/wikipedia-pubmed-and-PMC-w2v.bin'
 
 def main():
     # Uncomment this block for supervised classifier
-    #classify_keywords.supervised_classify(trainfile=os.path.join(filepath, 'full_keywords_19Jun2019.csv'), # CSV file
-    #                                      cat_file=os.path.join(filepath, 'categories_fouo.csv'),           # Keyword category names
-    #                                      kw_file=os.path.join(filepath, 'kw_map_all.csv'),                 # Manually mapped keywords
-    #                                      outfile=os.path.join(filepath, 'kw_map_pred_july2_elmo.csv'),         # Output keyword mapping
-    #                                      vecfile=None,                                                     # filepath for pubmed vectors if using pubmed model, None for Elmo model
-    #                                      model_type='elmo',                                                # 'pubmed' or 'elmo'
-    #                                      eval=False)                                                       # True to use 10% of training data for evaluation
+    classify_keywords.supervised_classify(trainfile=os.path.join(filepath, 'full_keywords_19Jun2019.csv'), # CSV file
+                                          kw_file=os.path.join(filepath, 'kw_map_all.csv'),                 # Manually mapped keywords
+                                          outfile=os.path.join(filepath, 'kw_map_pred_sep20_elmo.csv'),         # Output keyword mapping
+                                          vecfile=None,                                                     # filepath for pubmed vectors if using pubmed model, None for Elmo model
+                                          model_type='elmo',                                                # 'pubmed' or 'elmo'
+                                          eval=False)                                                       # True to use 10% of training data for evaluation
+
+    # Uncomment this block to run disease classification directly from the keyword_string
+    '''
+    classify_keywords.classify_disease(trainfile=os.path.join(filepath, 'full_keywords_19Jun2019.csv'), # CSV file
+                                       outfile=os.path.join(filepath, 'full_pred_aug22_elmo.csv'),         # Output keyword mapping
+                                       vecfile=None,                                                     # filepath for pubmed vectors if using pubmed model, None for Elmo model
+                                       model_type='elmo',                                                # 'pubmed' or 'elmo'
+                                       eval=True)                                                       # True to use 10% of training data for evaluation
+    '''
 
     # OR - uncomment this block for unsupervised clustering of keywords
+    '''
     cluster_keywords.unsupervised_cluster(infile=os.path.join(filepath, 'full_keywords_19Jun2019.csv'), # CSV file
                                           clusterfile=os.path.join(filepath, 'kw_clusters_43.csv'),        # Choose a name for the cluster output file
                                           outfile=os.path.join(filepath, 'kw_map_clusters_43.csv'),        # Choose a name for the output keyword mapping
                                           vecfile=vectors,                                                  # File containing word embeddings
                                           num_clusters=43)                                                  # The number of clusters to generate
+    '''
 
     # Use either the supervised or unsupervised keyword groupings to generate binary features for each record
     kw_tools.create_csv_from_csv(csv_file=os.path.join(filepath, 'full_keywords_19Jun2019.csv'),            # Same CSV file
-                                 kw_file=os.path.join(filepath, 'kw_map_clusters_43.csv'),        # The keyword mapping created above
-                                 cat_file=os.path.join(filepath, 'kw_clusters_43.names'),                    # Keyword category names
-                                 out_file=os.path.join(filepath, 'mds_child_jan2019_keywords_clusters43.csv'),  # Output CSV file
+                                 kw_file=os.path.join(filepath, 'kw_map_pred_sep20_elmo.csv'),        # The keyword mapping created above
+                                 cat_file=os.path.join(filepath, 'categories_fouo.csv'),                    # Keyword category names
+                                 out_file=os.path.join(filepath, 'mds_child_jan2019_keywords_elmo_cnn.csv'),  # Output CSV file
                                  include_other=True,       # True to include the 'other' keyword category
                                  tag_neg=False,             # True to use negex to tag negative keywords
                                  num_cats=43)               # Number of keyword categories (should be the same as num_clusters if using unsupervised)
