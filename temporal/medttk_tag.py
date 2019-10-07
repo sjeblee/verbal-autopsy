@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # Add medttk temporal tags and events to the xml
 
@@ -16,7 +16,7 @@ def main():
     args = argparser.parse_args()
 
     if not (args.infile and args.outfile):
-        print "usage: ./medttk_tag.py --in [file.xml] --out [outfile.xml]"
+        print("usage: ./medttk_tag.py --in [file.xml] --out [outfile.xml]")
         exit()
 
     run(args.infile, args.outfile)
@@ -26,7 +26,7 @@ def run(infile, outfile):
     text_outfile = "/u/sjeblee/temp-medttk.xml"
     element_name = "narr_medttk"
 
-    print "processing file: " + str(infile)
+    print("processing file:", infile)
 
     # Get the xml from file
     tree = etree.parse(infile)
@@ -66,11 +66,11 @@ def run(infile, outfile):
                 #        med_narr = med_narr + " " + ex.text
             newnode = etree.Element(element_name)
             newnode.text = med_narr
-            print "med_narr: " + med_narr
+            print("med_narr: ", med_narr)
             child.append(newnode)
 
     # write the stats to file
     tree.write(outfile)
 
 
-if __name__ == "__main__":main()
+if __name__ == "__main__": main()

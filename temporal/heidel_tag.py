@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 # Add temporal tags to the xml
 
@@ -15,7 +15,7 @@ def main():
     args = argparser.parse_args()
 
     if not (args.infile and args.outfile):
-        print "usage: ./heidel_tag.py --in [file.xml] --out [outfile.xml]"
+        print("usage: ./heidel_tag.py --in [file.xml] --out [outfile.xml]")
         exit()
 
     run(args.infile, args.outfile)

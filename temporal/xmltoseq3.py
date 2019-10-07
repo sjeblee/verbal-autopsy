@@ -4,7 +4,7 @@
 
 import sys
 sys.path.append('/u/sjeblee/research/va/git/verbal-autopsy')
-import data_util3 as data_util
+import data_util
 import tools
 
 from lxml import etree

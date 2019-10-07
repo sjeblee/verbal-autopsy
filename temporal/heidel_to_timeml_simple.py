@@ -29,7 +29,7 @@ def main():
     # Get the xml from file
     tree = etree.parse(args.infile)
     root = tree.getroot()
-    
+
     for child in root:
         node = child.find("narrative")
         narr = ""
@@ -48,16 +48,16 @@ def main():
                 simple_text = simplify(narr_ht)
                 text = simple_text.replace("&lt;", "<").replace("&gt;", ">")
             # Create a new node for timeml_simple
-            newnode = etree.Element("narr_timeml_simple")
+            newnode = etree.Element("narr_timeml_heidel")
             newnode.text = simple_text
             child.append(newnode)
-        
+
     # write the new xml to file
     tree.write(args.outfile)
 
     # Fix tags
     subprocess.call(["sed", "-i", "-e", 's/&lt;/</g', args.outfile])
-    subprocess.call(["sed", "-i", "-e", 's/&gt;/>/g', args.outfile])            
+    subprocess.call(["sed", "-i", "-e", 's/&gt;/>/g', args.outfile])
 
 def stringify_children(node):
     parts = ([node.text] + list(chain(*([tostring(c)] for c in node.getchildren()))))

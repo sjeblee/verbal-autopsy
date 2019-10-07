@@ -4,7 +4,7 @@
 
 import sys
 sys.path.append('..') # verbal-autopsy dir
-import data_util3 as data_util
+import data_util
 import models_pytorch
 import tools
 import word2vec3 as word2vec
@@ -62,7 +62,7 @@ def main():
 def run(trainfile, testfile, outfile="", modelname="crf", arg_inline=False, devfile=""):
     if 'va' in trainfile:
         split_sents = True
-    
+
     if modelname == 'ncrf':
         global use_ncrf
         use_ncrf = True
