@@ -15,12 +15,11 @@ import torch.nn.functional as F
 #import matplotlib.pyplot as plt
 #import matplotlib.ticker as ticker
 
-import data_util3
-import pickle
+#import data_util
+#import pickle
 
 numpy.set_printoptions(threshold=numpy.inf)
 use_cuda = torch.cuda.is_available()
-#use_cuda = False
 if use_cuda:
     torch.cuda.set_device(2)
 
@@ -435,7 +434,7 @@ class RNNClassifier(nn.Module):
 
     def _init_hidden(self, batch_size):
         hidden = Variable(torch.zeros(self.n_layers * self.n_directions,
-                             batch_size, self.hidden_size))
+                          batch_size, self.hidden_size))
         if use_cuda:
             return hidden.cuda()
         else:
@@ -495,49 +494,48 @@ def cnn_attnrnn(X, Y, num_epochs=10, loss_func='categorical_crossentropy', dropo
     for epoch in range(num_epochs):
         print("epoch", str(epoch))
         i = 0
-	numpy.random.seed(seed=1)
-	permutation = torch.from_numpy(numpy.random.permutation(X_len)).long()
-	Xiter = Xarray[permutation]
-	Yiter = Yarray[permutation]
+        numpy.random.seed(seed=1)
+        permutation = torch.from_numpy(numpy.random.permutation(X_len)).long()
+        Xiter = Xarray[permutation]
+        Yiter = Yarray[permutation]
 
-	while i+batch_size < X_len:
-	    batchX = Xiter[i:i+batch_size]
-	    batchY = Yiter[i:i+batch_size]
-	    Xtensor = torch.from_numpy(batchX).float()
-	    Ytensor = torch.from_numpy(batchY).long()
-	    feature = Variable(Xtensor)
-	    target = Variable(Ytensor)
+        while i+batch_size < X_len:
+            batchX = Xiter[i:i+batch_size]
+            batchY = Yiter[i:i+batch_size]
+            Xtensor = torch.from_numpy(batchX).float()
+            Ytensor = torch.from_numpy(batchY).long()
+            feature = Variable(Xtensor)
+            target = Variable(Ytensor)
 
-	    # Define optimizers
-	    cnn_optimizer.zero_grad()
-	    rnn_optimizer.zero_grad()
+            # Define optimizers
+            cnn_optimizer.zero_grad()
+            rnn_optimizer.zero_grad()
 
-	    # Train CNN_Text
-	    cnn_output = cnn(feature)
-    	    print("CNN trained")
-	    print("CNN output size: ", str(cnn_output.size()))
+            # Train CNN_Text
+            cnn_output = cnn(feature)
+        print("CNN trained")
+        print("CNN output size: ", str(cnn_output.size()))
 
-	    # Train RNNClassifier one-by-one
-	    for j in range(batch_size):
-		if i + j < X_len:
-		    rnn_output = rnn(cnn_output[j],1)
-		    loss = F.cross_entropy(rnn_output, torch.argmax(target[j]).reshape((1,)))
-	    print("RNN trained")
+        # Train RNNClassifier one-by-one
+        for j in range(batch_size):
+            if i + j < X_len:
+                rnn_output = rnn(cnn_output[j], 1)
+                loss = F.cross_entropy(rnn_output, torch.argmax(target[j]).reshape((1,)))
+        print("RNN trained")
 
-	    loss.backward()
-	    cnn_optimizer.step()
-	    rnn_optimizer.step()
+        loss.backward()
+        cnn_optimizer.step()
+        rnn_optimizer.step()
+        steps +=1
+        i = i + batch_size
 
-	    steps +=1
-	    i = i + batch_size
-
-	# Print epoch time
-	ct = time.time() - st
-	unit = "s"
-	if ct > 60:
-	    ct = ct/60
-	    unit = "m"
-	print("time so far: ", str(ct), unit)
+        # Print epoch time
+        ct = time.time() - st
+        unit = "s"
+        if ct > 60:
+            ct = ct/60
+            unit = "m"
+        print("time so far: ", str(ct), unit)
     return cnn, rnn
 
 ###########################################################
@@ -558,18 +556,18 @@ def cnn_attnrnn(X, Y, num_epochs=10, loss_func='categorical_crossentropy', dropo
 def test_cnn_attnrnn(cnn_model, rnn_model, testX, testids, labelencoder=None, collapse=False):
     y_pred = []
     for x in range(len(testX)):
-	input_row = testX[x]
+        input_row = testX[x]
 
-	icd = None
-	if icd is None:
-	    input_tensor = torch.from_numpy(numpy.asarray([input_row]).astype('float')).float()
-	    if use_cuda:
-		input_tensor = input_tensor.contiguous().cudata()
-	    cnn_output = cnn_model(Variable(input_tensor))
-	    icd_var = rnn_model(cnn_output,1)
-	    icd_code = torch.max(icd_var, 1)[1].data[0]
+        icd = None
+        if icd is None:
+            input_tensor = torch.from_numpy(numpy.asarray([input_row]).astype('float')).float()
+        if use_cuda:
+            input_tensor = input_tensor.contiguous().cudata()
+        cnn_output = cnn_model(Variable(input_tensor))
+        icd_var = rnn_model(cnn_output, 1)
+        icd_code = torch.max(icd_var, 1)[1].data[0]
 
-	y_pred.append(icd_code)
+        y_pred.append(icd_code)
 
     return y_pred
 
@@ -674,31 +672,32 @@ def test_nn(net, testX, threshold=0.01):
         samples = Variable(sample_tensor)
         outputs = net(samples)
 
-	outputs_ls = logsoftmax(outputs)
-	outputs_softmax = softmax(outputs)
-	predicted = torch.max(outputs_ls, 1)[1].data
-	probabilities = torch.max(outputs_softmax, 1)[0].data
+        outputs_ls = logsoftmax(outputs)
+        outputs_softmax = softmax(outputs)
+        predicted = torch.max(outputs_ls, 1)[1].data
+        probabilities = torch.max(outputs_softmax, 1)[0].data
         pred = pred + predicted.tolist()
 
-	# Get the probabilities, if the highest probability is less than the threshold, assign it to the ill-defined class.
-	probs = probs + probabilities.tolist()
-	for num, prob in enumerate(probs):
-	    if prob < threshold:  # Set the threshold. Initially hard-coded. Will be modified.
-		new_pred.append(9) # Index location of the ill-defined class.
-	    else:
-		new_pred.append(pred[num])
+        # Get the probabilities, if the highest probability is less than the threshold, assign it to the ill-defined class.
+        probs = probs + probabilities.tolist()
+        for num, prob in enumerate(probs):
+            if prob < threshold:  # Set the threshold. Initially hard-coded. Will be modifiedself.
+                new_pred.append(9) # Index location of the ill-defined class.
+            else:
+                new_pred.append(pred[num])
 
         del sample_tensor
         i = i+batch_size
     #return pred # Uncomment this line if threshold is not in used.
     return new_pred # Comment this line out if threshold is not in used.
 
+
 ''' Creates and trains a recurrent neural network model. Supports SimpleRNN, LSTM, and GRU
     X: a list of training data
     Y: a list of training labels
 '''
 def rnn_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', dropout=0.1, X2=[], pretrainX=[], pretrainY=[], pretrainX2=[], initial_states=None, num_epochs=15):
-    print("model: ", modelname, " nodes: ", str(num_nodes), " embedding: ", str(embedding_size), " max_seq_len: ", str(max_seq_len))
+    #print("model: ", modelname, " nodes: ", str(num_nodes), " embedding: ", str(embedding_size), " max_seq_len: ", str(max_seq_len))
 
     n_iters = len(X)
     print("epochs: ", str(num_epochs), " iters: ", str(n_iters))
@@ -853,7 +852,7 @@ def train_cnn(cnn, X, Y, batch_size, num_epochs, learning_rate, query=False):
                 logit = cnn(feature)
 
             loss = F.cross_entropy(logit, torch.max(target, 1)[1])
-            print('loss: ', str(loss.data[0]))
+            print('loss: ', str(loss.item()))
             loss.backward()
             optimizer.step()
             steps += 1
@@ -894,7 +893,7 @@ def test_cnn(model, testX, testids=None, probfile='/u/yoona/data/torch/probs_win
             # Softmax and log softmax values
             icd_vec = logsoftmax(icd_var)
             icd_vec_softmax = softmax(icd_var)
-            icd_code = torch.max(icd_vec, 1)[1].data[0]
+            icd_code = torch.max(icd_vec, 1)[1].item()
 
             # Save the first example attn map
             '''
@@ -907,14 +906,15 @@ def test_cnn(model, testX, testids=None, probfile='/u/yoona/data/torch/probs_win
                         outf.write(str(row.data[i]) + ',')
                     outf.write('\n')
                 outf.close()
-            '''
 
-	    # Assign to ill-defined class if the maximum probabilities is less than a threshold.
-	    #icd_prob = torch.max(icd_vec_softmax,1)[0]
-	    #if icd_prob < threshold:
+
+            # Assign to ill-defined class if the maximum probabilities is less than a threshold.
+            #icd_prob = torch.max(icd_vec_softmax,1)[0]
+            #if icd_prob < threshold:
             #    new_y_pred.append(9)
-	    #else:
-	    #    new_y_pred.append(icd_code)
+            #else:
+            #    new_y_pred.append(icd_code)
+            '''
 
             # Save the probabilties
             #if probfile is not None:
@@ -991,7 +991,7 @@ def train_encoder_decoder(input_variable, target_variable, encoder, decoder, enc
             decoder_input = decoder_output
             decoder_input = decoder_input.cuda() if use_cuda else decoder_input
 
-            target_var = target_variable[di].view([1,-1])
+            target_var = target_variable[di].view([1, -1])
             #print "- decoder_ouput: " + str(decoder_output.size())
             #print "- target_variable[di]: " + str(target_var.size())
 
@@ -1029,7 +1029,6 @@ def encoder_decoder_model(X, Y, num_nodes, print_every=1000, plot_every=100, lea
     print("output_dim: " + str(output_dim))
     encoder1 = EncoderRNN(input_dim, hidden_size)
     decoder1 = AttnDecoderRNN(hidden_size, output_dim, dropout_p=0.1, max_length=X.size()[1])
-
 
     if use_cuda:
         encoder1 = encoder1.cuda()
@@ -1076,6 +1075,7 @@ def encoder_decoder_model(X, Y, num_nodes, print_every=1000, plot_every=100, lea
 
     return encoder1, decoder1, output_dim
 
+
 '''
     testX: python list of input sequences (python lists)
     testY: python list of output sequences (also python lists)
@@ -1088,6 +1088,7 @@ def test_encoder_decoder(encoder, decoder, testX, max_length, output_dim):
         pred_seq = decoded_seq.storage.tolist()
         predY.append(pred_seq)
     return predY
+
 
 def decode(encoder, decoder, input_vec, max_length, output_dim):
     if use_cuda:
@@ -1131,6 +1132,7 @@ def decode(encoder, decoder, input_vec, max_length, output_dim):
 
     return decoded_seq, decoder_attentions[:di + 1]
 
+
 ##################################################
 # HELPER FUNCTIONS
 def asMinutes(s):
@@ -1138,12 +1140,14 @@ def asMinutes(s):
     s -= m * 60
     return '%dm %ds' % (m, s)
 
+
 def timeSince(since, percent):
     now = time.time()
     s = now - since
     es = s / (percent)
     rs = es - s
     return '%s (- %s)' % (asMinutes(s), asMinutes(rs))
+
 
 def showAttention(input_sentence, output_words, attentions):
     print("TODO")
@@ -1162,6 +1166,7 @@ def showAttention(input_sentence, output_words, attentions):
     #ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
 
     #plt.show()
+
 
 def evaluateAndShowAttention(input_sentence, encoder, attn_decoder):
     output_words, attentions = decode(encoder, attn_decoder, input_sentence, 10, 100)

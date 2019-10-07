@@ -92,7 +92,7 @@ def rebalance(features, labels, name="adasyn"):
         # Print original distribution
         print('original distribution:')
         for key in resample_dist.keys():
-                print str(key) + " : " + str(resample_dist[key])
+                print(str(key) + " : " + str(resample_dist[key]))
 
         # Smooth the distribution start by doubling the smallest half of the classes
         values = []
@@ -109,7 +109,7 @@ def rebalance(features, labels, name="adasyn"):
         # Print new distribution
         print('new distribution:')
         for key in resample_dist.keys():
-                print str(key) + " : " + str(resample_dist[key])
+                print(str(key) + " : " + str(resample_dist[key]))
 
         x_resampled = []
         y_resampled = []
@@ -137,5 +137,5 @@ def rebalance(features, labels, name="adasyn"):
                 else:
                         y_final.append(label)
                         x_final.append(x_resampled[z])
-                        print str(y_resampled[z]) + " : " + str(x_resampled[z])
+                        print(str(y_resampled[z]) + " : " + str(x_resampled[z]))
         return x_resampled, y_resampled

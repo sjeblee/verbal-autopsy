@@ -11,7 +11,7 @@ import os
 import time
 from keras.models import Model, Sequential, load_model
 from keras.layers import Input, Dense, Dropout, Activation, Flatten, Permute, Reshape, RepeatVector, BatchNormalization
-from keras.layers import Embedding, LSTM, GRU, TimeDistributed, Merge, merge, concatenate, multiply
+from keras.layers import Embedding, LSTM, GRU, TimeDistributed, merge, concatenate, multiply
 from keras.layers.convolutional import Conv1D
 from keras.layers.pooling import GlobalMaxPooling1D, MaxPooling1D
 from keras.layers.recurrent import SimpleRNN
@@ -23,7 +23,7 @@ from keras.utils import plot_model
 #import attention_utils
 import cluster_keywords
 import data_util
-import rebalance
+#import rebalance
 #from layers import Attention
 
 vec_types = ["narr_vec", "narr_seq", "event_vec", "event_seq"]
@@ -38,10 +38,10 @@ def nn_model(X, Y, num_nodes, act, num_epochs=10):
     if type(X) is list:
         X = numpy.asarray(X)
     #Y = to_categorical(Y)
-    print "X.shape: " + str(X.shape)
-    print "Y.shape: " + str(Y.shape)
+    print("X.shape: " + str(X.shape))
+    print("Y.shape: " + str(Y.shape))
 
-    print "neural network: nodes: " + str(num_nodes)
+    print("neural network: nodes: " + str(num_nodes))
     nn = Sequential([Dense(num_nodes, input_dim=X.shape[-1]),
                     Activation(act),
                     #Dense(num_nodes, input_dim=num_feats),
@@ -54,6 +54,7 @@ def nn_model(X, Y, num_nodes, act, num_epochs=10):
     nn.summary()
     return nn, X, Y
 
+
 ''' Creates and trains a recurrent neural network model. Supports SimpleRNN, LSTM, and GRU
     X: a list of training data
     Y: a list of training labels
@@ -61,8 +62,8 @@ def nn_model(X, Y, num_nodes, act, num_epochs=10):
 def rnn_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', dropout=0.1, X2=[], pretrainX=[], pretrainY=[], pretrainX2=[], initial_states=None, num_epochs=15, loss_func='categorical_crossentropy'):
     Y = to_categorical(Y)
     X = numpy.asarray(X)
-    print "train X shape: " + str(X.shape)
-    print "train Y shape: " + str(Y.shape)
+    print("train X shape: " + str(X.shape))
+    print("train Y shape: " + str(Y.shape))
     embedding_size = X.shape[-1]
     max_seq_len = X.shape[1]
     inputs = []
@@ -71,9 +72,9 @@ def rnn_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', dropout=0
     pretrain = False
     if len(pretrainX) > 0 and len(pretrainY) > 0:
         pretrain = True
-        print "Using pretraining"
+        print("Using pretraining")
 
-    print "model: " + modelname + " nodes: " + str(num_nodes) + " embedding: " + str(embedding_size) + " max_seq_len: " + str(max_seq_len)
+    print("model: " + modelname + " nodes: " + str(num_nodes) + " embedding: " + str(embedding_size) + " max_seq_len: " + str(max_seq_len))
 
     input_shape = (max_seq_len, embedding_size)
     input1 = Input(shape=input_shape)
@@ -83,7 +84,7 @@ def rnn_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', dropout=0
     if len(X2) > 0:
         hybrid = True
         X2 = numpy.asarray(X2)
-        print "X2 shape: " + str(X2.shape)
+        print("X2 shape: " + str(X2.shape))
         input_arrays.append(X2)
         ff_feats = X2.shape[1]
         input2 = Input(shape=(ff_feats,))
@@ -98,7 +99,7 @@ def rnn_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', dropout=0
     else:
         rnn = LSTM(num_nodes, return_sequences=False, return_state=True)
 
-    if initial_states == None:
+    if initial_states is None:
         rnn_out, rnn_states = rnn(input1)
     else:
         rnn_out, rnn_states = rnn(input1, initial_state=initial_states)
@@ -112,7 +113,7 @@ def rnn_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', dropout=0
         last_out = dropout_out
 
     if pretrain:
-        print "pretraining..."
+        print("pretraining...")
         for k in range(len(pretrainX)):
             trainX = numpy.asarray(pretrainX[k])
             trainY = to_categorical(pretrainY[k])
@@ -127,7 +128,7 @@ def rnn_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', dropout=0
             pre_nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
             pre_nn.fit(pretrain_input_arrays, trainY, epochs=num_epochs)
 
-    print "training with main data..."
+    print("training with main data...")
     prediction = Dense(Y.shape[1], activation='softmax')(last_out)
     nn = Model(inputs=inputs, outputs=prediction)
     nn.compile(optimizer='rmsprop', loss=loss_func, metrics=['accuracy'])
@@ -135,6 +136,7 @@ def rnn_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', dropout=0
 
     nn.summary()
     return nn, X, Y
+
 
 ''' Create and train a CNN model
     Hybrid features supported - pass structured feats as X2
@@ -146,9 +148,9 @@ def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, return_
     X = numpy.asarray(X)
     embedding_size = X.shape[-1]
     max_seq_len = X.shape[1]
-    print "train X shape: " + str(X.shape)
-    print "CNN: embedding: " + str(embedding_size)
-    print "max_seq_len: " + str(max_seq_len)
+    print("train X shape: " + str(X.shape))
+    print("CNN: embedding: " + str(embedding_size))
+    print("max_seq_len: " + str(max_seq_len))
     branches = []
     inputs = []
     input_arrays = [X]
@@ -156,7 +158,7 @@ def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, return_
     pretrain = False
     if len(pretrainX) > 0 and len(pretrainY) > 0:
         pretrain = True
-        print "Using pretraining"
+        #print "Using pretraining"
 
     # Keras functional API with attention
     # Input layers
@@ -166,7 +168,7 @@ def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, return_
     if len(X2) > 0:
         hybrid = True
         X2 = numpy.asarray(X2)
-        print "X2 shape: " + str(X2.shape)
+        #print "X2 shape: " + str(X2.shape)
         input_arrays.append(X2)
         input2 = Input(shape=(X2.shape[1],))
         inputs.append(input2)
@@ -178,14 +180,14 @@ def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, return_
     # Convolution
     conv_outputs = []
     for w in windows:
-        print "window: " + str(max_seq_len) + " x " + str(w)
+        #print "window: " + str(max_seq_len) + " x " + str(w)
         conv_layer = Conv1D(max_seq_len, w, input_shape=input_shape)
 	    #conv_layer = Conv1D(10, w, input_shape=input_shape)
         conv = conv_layer(input1)
         max_pool_layer = GlobalMaxPooling1D()
         max_pool = max_pool_layer(conv)
         conv_outputs.append(max_pool)
-        print "conv: " + str(conv_layer.output_shape) + " pool: " + str(max_pool_layer.output_shape)
+        print("conv: " + str(conv_layer.output_shape) + " pool: " + str(max_pool_layer.output_shape))
 
     # Merge
     merged = concatenate(conv_outputs, axis=-1)
@@ -195,7 +197,7 @@ def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, return_
         merged = concatenate([merged, ff], axis=-1)
 
     if pretrain:
-        print "pretraining..."
+        #print "pretraining..."
         for k in range(len(pretrainX)):
             trainX = numpy.asarray(pretrainX[k])
             trainY = to_categorical(pretrainY[k])
@@ -228,16 +230,17 @@ def cnn_model(X, Y, act=None, windows=[1,2,3,4,5], X2=[], num_epochs=10, return_
     else:
         return nn, X, Y
 
+
 ''' Creates and trains a recurrent neural network model. Supports SimpleRNN, LSTM, and GRU
     X: a list of training data
     Y: a list of training labels
 '''
 def rnn_keyword_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', dropout=0.1, X2=[], pretrainX=[], pretrainY=[], pretrainX2=[], keywords=[], initial_states=None, windows=[1,2,3,4,5], num_epochs=15):
-    print "keyword rnn"
+    #print "keyword rnn"
     Y = to_categorical(Y)
     X = numpy.asarray(X)
     keywords = numpy.asarray(keywords)
-    print "train X shape: " + str(X.shape)
+    print("train X shape: " + str(X.shape))
     embedding_size = X.shape[-1]
     max_seq_len = X.shape[1]
     inputs = []
@@ -252,13 +255,13 @@ def rnn_keyword_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', d
     # Keyword CNN
     conv_outputs = []
     for w in windows:
-        print "window: " + str(max_seq_len) + " x " + str(w)
+        #print "window: " + str(max_seq_len) + " x " + str(w)
         conv_layer = Conv1D(max_seq_len, w, input_shape=input_shape)
         conv = conv_layer(input1)
         max_pool_layer = GlobalMaxPooling1D()
         max_pool = max_pool_layer(conv)
         conv_outputs.append(max_pool)
-        print "conv: " + str(conv_layer.output_shape) + " pool: " + str(max_pool_layer.output_shape)
+        #print "conv: " + str(conv_layer.output_shape) + " pool: " + str(max_pool_layer.output_shape)
     kw_out = concatenate(conv_outputs, axis=-1)
 
     # Keyword GRU
@@ -276,13 +279,13 @@ def rnn_keyword_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', d
     # RNN Pretraining
     if len(pretrainX) > 0 and len(pretrainY) > 0:
         pretrain = True
-        print "Using pretraining"
+        #print "Using pretraining"
 
-    print "model: " + modelname + " nodes: " + str(num_nodes) + " embedding: " + str(embedding_size) + " max_seq_len: " + str(max_seq_len)
+    print("model: " + modelname + " nodes: " + str(num_nodes) + " embedding: " + str(embedding_size) + " max_seq_len: " + str(max_seq_len))
 
     # Handle hybrid model
     if len(X2) > 0:
-        print "hybrid not supported yet!"
+        print("hybrid not supported yet!")
         #hybrid = True
         #X2 = numpy.asarray(X2)
         #print "X2 shape: " + str(X2.shape)
@@ -299,7 +302,7 @@ def rnn_keyword_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', d
     else:
         rnn = LSTM(num_nodes, return_sequences=False, return_state=True)
 
-    if initial_states == None:
+    if initial_states is None:
         rnn_out, rnn_states = rnn(input1)
     else:
         rnn_out, rnn_states = rnn(input1, initial_state=initial_states)
@@ -316,7 +319,7 @@ def rnn_keyword_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', d
     last_out = concatenate([dropout_out, kw_pred_main], axis=-1)
 
     if pretrain:
-        print "pretraining..."
+        #print "pretraining..."
         for k in range(len(pretrainX)):
             trainX = numpy.asarray(pretrainX[k])
             trainY = to_categorical(pretrainY[k])
@@ -331,7 +334,7 @@ def rnn_keyword_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', d
             pre_nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
             pre_nn.fit(pretrain_input_arrays, trainY, epochs=num_epochs)
 
-    print "training with main data..."
+    print("training with main data...")
     prediction = Dense(Y.shape[1], activation='softmax')(last_out)
     nn = Model(inputs=inputs, outputs=prediction)
     nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
@@ -340,17 +343,18 @@ def rnn_keyword_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', d
     nn.summary()
     return nn, kw_model, X, Y
 
+
 ''' Creates and trains a recurrent neural network model. Supports SimpleRNN, LSTM, and GRU
     X: a list of training data
     Y: a list of training labels
 '''
 def rnn_cnn_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', dropout=0.1, X2=[], pretrainX=[], pretrainY=[], pretrainX2=[], initial_states=None, windows=[1,2,3], num_epochs=15):
-    print "rnn cnn model"
+    #print "rnn cnn model"
     Y = to_categorical(Y)
     X = numpy.asarray(X)
     X2 = numpy.asarray(X2)
-    print "train X shape: " + str(X.shape)
-    print "X2 shape: " + str(X2.shape)
+    #print "train X shape: " + str(X.shape)
+    #print "X2 shape: " + str(X2.shape)
     embedding_size = X.shape[-1]
     max_seq_len = X.shape[1]
     inputs = []
@@ -368,13 +372,13 @@ def rnn_cnn_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', dropo
     # CNN
     conv_outputs = []
     for w in windows:
-        print "window: " + str(max_seq_len) + " x " + str(w)
+        #print "window: " + str(max_seq_len) + " x " + str(w)
         conv_layer = Conv1D(max_seq_len, w, input_shape=input_shape)
         conv = conv_layer(input2)
         max_pool_layer = GlobalMaxPooling1D()
         max_pool = max_pool_layer(conv)
         conv_outputs.append(max_pool)
-        print "conv: " + str(conv_layer.output_shape) + " pool: " + str(max_pool_layer.output_shape)
+        #print "conv: " + str(conv_layer.output_shape) + " pool: " + str(max_pool_layer.output_shape)
     pre_out = concatenate(conv_outputs, axis=-1)
 
     # GRU
@@ -392,13 +396,13 @@ def rnn_cnn_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', dropo
     # RNN Pretraining
     if len(pretrainX) > 0 and len(pretrainY) > 0:
         pretrain = True
-        print "Using pretraining"
+        print("Using pretraining")
 
-    print "model: " + modelname + " nodes: " + str(num_nodes) + " embedding: " + str(embedding_size) + " max_seq_len: " + str(max_seq_len)
+    #print "model: " + modelname + " nodes: " + str(num_nodes) + " embedding: " + str(embedding_size) + " max_seq_len: " + str(max_seq_len)
 
     # Handle hybrid model
     if len(X2) > 0:
-        print "hybrid not supported yet!"
+        print("hybrid not supported yet!")
         #hybrid = True
         #X2 = numpy.asarray(X2)
         #print "X2 shape: " + str(X2.shape)
@@ -432,7 +436,7 @@ def rnn_cnn_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', dropo
     last_out = concatenate([dropout_out, pre_out], axis=-1)
 
     if pretrain:
-        print "pretraining..."
+        #print "pretraining..."
         for k in range(len(pretrainX)):
             trainX = numpy.asarray(pretrainX[k])
             trainY = to_categorical(pretrainY[k])
@@ -447,7 +451,7 @@ def rnn_cnn_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', dropo
             pre_nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
             pre_nn.fit(pretrain_input_arrays, trainY, epochs=num_epochs)
 
-    print "training with main data..."
+    #print "training with main data..."
     prediction = Dense(Y.shape[1], activation='softmax')(last_out)
     nn = Model(inputs=inputs, outputs=prediction)
     nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
@@ -456,14 +460,15 @@ def rnn_cnn_model(X, Y, num_nodes, activation='sigmoid', modelname='lstm', dropo
     nn.summary()
     return nn, X, Y
 
+
 ''' Creates and trains a multi-layer neural network model. Supports SimpleRNN, LSTM, GRU, and CNN
     X: a list of training data
     Y: a list of numpy arrays of training labels
 '''
 def stacked_model(X, Y_arrays, num_nodes, activation='sigmoid', models='gru_cnn', dropout=0.1, pretrainX=[], pretrainY=[], keywords=[], initial_states=None, windows=[1,2,3,4,5], num_epochs=15, loss_func='categorical_crossentropy'):
-    print "stacked model: " + models
+    #print "stacked model: " + models
     X = numpy.asarray(X)
-    print "train X shape: " + str(X.shape)
+    #print "train X shape: " + str(X.shape)
     embedding_size = X.shape[-1]
     max_seq_len = X.shape[1]
     inputs = []
@@ -481,7 +486,7 @@ def stacked_model(X, Y_arrays, num_nodes, activation='sigmoid', models='gru_cnn'
     #    pretrain = True
     #    print "Using pretraining"
 
-    print "nodes: " + str(num_nodes) + " embedding: " + str(embedding_size) + " max_seq_len: " + str(max_seq_len)
+    #print "nodes: " + str(num_nodes) + " embedding: " + str(embedding_size) + " max_seq_len: " + str(max_seq_len)
 
     # Main layers
     layer_in = input1
@@ -494,7 +499,7 @@ def stacked_model(X, Y_arrays, num_nodes, activation='sigmoid', models='gru_cnn'
         elif modelname == 'gru':
             layer = GRU(num_nodes, return_sequences=True, return_state=False)
             layer_out = layer(layer_in)
-            print "GRU layer: " + str(num_nodes) + " nodes, shape: " + str(layer.output_shape)
+            #print "GRU layer: " + str(num_nodes) + " nodes, shape: " + str(layer.output_shape)
             #layer_shape = layer.output_shape
         elif modelname == 'lstm':
             layer = LSTM(num_nodes, return_sequences=True, return_state=False)
@@ -503,20 +508,20 @@ def stacked_model(X, Y_arrays, num_nodes, activation='sigmoid', models='gru_cnn'
             layer = None
             conv_outputs = []
             for w in windows:
-                print "window: " + str(max_seq_len) + " x " + str(w)
+                #print "window: " + str(max_seq_len) + " x " + str(w)
                 conv_layer = Conv1D(max_seq_len, w, input_shape=layer_shape)
                 conv = conv_layer(layer_in)
                 max_pool_layer = GlobalMaxPooling1D()
                 max_pool = max_pool_layer(conv)
                 conv_outputs.append(max_pool)
-                print "conv: " + str(conv_layer.output_shape) + " pool: " + str(max_pool_layer.output_shape)
+                #print "conv: " + str(conv_layer.output_shape) + " pool: " + str(max_pool_layer.output_shape)
             layer_out = concatenate(conv_outputs, axis=-1)
 
         if modelname.strip() != "":
             drop = Dropout(dropout)
             dropout_out = drop(layer_out)
             layer_shape = drop.output_shape
-            print "Dropout layer shape: " + str(layer_shape)
+            #print "Dropout layer shape: " + str(layer_shape)
             layer_in = dropout_out
 
     # GRU flattening
@@ -528,12 +533,12 @@ def stacked_model(X, Y_arrays, num_nodes, activation='sigmoid', models='gru_cnn'
     loss_map = {}
     loss_weight_map = {}
     for Y in Y_arrays:
-        print "Y shape: " + str(Y.shape)
+        #print "Y shape: " + str(Y.shape)
         layer_name = "output" + str(num)
         num = num+1
         dense_layer = Dense(Y.shape[-1], activation='softmax', name=layer_name)
         prediction = dense_layer(layer_out)
-        print "Dense: input: " + str(dense_layer.input_shape) + " output: " + str(dense_layer.output_shape)
+        #print "Dense: input: " + str(dense_layer.input_shape) + " output: " + str(dense_layer.output_shape)
         output_list.append(prediction)
         loss_map[layer_name] = loss_func
         loss_weight_map[layer_name] = 1.
@@ -554,7 +559,7 @@ def stacked_model(X, Y_arrays, num_nodes, activation='sigmoid', models='gru_cnn'
     #        pre_nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
     #        pre_nn.fit(pretrain_input_arrays, trainY, epochs=num_epochs)
 
-    print "training with main data..."
+    #print "training with main data..."
     nn = Model(inputs=inputs, outputs=output_list)
     if len(output_list) == 2:
         nn.compile(optimizer='rmsprop', metrics=['accuracy'], loss={'output0': 'categorical_crossentropy', 'output1': 'mean_squared_error'}, loss_weights={'output0': 1., 'output1': .1})
@@ -565,12 +570,13 @@ def stacked_model(X, Y_arrays, num_nodes, activation='sigmoid', models='gru_cnn'
     nn.summary()
     return nn, X, Y_arrays
 
+
 ''' TODO: Fix this
 '''
 def create_filter_rnn_model(X, Y, embedding_size, num_nodes, activation='tanh', dropout=0.1, hybrid=False, X2=[]):
     Y = to_categorical(Y)
     X = numpy.asarray(X)
-    print "train X shape: " + str(X.shape)
+    #print "train X shape: " + str(X.shape)
     embedding_size = X.shape[-1]
     max_seq_len = X.shape[1]
     inputs = []
@@ -579,7 +585,7 @@ def create_filter_rnn_model(X, Y, embedding_size, num_nodes, activation='tanh', 
     num_epochs = 30
     dropout = 0.2
 
-    print "GRU: nodes: " + str(num_nodes) + " embedding: " + str(embedding_size) + " max_seq_len: " + str(max_seq_len)
+    #print "GRU: nodes: " + str(num_nodes) + " embedding: " + str(embedding_size) + " max_seq_len: " + str(max_seq_len)
     input_shape = (max_seq_len, embedding_size)
     input1 = Input(shape=input_shape)
     inputs.append(input1)
@@ -593,11 +599,11 @@ def create_filter_rnn_model(X, Y, embedding_size, num_nodes, activation='tanh', 
 
     rnn1 = GRU(num_nodes, return_sequences=True)
     rnn1_out = rnn1(input1)
-    print "rnn1 output_shape: " + str(rnn1.output_shape)
+    #print "rnn1 output_shape: " + str(rnn1.output_shape)
     dense0_out = TimeDistributed(Dense(num_nodes, activation='tanh'))(rnn1_out)
     dense1 = TimeDistributed(Dense(1, activation='softmax'), name='dense1')
     weights = dense1(dense0_out)
-    print "dense1 output_shape: " + str(dense1.output_shape)
+    #print "dense1 output_shape: " + str(dense1.output_shape)
     #norm_weights = BatchNormalization(name='norm_weights')
     #norm_weights_out = norm_weights(weights) # TODO: normalize values to 0 to 1
 
@@ -609,8 +615,8 @@ def create_filter_rnn_model(X, Y, embedding_size, num_nodes, activation='tanh', 
     repeat = TimeDistributed(RepeatVector(embedding_size))
     repeated_weights = repeat(weights)
 
-    print "repeat input_shape: " + str(repeat.input_shape)
-    print "repeat output_shape: " + str(repeat.output_shape)
+    #print "repeat input_shape: " + str(repeat.input_shape)
+    #print "repeat output_shape: " + str(repeat.output_shape)
     final_weights = Reshape(input_shape)(repeated_weights)
     #TODO: mutiply layer - need to convert 1d weight to embedding_size vector?
     filter_out = multiply([input1, final_weights])
@@ -635,7 +641,7 @@ def create_filter_rnn_model(X, Y, embedding_size, num_nodes, activation='tanh', 
     nn.summary()
 
     # Save weights
-    print "saving weights for train data"
+    #print "saving weights for train data"
     weight_model = Model(inputs=inputs, outputs=nn.get_layer('dense1').output)
     train_weights = weight_model.predict(X)
     filename = "filternn_weights"

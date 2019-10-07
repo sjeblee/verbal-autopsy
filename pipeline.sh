@@ -1,13 +1,13 @@
-a!/bin/bash
+#!/bin/bash
 # Script to run all the steps of the Verbal Autopsy pipeline
 
 # Directories for data input and output: SET THESE
 prefix="/u/sjeblee/research/va/data"   # File output prefix
 dataloc="/u/sjeblee/research/va/data/datasets"  # Location of data files (i.e. parent of mds+rct folder
 
-name="cnn_query_cghr"   # Give the output folder a name, will be created in $prefix
-modelname="cnn-query"        # Model type: one of: nn cnn svm rnn gru
-prep="spell,kwc"          # Preprocessings: any comma-separated list of: none spell stem, kwc
+name="cnn_cghr_py3"   # Give the output folder a name, will be created in $prefix
+modelname="cnn"        # Model type: one of: nn cnn svm rnn gru
+prep="spell"          # Preprocessings: any comma-separated list of: none spell stem, kwc
 feats="narr_vec"    # Features, comma-separated list of: narr_count narr_vec narr_symp dem narr_tfidf lda
 fname="narrv100"         # Give the featureset a name
 labels="cghr_cat"     # ICD categories to use (leave this as cghr_cat)
@@ -22,7 +22,7 @@ chvfile="/u/sjeblee/research/data/va/resources/CHV_concepts_terms_flatfile_20110
 mkdir -p $prefix/$name
 
 # DEV
-python pipeline.py --name $name --model $modelname --dataset $dataset --modelname ${modelname}_${trainset}_${fname}_${labels} --train $trainset --dev $devset --preprocess $prep --features $feats --featurename $fname --labels $labels --vectors $vecfile --prefix $prefix --dataloc $dataloc --sympfile $sympfile -c $chvfile | tee $prefix/$name/out-$devset-$modelname-$fname.txt
+python3 pipeline.py --name $name --model $modelname --dataset $dataset --modelname ${modelname}_${trainset}_${fname}_${labels} --train $trainset --dev $devset --preprocess $prep --features $feats --featurename $fname --labels $labels --vectors $vecfile --prefix $prefix --dataloc $dataloc --sympfile $sympfile -c $chvfile | tee $prefix/$name/out-$devset-$modelname-$fname.txt
 
 # HYPEROPT
 #python pipeline.py --name "rf_hyperopt" --model "rf" --modelname "rf_h" --train "all" --dev "all" --features "type,narr_count" --ex "hyperopt" | tee ../../data/rf_hyperopt/out-hyperopt.txt

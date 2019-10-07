@@ -4,8 +4,8 @@
 
 from lxml import etree
 from sklearn.decomposition import LatentDirichletAllocation
-from keras.preprocessing.sequence import pad_sequences
-from keras.preprocessing.text import hashing_trick
+#from keras.preprocessing.sequence import pad_sequences
+#from keras.preprocessing.text import hashing_trick
 import sklearn.feature_extraction
 import argparse
 import numpy
@@ -15,7 +15,7 @@ import time
 import re
 import data_util
 import preprocessing
-import rebalance
+#import rebalance
 import word2vec3 as word2vec
 import codecs
 
@@ -242,11 +242,11 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
                     words.append(wx.strip().strip('–'))
             keywords.append(" ".join(words))
             if kw_words in featurenames:
-                max_seq_len = 30
+                kw_seq_len = 30
                 words = " ".join(words).split(' ')
-                if len(words) > max_seq_len:
-                    words = words[0:max_seq_len]
-                while len(words) < max_seq_len:
+                if len(words) > kw_seq_len:
+                    words = words[0:kw_seq_len]
+                while len(words) < kw_seq_len:
                     words.append("0")
                 features[kw_words] = words
 
@@ -256,11 +256,11 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
             #item = child.find(element)
             item = child.find("narrative")
             if item is not None:
-                narr_string = data_util.stringify_children(item).encode('utf-8')
+                narr_string = data_util.stringify_children(item)#.encode('utf-8')
 
                 if narr_string == "":
                     print('warning: empty narrative')
-                n_words = [w.strip() for w in narr_string.lower().translate(string.maketrans("", ""), string.punctuation).split(' ')]
+                n_words = [w.strip() for w in remove_punctuation(narr_string.lower()).split(' ')]
                 text = " ".join(n_words)
 
                 # Word features
@@ -425,7 +425,7 @@ def extract(infile, outfile, dict_keys, stem=False, lemma=False, element="narrat
                     feat = matrix[x]
                     for i in range(len(matrix_keys)):
                         key = matrix_keys[i]
-                        val = count_matrix[x,i]
+                        val = count_matrix[x, i]
                         feat[key] = val
 
         # Convert counts to TFIDF
@@ -788,6 +788,10 @@ def get_narrs(filename, element="narrative"):
             #print narr_string.strip().lower()
             narratives.append(narr_string.strip().lower())
     return narratives
+
+def remove_punctuation(x):
+    table = str.maketrans({key: None for key in string.punctuation})
+    return x.translate(table)
 
 
 if __name__ == "__main__": main()

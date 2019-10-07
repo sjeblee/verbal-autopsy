@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # Build a classifier model with the VA features
 # @author sjeblee@cs.toronto.edu
 
@@ -96,7 +96,7 @@ def hyperopt(arg_model, arg_train_feats, arg_test_feats, arg_result_file, arg_pr
             #'embedding_size':hp.choice('embedding_size', [100, 150, 200, 250, 300, 400]),
             'dropout':hp.uniform('dropout', 0.1, 0.9)
         }
-    
+
     elif h_model == "svm":
         objective = obj_svm
         space = {
@@ -303,7 +303,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     trainlabels = []     # Correct ICD codes
     X = []               # Feature vectors
     Y = []
-    
+
     # Read in feature keys
     print "reading feature keys..."
     global keys
@@ -323,7 +323,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     #print "rebalance: smote"
     #X, Y = rebalance.rebalance(X, Y, "smote")
     #print "X: " + str(len(X)) + "\nY: " + str(len(Y))
-    
+
     # Train the model
     print "training model..."
     stime = time.time()
@@ -350,7 +350,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
             X = numpy.asarray(X)
         else:
             print "creating a new neural network model"
-            embedding_dim = 200 
+            embedding_dim = 200
             if arg_model == "nn":
                 model, X, Y = create_nn_model(X, Y, anova_function, num_feats, num_nodes, 'relu')
             elif arg_model == "lstm":
@@ -452,7 +452,7 @@ def create_nn_model(X, Y, anova_function, num_feats, num_nodes, act):
                     #Activation(activation),
                     Dense(Y.shape[1]),
                     Activation('softmax'),])
-        
+
     nn.compile(optimizer='rmsprop', loss='categorical_crossentropy', metrics=['accuracy'])
     nn.fit(X, Y)
     nn.summary()
@@ -492,7 +492,7 @@ def create_lstm_model(X, Y, embedding_size, num_nodes, activation='sigmoid', dro
                      #Flatten(), # For bidirectional
     #                 Dense(Y.shape[1], activation='softmax')])
 
-    input_shape = (max_seq_len, embedding_size) 
+    input_shape = (max_seq_len, embedding_size)
     inputs = Input(shape=input_shape)
 
     attn_out = attention(inputs, max_seq_len, embedding_size)
@@ -518,7 +518,7 @@ def create_cnn_model(X, Y, embedding_size, act=None, window=3):
     branches = []
 
     # Keras functional API with attention
-    input_shape = (max_seq_len, embedding_size) 
+    input_shape = (max_seq_len, embedding_size)
     inputs = Input(shape=input_shape)
 
     #attention_layer = Dense(embedding_size, activation='softmax', name='attention')
@@ -659,4 +659,4 @@ def map_back(results):
     return output
 
 
-if __name__ == "__main__":main() 
+if __name__ == "__main__":main()

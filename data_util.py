@@ -310,7 +310,7 @@ def stringify_children(node):
     for x in range(len(parts)):
         if type(parts[x]) != str:
             parts[x] = str(parts[x])
-    return ''.join(filter(None, parts))
+    return str(''.join(filter(None, parts)))
 
 
 ''' Get contents of tags as a list of strings

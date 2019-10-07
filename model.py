@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # Build a classifier model with the VA features
 # @author sjeblee@cs.toronto.edu
 
@@ -11,13 +11,13 @@ import numpy
 import os
 import time
 from hyperopt import hp, fmin, tpe, space_eval
-from keras.models import Model, Sequential, load_model
-from keras.layers import Input, Dense, Dropout, Activation, Flatten, Permute, Reshape, RepeatVector, BatchNormalization
-from keras.layers import Embedding, LSTM, GRU, TimeDistributed, Merge, merge, concatenate, multiply
-from keras.layers.convolutional import Conv1D
-from keras.layers.pooling import GlobalMaxPooling1D, MaxPooling1D
-from keras.layers.recurrent import SimpleRNN
-from keras.layers.wrappers import Bidirectional
+#from keras.models import Model, Sequential, load_model
+#from keras.layers import Input, Dense, Dropout, Activation, Flatten, Permute, Reshape, RepeatVector, BatchNormalization
+#from keras.layers import Embedding, LSTM, GRU, TimeDistributed, Merge, merge, concatenate, multiply
+#from keras.layers.convolutional import Conv1D
+#from keras.layers.pooling import GlobalMaxPooling1D, MaxPooling1D
+#from keras.layers.recurrent import SimpleRNN
+#from keras.layers.wrappers import Bidirectional
 from keras.utils.np_utils import to_categorical
 from keras.utils import plot_model
 from numpy import array, int32, float32
@@ -34,10 +34,10 @@ from sklearn.pipeline import make_pipeline
 import cluster_keywords
 import data_util
 import model_library
-import rebalance
+#import rebalance
 import model_library_torch
 #from layers import Attention
-from model_dirichlet import create_nn_model
+#from model_dirichlet import create_nn_model
 
 import torch
 import pickle
@@ -69,7 +69,7 @@ def main():
     args = argparser.parse_args()
 
     if not (args.infile and args.outfile and args.testfile and args.model):
-        print "usage: python model.py --in [train.features] --test [test.features] --out [test.results] --labels [ICD_cat/ICD_cat_neo/Final_code] --model [nn/cnn/lstm/gru/filternn] --name [rnn_ngram3] --prefix [/sjeblee/research/models]"
+        print("usage: python model.py --in [train.features] --test [test.features] --out [test.results] --labels [ICD_cat/ICD_cat_neo/Final_code] --model [nn/cnn/lstm/gru/filternn] --name [rnn_ngram3] --prefix [/sjeblee/research/models]")
         exit()
 
     labelname = "Final_Code"
@@ -83,7 +83,7 @@ def main():
     run(args.model, args.name, args.infile, args.testfile, args.outfile, prefix, labelname)
 
 def hyperopt(arg_model, arg_train_feats, arg_test_feats, arg_result_file, arg_prefix, arg_labelname):
-    print "hyperopt"
+    print("hyperopt")
 
     # Set up data file references
     global h_model, h_train, h_test, h_result, h_prefix, labelname
@@ -98,31 +98,31 @@ def hyperopt(arg_model, arg_train_feats, arg_test_feats, arg_result_file, arg_pr
     n_feats = 200
     space = None
     objective = None
+    global activation
 
-    print "h_model: " + h_model
+    print("h_model: ", h_model)
     if h_model == "nn":
         objective = obj_nn
-        global activation
         activation = 'relu'
         space = {
-            'activation':hp.choice('activation', [('relu', 'relu'), ('tanh', 'tanh'), ('sigmoid','sigmoid')]),
-            'n_nodes':hp.uniform('n_nodes', 50, 300),
-            'n_feats':hp.uniform('n_feats', 100, 400),
-            'anova_name':hp.choice('anova_name', [('f_classif', 'f_classif'), ('chi2', 'chi2')]),
-	    'threshold':hp.choice('threshold',[0.0,0.05,0.1,0.15,0.2,0.25,3]),
-	    'num_epochs':hp.choice('num_epochs', [10,15,20,25,30])
+            'activation': hp.choice('activation', [('relu', 'relu'), ('tanh', 'tanh'), ('sigmoid','sigmoid')]),
+            'n_nodes': hp.uniform('n_nodes', 50, 300),
+            'n_feats': hp.uniform('n_feats', 100, 400),
+            'anova_name': hp.choice('anova_name', [('f_classif', 'f_classif'), ('chi2', 'chi2')]),
+            'threshold': hp.choice('threshold',[0.0,0.05,0.1,0.15,0.2,0.25,3]),
+            'num_epochs': hp.choice('num_epochs', [10,15,20,25,30])
         }
 
     if h_model == "cnn":
-	objective = obj_cnn
-	global activation
-	activation = 'relu'
-	space = {
-	    #'activation':hp.choice('activation', [('relu','relu'), ('tanh','tank'),('sigmoid','sigmoid')]),
-	    'dropout':hp.uniform('dropout',0,0.01),
-	    'threshold':hp.choice('threshold',[0.0,0.05,0.1,0.15]),
-	    'kernel_sizes':hp.choice('kernel_sizes', [5,6,7,8]),
-	    'num_epochs':hp.choice('num_epochs', [10,15,20,25,30])
+        objective = obj_cnn
+        #global activation
+        activation = 'relu'
+        space = {
+            #'activation':hp.choice('activation', [('relu','relu'), ('tanh','tank'),('sigmoid','sigmoid')]),
+            'dropout':hp.uniform('dropout',0,0.01),
+            'threshold':hp.choice('threshold',[0.0,0.05,0.1,0.15]),
+            'kernel_sizes':hp.choice('kernel_sizes', [5,6,7,8]),
+            'num_epochs':hp.choice('num_epochs', [10,15,20,25,30])
 	}
 
     elif h_model == "lstm":
@@ -157,9 +157,9 @@ def hyperopt(arg_model, arg_train_feats, arg_test_feats, arg_result_file, arg_pr
         }
 
     # Run hyperopt
-    print "space: " + str(space)
+    print("space: ", str(space))
     best = fmin(objective, space, algo=tpe.suggest, max_evals=100)
-    print best
+    print(best)
 
 def obj_nn(params):
     activation = params['activation'][0]
@@ -168,7 +168,7 @@ def obj_nn(params):
     anova_name = params['anova_name'][0]
     threshold = float(params['threshold'])
     num_epochs = int(params['num_epochs'])
-    print "obj_nn: " + str(activation) + ", nodes:" + str(n_nodes) + ", feats:" + str(n_feats) + ", anova: " + str(anova_name) + ", threshold: " + str(threshold) + ", num_epochs:" + str(num_epochs)
+    print("obj_nn: " + str(activation) + ", nodes:" + str(n_nodes) + ", feats:" + str(n_feats) + ", anova: " + str(anova_name) + ", threshold: " + str(threshold) + ", num_epochs:" + str(num_epochs))
 
     anova_function = None
     if anova_name == 'chi2':
@@ -190,17 +190,17 @@ def obj_nn(params):
     Y = []
     Y = preprocess(h_train, trainids, trainlabels, X, Y, keys, trainlabels=True)
     #print "X: " + str(len(X)) + "\nY: " + str(len(Y))
-    if use_torch == False:
-	model, X, Y = create_nn_model(X, Y, anova_function, n_feats, n_nodes, activation)
+    if use_torch is False:
+        model, X, Y = model_library.nn_model(X, Y, n_nodes, activation, num_epochs)
     else: # Use pytorch model
-	Y = to_categorical(Y)
-	model = model_library_torch.nn_model(X,Y,n_nodes,activation, num_epochs=num_epochs)
+        Y = to_categorical(Y)
+        model = model_library_torch.nn_model(X, Y, n_nodes, activation, num_epochs=num_epochs)
     # Run test
-    testids, testlabels, predictedlabels = test('nn', model, h_test,threshold=threshold)
-    print "Real Labels shape: " + str(testlabels)
-    print "Predicted Labels shape: " + str(predictedlabels)
+    testids, testlabels, predictedlabels = test('nn', model, h_test, threshold=threshold)
+    print("Real Labels shape: ", str(testlabels))
+    print("Predicted Labels shape: ", predictedlabels)
     f1score = metrics.f1_score(testlabels, predictedlabels, average='weighted')
-    print "F1: " + str(f1score)
+    print('F1:', f1score)
 
     # Return a score to minimize
     return 1 - f1score
@@ -210,11 +210,11 @@ def obj_cnn(params):
     threshold = float(params['threshold'])
     kernel_sizes = int(params['kernel_sizes'])
     num_epochs = int(params['num_epochs'])
-    print "obj_cnn: " + "dropout = " + str(dropout) + ", threshold = " + str(threshold) + ", kernel_sizes = " + str(kernel_sizes) + ", num_epochs = " + str(num_epochs)
+    print("obj_cnn: " + "dropout = " + str(dropout) + ", threshold = " + str(threshold) + ", kernel_sizes = " + str(kernel_sizes) + ", num_epochs = " + str(num_epochs))
 
     global keys
     with open(h_train + ".keys", "r") as kfile:
-	keys = eval(kfile.read())
+        keys = eval(kfile.read())
 
     global labelencoder, typeencoder
     labelencoder = preprocessing.LabelEncoder() # Transforms ICD codes to numbers
@@ -226,17 +226,16 @@ def obj_cnn(params):
     Y = preprocess(h_train, trainids, trainlabels, X, Y, keys, trainlabels=True)
 
     Y = to_categorical(Y)
-    if use_torch == False:
-	model, X, Y = model_library.cnn_model(X,Y)
+    if use_torch is False:
+        model, X, Y = model_library.cnn_model(X, Y)
     else:
-	model = model_library_torch.cnn_model(X,Y, dropout=dropout, kernel_sizes=kernel_sizes, num_epochs=num_epochs)
+        model = model_library_torch.cnn_model(X, Y, dropout=dropout, kernel_sizes=kernel_sizes, num_epochs=num_epochs)
 
     testids, testlabels, predictedlabels = test('cnn', model, h_test, threshold=threshold)
-    print "Real Labels shape: " + str(testlabels)
-    print "Predicted Labels shape: " + str(predictedlabels)
+    print("Real Labels shape: " + str(testlabels))
+    print("Predicted Labels shape: " + str(predictedlabels))
     f1score = metrics.f1_score(testlabels, predictedlabels, average='weighted')
-    print "F1: " + str(f1score)
-
+    print("F1: " + str(f1score))
 
     # Return a score to minimize
     return 1 - f1score
@@ -246,7 +245,7 @@ def obj_lstm(params):
     n_nodes = int(params['n_nodes'])
     embedding_size = 200
     dropout = float(params['dropout'])
-    print "obj_lstm: " + str(activation) + ", nodes:" + str(n_nodes) + ", embedding_size:" + str(embedding_size) + ", dropout: " + str(dropout)
+    print("obj_lstm: " + str(activation) + ", nodes:" + str(n_nodes) + ", embedding_size:" + str(embedding_size) + ", dropout: " + str(dropout))
 
     # Read in feature keys
     global keys
@@ -268,7 +267,7 @@ def obj_lstm(params):
     # Run test
     testids, testlabels, predictedlabels = test('lstm', model, h_test)
     f1score = metrics.f1_score(testlabels, predictedlabels)
-    print "F1: " + str(f1score)
+    print("F1: " + str(f1score))
 
     # Return a score to minimize
     return 1 - f1score
@@ -279,7 +278,7 @@ def obj_svm(params):
     anova_name = params['anova_name'][1]
     prob = params['prob'][1]
     weight_classes = params['weight_classes'][1]
-    print "obj_svm: " + str(kern) + ", prob:" + str(prob) + ", feats:" + str(n_feats) + ", anova: " + str(anova_name)
+    print("obj_svm: " + str(kern) + ", prob:" + str(prob) + ", feats:" + str(n_feats) + ", anova: " + str(anova_name))
 
     anova_function = None
     if anova_name == 'chi2':
@@ -313,7 +312,7 @@ def obj_svm(params):
     # Run test
     testids, testlabels, predictedlabels = test('svm', model, h_test)
     f1score = metrics.f1_score(testlabels, predictedlabels)
-    print "F1: " + str(f1score)
+    print("F1: " + str(f1score))
 
     # Return a score to minimize
     return 1 - f1score
@@ -326,7 +325,7 @@ def obj_rf(params):
     max_feats = float(params['max_feats'])
     mss = int(params['mss'])
     weight_classes = params['weight_classes'][1]
-    print "obj_rf: " + str(trees) + ", crit:" + crit + ", n_feats:" + str(n_feats) + ", anova: " + str(anova_name) + " max_feats: " + str(max_feats) + " mss: " + str(mss) + " weight_classes: " + str(weight_classes)
+    print("obj_rf: " + str(trees) + ", crit:" + crit + ", n_feats:" + str(n_feats) + ", anova: " + str(anova_name) + " max_feats: " + str(max_feats) + " mss: " + str(mss) + " weight_classes: " + str(weight_classes))
 
     anova_function = None
     if anova_name == 'chi2':
@@ -360,7 +359,7 @@ def obj_rf(params):
     # Run test
     testids, testlabels, predictedlabels = test('rf', model, h_test)
     f1score = metrics.f1_score(testlabels, predictedlabels)
-    print "F1: " + str(f1score)
+    print("F1: " + str(f1score))
 
     # Return a score to minimize
     return 1 - f1score
@@ -394,7 +393,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
         rec_type = 'neonate'
 
     # Read in feature keys
-    print "reading feature keys..."
+    print("reading feature keys...")
     global keys
     with open(arg_train_feats + ".keys", "r") as kfile:
         keys = eval(kfile.read())
@@ -406,7 +405,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     hybrid = False
     if len(vec_keys) > 0 and len(point_keys) > 2:
         hybrid = True
-        print "hybrid features"
+        print("hybrid features")
 
     # Transform ICD codes and record types to numbers
     global labelencoder, typeencoder
@@ -419,15 +418,15 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
 
     # Load the features
     if hybrid:
-        print "hybrid features"
+        print("hybrid features")
         Y = preprocess(arg_train_feats, trainids, trainlabels, X, Y, vec_keys, trainlabels=True)
         preprocess(arg_train_feats, [], [], X2, [], point_keys, trainlabels=True)
     else:
         test_labs = get_labels(arg_test_feats, arg_labelname)
         Y = preprocess(arg_train_feats, trainids, trainlabels, X, Y, keys, trainlabels=True, extra_labels=test_labs)
         #Y = preprocess(arg_train_feats, trainids, trainlabels, X, Y, keys, trainlabels=True, Y2_labels='keyword_clusters')
-    print "X: " + str(len(X)) + " Y: " + str(len(Y))
-    print "X2: " + str(len(X2))
+    print("X: " + str(len(X)) + " Y: " + str(len(Y)))
+    print("X2: " + str(len(X2)))
     x_feats = numpy.asarray(X).shape[-1]
 
     # TEMP
@@ -437,12 +436,12 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
 
     # Rebalance
     if arg_rebalance != "":
-        print "rebalance: " + arg_rebalance
+        print("rebalance: ", arg_rebalance)
         X, Y = rebalance.rebalance(X, Y, arg_rebalance)
-        print "X: " + str(len(X)) + "\nY: " + str(len(Y))
+        print("X: " + str(len(X)) + "\nY: " + str(len(Y)))
 
     # Train the model
-    print "training model..."
+    print("training model...")
     stime = time.time()
 
     # Feature selection
@@ -451,16 +450,16 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     anova_function = f_classif
     if arg_anova == "chi2":
         anova_function = chi2
-    print "anova_function: " + arg_anova
+    print("anova_function: ", arg_anova)
 
     # Seleck k best features for each class
-    if output_topk_features == True:
+    if output_topk_features is True:
         if arg_model == "nn":
-            select_top_k_features_per_class(X,Y,anova_function,arg_prefix, 100)
+            select_top_k_features_per_class(X, Y, anova_function, arg_prefix, 100)
 
     # Select best features for all data
     if ((not is_nn) or arg_model == "nn") and num_feats < x_feats:
-        anova_filter, X = create_anova_filter(X, Y, anova_function,arg_prefix, num_feats)
+        anova_filter, X = create_anova_filter(X, Y, anova_function, arg_prefix, num_feats)
 
     global model
     model = None
@@ -470,7 +469,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     if is_nn:
         modelfile = arg_prefix + "/" + arg_modelname + ".model"
         if os.path.exists(modelfile):
-            print "using pre-existing model at " + modelfile
+            print("using pre-existing model at:", modelfile)
             if use_torch:
                 model = torch.load(modelfile)
             else:
@@ -482,13 +481,13 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
             cnn_modelfile = arg_prefix + "/" + arg_modelname + "_cnn.model"
             rnn_modelfile = arg_prefix + "/" + arg_modelname + "_rnn.model"
             if (os.path.exists(cnn_modelfile) and os.path.exists(rnn_modelfile)):
-                print "using pre-existing model at " + cnn_modelfile + " and " + rnn_modelfile
+                print("using pre-existing model at " + cnn_modelfile + " and " + rnn_modelfile)
                 cnn_input_model = torch.load(cnn_modelfile)
                 rnn_model = torch.load(rnn_modelfile)
                 model = [cnn_input_model, rnn_model]
                 X = numpy.asarray(X)
             else:
-                print "creating a new cnn-rnn ensemble model"
+                print("creating a new cnn-rnn ensemble model")
                 if use_torch:
                     Y = to_categorical(Y)
                     cnn_input_model, rnn_model = model_library_torch.cnn_attnrnn(X, Y)
@@ -498,9 +497,9 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
                     torch.save(cnn_input_model, cnn_modelfile)
                     torch.save(rnn_model, rnn_modelfile)
                 else:
-                    print "cnn-rnn model must use pytorch"
+                    print("cnn-rnn model must use pytorch")
         else:
-            print "creating a new neural network model"
+            print("creating a new neural network model")
             embedding_dim = 100
             #if "keyword_clusters" in keys:
             #    num_nodes = 100
@@ -548,7 +547,7 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
                 Y = to_categorical(Y)
                 model, X, Y = create_filter_rnn_model(X, Y, embedding_dim, num_nodes)
 
-        print "saving the model..."
+        print("saving the model...")
 
         if not use_torch: # Save Keras model
             model.save(modelfile)
@@ -559,22 +558,22 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     # Other models
     else:
         if arg_model == "svm":
-            print "svm model"
+            print("svm model")
             model = svm.SVC(kernel='linear', decision_function_shape='ovr', probability=True)
         elif arg_model == "knn":
-            print "k-nearest neighbor model"
+            print("k-nearest neighbor model")
             model = neighbors.KNeighborsClassifier(n_neighbors=1, weights='distance', n_jobs=-1)
         elif arg_model == "nb":
-            print "naive bayes model"
+            print("naive bayes model")
             model = MultinomialNB()
         elif arg_model == "rf":
-            print "random forest model"
+            print("random forest model")
             model = RandomForestClassifier(n_estimators=26, max_features=0.0485, min_samples_split=4, class_weight='balanced', n_jobs=-1)
 
         model.fit(X, Y)
 
     etime = time.time()
-    print "training took " + str(etime - stime) + " s"
+    print("training took " + str(etime - stime) + " s")
 
     # Test
     if '_' in arg_model:
@@ -593,7 +592,8 @@ def run(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_result_fi
     output.close()
 
     total_time = (time.time() - total_start_time) / 60
-    print "total time: " + str(total_time) + " mins"
+    print("total time: " + str(total_time) + " mins")
+
 
 def run_joint(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_results_file, arg_prefix, arg_labelname, arg_n_feats=227, arg_anova="chi2", arg_nodes=192, arg_activation='relu', arg_dropout=0.5, arg_rebalance=""):
     total_start_time = time.time()
@@ -624,7 +624,7 @@ def run_joint(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_res
     X2_neonate = []
 
     # Read in feature keys
-    print "reading feature keys..."
+    print("reading feature keys...")
     global keys
     with open(arg_train_feats[0] + ".keys", "r") as kfile:
         keys = eval(kfile.read())
@@ -636,7 +636,7 @@ def run_joint(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_res
     hybrid = False
     if len(vec_keys) > 0 and len(point_keys) > 2:
         hybrid = True
-        print "hybrid features"
+        print("hybrid features")
 
     # Transform ICD codes and record types to numbers
     global labelencoder, labelencoder_adult, labelencoder_child, labelencoder_neonate
@@ -662,9 +662,9 @@ def run_joint(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_res
         preprocess(arg_train_feats[1], [], [], X2_child, [], point_keys, rec_type='child', trainlabels=True)
         preprocess(arg_train_feats[2], [], [], X2_neonate, [], point_keys, rec_type='neonate', trainlabels=True)
 
-    print "adult X: " + str(len(X_adult)) + " Y: " + str(len(Y_adult))
-    print "child X: " + str(len(X_child)) + " Y: " + str(len(Y_child))
-    print "neonate X: " + str(len(X_neonate)) + " Y: " + str(len(Y_neonate))
+    print("adult X: " + str(len(X_adult)) + " Y: " + str(len(Y_adult)))
+    print("child X: " + str(len(X_child)) + " Y: " + str(len(Y_child)))
+    print("neonate X: " + str(len(X_neonate)) + " Y: " + str(len(Y_neonate)))
     Y_adult = to_categorical(Y_adult)
     Y_child = to_categorical(Y_child)
     Y_neonate = to_categorical(Y_neonate)
@@ -680,7 +680,7 @@ def run_joint(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_res
     #    print "X: " + str(len(X)) + "\nY: " + str(len(Y))
 
     # Train the model
-    print "training model..."
+    print("training model...")
     stime = time.time()
 
     global model
@@ -694,15 +694,15 @@ def run_joint(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_res
     #    Y = to_categorical(Y)
     #    X = numpy.asarray(X)
     #else:
-    print "creating a new neural network model"
+    print("creating a new neural network model")
     embedding_dim = 200
-        #if arg_model == "nn":
-        #    model, X, Y = create_nn_model(X, Y, anova_function, num_feats, num_nodes, 'relu')
+    #if arg_model == "nn":
+    #    model, X, Y = create_nn_model(X, Y, anova_function, num_feats, num_nodes, 'relu')
     if arg_model == "lstm" or arg_model == "gru" or arg_model == "rnn" or arg_model=="cnn":
         num_nodes = 100
 
         # ADULT
-        print "ADULT"
+        print("ADULT")
         X_pretrain = [X_child, X_neonate]
         Y_pretrain = [Y_child, Y_neonate]
         X2_pretrain = []
@@ -718,7 +718,7 @@ def run_joint(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_res
         testids_adult, testlabels_adult, predictedlabels_adult = test(arg_model, model_adult, arg_test_feats[0], hybrid=hybrid, rec_type='adult')
 
         # CHILD
-        print "CHILD"
+        print("CHILD")
         X_pretrain = [X_adult, X_neonate]
         Y_pretrain = [Y_adult, Y_neonate]
         X2_pretrain = []
@@ -730,11 +730,11 @@ def run_joint(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_res
             else:
                 model_child, X_child_out, Y_child_out = model_library.cnn_model(X_child, to_categorical(Y_child), X2=X2_child, pretrainX=X_pretrain, pretrainY=Y_pretrain, pretrainX2=X2_pretrain, num_epochs=15)
         else:
-             model_child, X_child_out, Y_child_out = model_library.rnn_model(X_child, Y_child, num_nodes, modelname=arg_model, X2=X2_child, pretrainX=X_pretrain, pretrainY=Y_pretrain, pretrainX2=X2_pretrain, num_epochs=15)
+            model_child, X_child_out, Y_child_out = model_library.rnn_model(X_child, Y_child, num_nodes, modelname=arg_model, X2=X2_child, pretrainX=X_pretrain, pretrainY=Y_pretrain, pretrainX2=X2_pretrain, num_epochs=15)
         testids_child, testlabels_child, predictedlabels_child = test(arg_model, model_child, arg_test_feats[1], hybrid=hybrid, rec_type='child')
 
         # NEONATE
-        print "NEONATE"
+        print("NEONATE")
         X_pretrain = [X_adult, X_child]
         Y_pretrain = [Y_adult, Y_child]
         X2_pretrain = []
@@ -763,10 +763,10 @@ def run_joint(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_res
 
     # Other models
     else:
-         print "ERROR: joint does not support model " + arg_model
+        print("ERROR: joint does not support model " + arg_model)
 
     etime = time.time()
-    print "training took " + str(etime - stime) + " s"
+    print("training took " + str(etime - stime) + " s")
 
     # Write results to file
     write_results(arg_results_file[0], testids_adult, testlabels_adult, predictedlabels_adult)
@@ -774,10 +774,10 @@ def run_joint(arg_model, arg_modelname, arg_train_feats, arg_test_feats, arg_res
     write_results(arg_results_file[2], testids_neonate, testlabels_neonate, predictedlabels_neonate)
 
     total_time = (time.time() - total_start_time) / 60
-    print "total time: " + str(total_time) + " mins"
+    print("total time: " + str(total_time) + " mins")
+
 
 def write_results(filename, testids, testlabels, predictedlabels):
-
     # Write results to a file
     output = open(filename, 'w')
     for i in range(len(testids)):
@@ -788,8 +788,9 @@ def write_results(filename, testids, testlabels, predictedlabels):
         output.write(str(out) + "\n")
     output.close()
 
+
 def test(model_type, model, testfile, anova_filter=None, hybrid=False, rec_type=None, kw_cnn=None, threshold=0.01):
-    print "testing..."
+    print("testing...")
     if model is None:
         print('ERROR: model is None')
     stime = time.time()
@@ -810,7 +811,7 @@ def test(model_type, model, testfile, anova_filter=None, hybrid=False, rec_type=
         testX = anova_filter.transform(testX)
     if is_nn:
         testX = numpy.asarray(testX)
-        print "testX shape: " + str(testX.shape)
+        print("testX shape: " + str(testX.shape))
 
     inputs = [testX]
     if hybrid:
@@ -847,24 +848,24 @@ def test(model_type, model, testfile, anova_filter=None, hybrid=False, rec_type=
 
         # Decode labels
         kw_pred_labels = data_util.decode_multi_hot(kw_pred)
-        print "kw_pred_labels[0]: " + str(kw_pred_labels[0])
+        print("kw_pred_labels[0]: " + str(kw_pred_labels[0]))
         clusterfile = "/u/sjeblee/research/va/data/datasets/mds+rct/train_adult_cat_spell.clusters"
         kw_pred_text = cluster_keywords.interpret_clusters(kw_pred_labels, clusterfile)
         kw_true_text = cluster_keywords.interpret_clusters(data_util.decode_multi_hot(testX2), clusterfile)
-        print "kw_pred_text[0]: " + str(kw_pred_text[0])
-        print "kw_true_text[0]: " + str(kw_true_text[0])
+        print("kw_pred_text[0]: " + str(kw_pred_text[0]))
+        print("kw_true_text[0]: " + str(kw_true_text[0]))
 
         # Score results against nearest neighbor classifier
-        print "Scores for 1 class (0.1 cutoff):"
+        print("Scores for 1 class (0.1 cutoff):")
         precision, recall, f1, micro_p, micro_r, micro_f1 = data_util.score_vec_labels(testX2, kw_pred)
-        print "Macro KW scores:"
-        print "F1: " + str(f1)
-        print "precision: " + str(precision)
-        print "recall: " + str(recall)
-        print "Micro KW scores:"
-        print "F1: " + str(micro_f1)
-        print "precision: " + str(micro_p)
-        print "recall: " + str(micro_r)
+        print("Macro KW scores:")
+        print("F1: " + str(f1))
+        print("precision: " + str(precision))
+        print("recall: " + str(recall))
+        print("Micro KW scores:")
+        print("F1: " + str(micro_f1))
+        print("precision: " + str(micro_p))
+        print("recall: " + str(micro_r))
 
     labenc = labelencoder
     if rec_type == 'adult':
@@ -875,19 +876,19 @@ def test(model_type, model, testfile, anova_filter=None, hybrid=False, rec_type=
         labenc = labelencoder_neonate
 
     # Print out classes for index location of each class in the list
-    print "Index location of each class: "
+    print("Index location of each class: ")
     print(str(labenc.classes_))
 
     predictedlabels = labenc.inverse_transform(results)
     etime = time.time()
-    print "testing took " + str(etime - stime) + " s"
-    print "testY: " + str(testY)
-    print "results: " + str(results)
-    print "predicted labels: " + str(predictedlabels)
+    print("testing took " + str(etime - stime) + " s")
+    print("testY: " + str(testY))
+    print("results: " + str(results))
+    print("predicted labels: " + str(predictedlabels))
     return testids, testlabels, predictedlabels
 
 def test_multi(model_type, model, testfile, rec_type=None):
-    print "testing multi..."
+    print("testing multi...")
     stime = time.time()
     testids = []
     testlabels = []
@@ -901,12 +902,12 @@ def test_multi(model_type, model, testfile, rec_type=None):
     #    preprocess(testfile, [], [], testX2, [], point_keys)
     #else:
     Y_arrays = preprocess(testfile, testids, testlabels, testX, testY, keys, rec_type, Y2_labels='keyword_clusters')
-    print "Y_arrays: " + str(len(Y_arrays))
+    print("Y_arrays: " + str(len(Y_arrays)))
     testY = Y_arrays[0]
     testY2 = Y_arrays[1]
     testX = numpy.asarray(testX)
-    print "testX shape: " + str(testX.shape)
-    print "testY2 shape: " + str(len(testY2))
+    print("testX shape: " + str(testX.shape))
+    print("testY2 shape: " + str(len(testY2)))
     #print "testY2: " + str(type(testY2)) + " : " + str(testY2)
 
     inputs = [testX]
@@ -919,7 +920,7 @@ def test_multi(model_type, model, testfile, rec_type=None):
     results = map_back(predictedY[0])
     kw_pred = predictedY[1]
     #kw_pred = model.predict(inputs)
-    print "kw_pred: " + str(len(kw_pred))
+    print("kw_pred: " + str(len(kw_pred)))
 
     # Score keywords from keyword model
     kw_pred = data_util.map_to_multi_hot(kw_pred)
@@ -930,7 +931,7 @@ def test_multi(model_type, model, testfile, rec_type=None):
 
     # Decode labels
     kw_pred_labels = data_util.decode_multi_hot(kw_pred)
-    print "kw_pred_labels[0]: " + str(kw_pred_labels[0])
+    print("kw_pred_labels[0]: " + str(kw_pred_labels[0]))
     #clusterfile = "/u/sjeblee/research/va/data/datasets/mds+rct/train_adult_cat_spell.clusters_km2"
     #kw_pred_text = cluster_keywords.interpret_clusters(kw_pred_labels, clusterfile)
     #kw_true_text = cluster_keywords.interpret_clusters(data_util.decode_multi_hot(testY2), clusterfile)
@@ -938,16 +939,16 @@ def test_multi(model_type, model, testfile, rec_type=None):
     #print "kw_true_text[0]: " + str(kw_true_text[0])
 
     # Score results against nearest neighbor classifier
-    print "Scores for 1 class (0.1 cutoff):"
+    print("Scores for 1 class (0.1 cutoff):")
     precision, recall, f1, micro_p, micro_r, micro_f1 = data_util.score_vec_labels(testY2, kw_pred)
-    print "Macro KW scores:"
-    print "F1: " + str(f1)
-    print "precision: " + str(precision)
-    print "recall: " + str(recall)
-    print "Micro KW scores:"
-    print "F1: " + str(micro_f1)
-    print "precision: " + str(micro_p)
-    print "recall: " + str(micro_r)
+    print("Macro KW scores:")
+    print("F1: " + str(f1))
+    print("precision: " + str(precision))
+    print("recall: " + str(recall))
+    print("Micro KW scores:")
+    print("F1: " + str(micro_f1))
+    print("precision: " + str(micro_p))
+    print("recall: " + str(micro_r))
 
     labenc = labelencoder
     if rec_type == 'adult':
@@ -958,26 +959,26 @@ def test_multi(model_type, model, testfile, rec_type=None):
         labenc = labelencoder_neonate
     predictedlabels = labenc.inverse_transform(results)
     etime = time.time()
-    print "testing took " + str(etime - stime) + " s"
-    print "testY: " + str(testY)
-    print "results: " + str(results)
+    print("testing took " + str(etime - stime) + " s")
+    print("testY: " + str(testY))
+    print("results: " + str(results))
     return testids, testlabels, predictedlabels
 
 def train_test_joint_lstm_model(X_adult, Y_adult, X_child, Y_child, X_neo, Y_neo, arg_test_feats, arg_results_file, embedding_size, num_nodes, activation='sigmoid', modelname='lstm', dropout=0.1, hybrid=False, X2=[]):
     Y_adult = to_categorical(Y_adult)
     X_adult = numpy.asarray(X_adult)
-    print "train X shape adult: " + str(X_adult.shape)
+    print("train X shape adult: " + str(X_adult.shape))
     Y_child = to_categorical(Y_child)
     X_child = numpy.asarray(X_child)
-    print "train X shape child: " + str(X_child.shape)
+    print("train X shape child: " + str(X_child.shape))
     Y_neo = to_categorical(Y_neo)
     X_neo = numpy.asarray(X_neo)
-    print "train X shape neo: " + str(X_neo.shape)
+    print("train X shape neo: " + str(X_neo.shape))
     embedding_size = X_adult.shape[-1]
     inputs = []
     #input_arrays = [X]
 
-    print "model: " + modelname + " nodes: " + str(num_nodes) + " embedding: " + str(embedding_size) + " max_seq_len: " + str(max_seq_len)
+    print("model: " + modelname + " nodes: " + str(num_nodes) + " embedding: " + str(embedding_size) + " max_seq_len: " + str(max_seq_len))
 
     rnn_states = None
     input_shape = (max_seq_len, embedding_size)
@@ -986,7 +987,7 @@ def train_test_joint_lstm_model(X_adult, Y_adult, X_child, Y_child, X_neo, Y_neo
     # TODO: fix hybrid to work with joint training
     if hybrid:
         X2 = numpy.asarray(X2)
-        print "X2 shape: " + str(X2.shape)
+        print("X2 shape: " + str(X2.shape))
         inputs.append(X2)
         input2 = Input(shape=(X2.shape[1],))
         inputs.append(input2)
@@ -996,7 +997,7 @@ def train_test_joint_lstm_model(X_adult, Y_adult, X_child, Y_child, X_neo, Y_neo
         rnn = GRU(num_nodes, return_sequences=False, return_state=True)
     else:
         rnn = LSTM(num_nodes, return_sequences=False, return_state=True)
-    if rnn_states == None:
+    if rnn_states is None:
         rnn_out, rnn_states = rnn(input1)
     else:
         rnn_out, rnn_states = rnn(input1, initial_state=rnn_states)
@@ -1020,19 +1021,19 @@ def train_test_joint_lstm_model(X_adult, Y_adult, X_child, Y_child, X_neo, Y_neo
 
     model_adult.fit(X_adult, Y_adult, epochs=15)
     model_adult.summary()
-    print "test feats: " + arg_test_feats[0]
+    print("test feats: " + arg_test_feats[0])
     testids_adult, testlabels_adult, predictedlabels_adult = test(modelname, model_adult, arg_test_feats[0], hybrid, 'adult')
     write_results(arg_results_file[0], testids_adult, testlabels_adult, predictedlabels_adult)
 
     model_child.fit(X_child, Y_child, epochs=15)
     model_child.summary()
-    print "test feats: " + arg_test_feats[1]
+    print("test feats: " + arg_test_feats[1])
     testids_child, testlabels_child, predictedlabels_child = test(modelname, model_child, arg_test_feats[1], hybrid, 'child')
     write_results(arg_results_file[1], testids_child, testlabels_child, predictedlabels_child)
 
     model_neo.fit(X_neo, Y_neo, epochs=15)
     model_neo.summary()
-    print "test feats: " + arg_test_feats[2]
+    print("test feats: " + arg_test_feats[2])
     testids_neonate, testlabels_neonate, predictedlabels_neonate = test(modelname, model_neo, arg_test_feats[2], hybrid, 'neonate')
     write_results(arg_results_file[2], testids_neonate, testlabels_neonate, predictedlabels_neonate)
 
@@ -1041,7 +1042,7 @@ def train_test_joint_lstm_model(X_adult, Y_adult, X_child, Y_child, X_neo, Y_neo
 def create_filter_rnn_model(X, Y, embedding_size, num_nodes, activation='tanh', dropout=0.1, hybrid=False, X2=[]):
     Y = to_categorical(Y)
     X = numpy.asarray(X)
-    print "train X shape: " + str(X.shape)
+    print("train X shape: " + str(X.shape))
     embedding_size = X.shape[-1]
     inputs = []
     input_arrays = [X]
@@ -1049,7 +1050,7 @@ def create_filter_rnn_model(X, Y, embedding_size, num_nodes, activation='tanh', 
     num_epochs = 30
     dropout = 0.2
 
-    print "GRU: nodes: " + str(num_nodes) + " embedding: " + str(embedding_size) + " max_seq_len: " + str(max_seq_len)
+    print("GRU: nodes: " + str(num_nodes) + " embedding: " + str(embedding_size) + " max_seq_len: " + str(max_seq_len))
     input_shape = (max_seq_len, embedding_size)
     input1 = Input(shape=input_shape)
     inputs.append(input1)
@@ -1063,11 +1064,11 @@ def create_filter_rnn_model(X, Y, embedding_size, num_nodes, activation='tanh', 
 
     rnn1 = GRU(num_nodes, return_sequences=True)
     rnn1_out = rnn1(input1)
-    print "rnn1 output_shape: " + str(rnn1.output_shape)
+    print("rnn1 output_shape: " + str(rnn1.output_shape))
     dense0_out = TimeDistributed(Dense(num_nodes, activation='tanh'))(rnn1_out)
     dense1 = TimeDistributed(Dense(1, activation='softmax'), name='dense1')
     weights = dense1(dense0_out)
-    print "dense1 output_shape: " + str(dense1.output_shape)
+    print("dense1 output_shape: " + str(dense1.output_shape))
     #norm_weights = BatchNormalization(name='norm_weights')
     #norm_weights_out = norm_weights(weights) # TODO: normalize values to 0 to 1
 
@@ -1079,8 +1080,8 @@ def create_filter_rnn_model(X, Y, embedding_size, num_nodes, activation='tanh', 
     repeat = TimeDistributed(RepeatVector(embedding_size))
     repeated_weights = repeat(weights)
 
-    print "repeat input_shape: " + str(repeat.input_shape)
-    print "repeat output_shape: " + str(repeat.output_shape)
+    print("repeat input_shape: " + str(repeat.input_shape))
+    print("repeat output_shape: " + str(repeat.output_shape))
     final_weights = Reshape(input_shape)(repeated_weights)
     #TODO: mutiply layer - need to convert 1d weight to embedding_size vector?
     filter_out = multiply([input1, final_weights])
@@ -1105,7 +1106,7 @@ def create_filter_rnn_model(X, Y, embedding_size, num_nodes, activation='tanh', 
     nn.summary()
 
     # Save weights
-    print "saving weights for train data"
+    print("saving weights for train data")
     weight_model = Model(inputs=inputs, outputs=nn.get_layer('dense1').output)
     train_weights = weight_model.predict(X)
     filename = "filternn_weights"
@@ -1143,26 +1144,28 @@ def attention(inputs, time_steps, input_dim):
 
     #return attention_vector
 
+
 def create_anova_filter(X, Y, function, output_path, num_feats):
     global anova_filter
     anova_filter = SelectKBest(function, k=num_feats)
     anova_filter.fit(X, Y)
     X = anova_filter.transform(X)
     selected = anova_filter.get_support(True)
-    print "Best indices: " + str(selected)
+    print("Best indices: " + str(selected))
 
     # Sort selected indices in terms of scores. Descending order.
     scores = anova_filter.scores_
     sorted_idx = numpy.argsort(scores)[::-1][:num_feats]
 
-    print "features selected: "
+    print("features selected: ")
     output = open(output_path + "/top_" + str(num_feats) + "_features.txt", "w")
     for i in sorted_idx:
         output.write(keys[i+2] + " ")
         output.write(str(scores[i]))
         output.write("\n")
-        print "\t" + keys[i+2]
+        print("\t" + keys[i+2])
     return anova_filter, X
+
 
 '''
     Get the features from the feature file
@@ -1180,7 +1183,7 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
 
     # Read in the feature vectors
     starttime = time.time()
-    print "preprocessing features: " + str(feats)
+    print("preprocessing features: ", feats)
     types = []
     kw_clusters = []
     vec_feats = False
@@ -1205,7 +1208,7 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
             #        symptoms_keys_fixed = True
 
             for key in keys:
-            #for key in feats:
+                #for key in feats:
                 if key == 'MG_ID':
                     ids.append(vector[key])
                     #print "ID: " + vector[key]
@@ -1213,7 +1216,7 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
                     labels.append(vector[key])
                 elif key in feats and key not in ignore_feats: # Only pull out the desired features
                     if key == "CL_type":
-                        print "CL_type: " + vector[key]
+                        print("CL_type: ", vector[key])
                         types.append(vector[key])
                     elif key == "keyword_clusters":
                         kw_text = vector[key]
@@ -1259,7 +1262,7 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
 
     # Convert type features to numerical features
     if len(types) > 0: #and not vec_feats:
-        print "converting types to numeric features"
+        print("converting types to numeric features")
         if trainlabels:
             typeencoder.fit(types)
         enc_types = typeencoder.transform(types)
@@ -1276,7 +1279,7 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
         use_multi_hot = True
         #use_multi_hot = (Y2_labels == 'keyword_clusters')
         if use_multi_hot:
-            print "converting keyword clusters to multi-hot vectors"
+            print("converting keyword clusters to multi-hot vectors")
             cluster_feats = data_util.multi_hot_encoding(kw_clusters, 100)
             labels2 = cluster_feats
             #keys.remove("keyword_clusters")
@@ -1284,7 +1287,7 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
 
         else:
             # Convert keywords to cluster embeddings
-            print "converting clusters to embeddings..."
+            print("converting clusters to embeddings...")
             clusterfile = "/u/sjeblee/research/va/data/datasets/mds+rct/train_adult_cat_spell.clusters_e2"
             vecfile = "/u/sjeblee/research/va/data/datasets/mds+rct/narr+ice+medhelp.vectors.100"
             cluster_feats = cluster_keywords.cluster_embeddings(kw_clusters, clusterfile, vecfile)
@@ -1300,13 +1303,13 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
     # Convert ICD codes to numerical labels
     labenc = labelencoder
     if rec_type == 'adult':
-        print "using adult labelencoder"
+        print("using adult labelencoder")
         labenc = labelencoder_adult
     elif rec_type == 'child':
-        print "using child labelencoder"
+        print("using child labelencoder")
         labenc = labelencoder_child
     elif rec_type == 'neonate':
-        print "using neonate labelencoder"
+        print("using neonate labelencoder")
         labenc = labelencoder_neonate
     if trainlabels:
         labenc.fit(labels + extra_labels)
@@ -1315,15 +1318,16 @@ def preprocess(filename, ids, labels, x, y, feats, rec_type=None, trainlabels=Fa
 
     # Normalize features to 0 to 1 (if not word vectors)
     if not vec_feats:
-	preprocessing.minmax_scale(x, copy=False)
+        preprocessing.minmax_scale(x, copy=False)
     endtime = time.time()
     mins = float(endtime-starttime)/60
-    print "preprocessing took " + str(mins) + " mins"
+    print("preprocessing took " + str(mins) + " mins")
     if use_extra_labels:
-        print "returning extra labels"
+        print("returning extra labels")
         return [y, labels2]
     else:
         return y
+
 
 def map_back(results):
     output = []
@@ -1332,6 +1336,7 @@ def map_back(results):
         val = numpy.argmax(res)
         output.append(val)
     return output
+
 
 def split_feats(keys, labelname):
     ignore_feats = ["WB10_codex", "WB10_codex2", "WB10_codex4"]
@@ -1343,8 +1348,8 @@ def split_feats(keys, labelname):
         elif key == labelname or key not in ignore_feats:
             point_keys.append(key)
 
-    print "vec_keys: " + str(vec_keys)
-    print "point_keys: " + str(point_keys)
+    print("vec_keys: ", str(vec_keys))
+    print("point_keys: ", str(point_keys))
     print("Keys printed")
     return vec_keys, point_keys
 
@@ -1359,6 +1364,7 @@ def get_labels(filename, labelname):
             labels.append(vector[labelname])
     return labels
 
+
 #########################################################
 # Select K Best symptoms for each class
 # Create output files containing best k features for each class
@@ -1370,33 +1376,34 @@ def get_labels(filename, labelname):
 # 	k		: number of top-k features to be selected
 #
 #
-def select_top_k_features_per_class(X, Y, function, output_path, k = 100):
+def select_top_k_features_per_class(X, Y, function, output_path, k=100):
     classes = labelencoder.classes_
 
     for i in range(len(classes)):
-	output = open(output_path + "/top_" + str(k) + "_features_class_" + classes[i], 'w')
-	output.write("Class : " + str(classes[i]))
-	print "Class: " + str(classes[i])
-	this_Y = []
-	for j in range(len(Y)):
-	    if Y[j] == i:
-		binary = 1
-	    else:
-		binary = 0
-	    this_Y.append(binary)
-	anova_symp = SelectKBest(function, 'all')
-	anova_symp.fit(X,this_Y)
-	best_indices = anova_symp.get_support(True)
+        output = open(output_path + "/top_" + str(k) + "_features_class_" + classes[i], 'w')
+        output.write("Class : " + str(classes[i]))
+        print("Class: " + str(classes[i]))
+        this_Y = []
+        for j in range(len(Y)):
+            if Y[j] == i:
+                binary = 1
+            else:
+                binary = 0
+            this_Y.append(binary)
+        anova_symp = SelectKBest(function, 'all')
+        anova_symp.fit(X, this_Y)
+        best_indices = anova_symp.get_support(True)
         scores = anova_symp.scores_
         output.write("The sorted indices:")
         sorted_idx = numpy.argsort(scores)[::-1][:k]
         output.write(str(sorted_idx))
 
-	for i in range(len(sorted_idx)):
-	    selected = str(keys[sorted_idx[i] + 2])
-	    output.write("\n")
-	    output.write(selected + " ")
-            output.write(str(scores[sorted_idx[i]]))
+    for i in range(len(sorted_idx)):
+        selected = str(keys[sorted_idx[i] + 2])
+        output.write("\n")
+        output.write(selected + " ")
+        output.write(str(scores[sorted_idx[i]]))
         output.close()
 
-if __name__ == "__main__":main()
+
+if __name__ == "__main__": main()
