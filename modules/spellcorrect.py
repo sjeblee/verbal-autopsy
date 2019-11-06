@@ -131,7 +131,7 @@ class SpellingCorrector(ModuleBase):
                     prevwords = []
                     prevn = 4
                     for word in kw_phrase.split(' '):
-                        word = word.strip().lower().translate(None, string.punctuation)
+                        word = ' '.join(wordpunct_tokenize(word.strip().lower()))
                         if len(word) > 0:
                             # Hand-crafted mappings
                             if word in mapping.keys():
