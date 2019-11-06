@@ -7,11 +7,14 @@ from __future__ import print_function
 import argparse
 import numpy
 import sys
+import time
 from lxml import etree
+from sklearn.metrics import f1_score
 from sklearn.metrics.pairwise import cosine_similarity
 from statsmodels.stats.contingency_tables import mcnemar
 
-import word2vec
+import word2vec3 as word2vec
+from keywords import cluster_keywords, kw_tools
 #from temporal import tag_symptoms
 
 def main():
@@ -44,6 +47,56 @@ def contingency_stats(infile):
                 result = 0
             results[entry['MG_ID']] = result
     return results
+
+
+def kw_cluster_f1(infile, clusterfile, vecfile):
+    xmltree = etree.parse(infile)
+    print('loading cluster centers...')
+    cluster_centers = cluster_keywords.get_cluster_centers(clusterfile)
+    start = time.time()
+    print('loading word embedddings...')
+    vec_model, dim = kw_tools.load_w2v(vecfile)
+    print('loading embeddings took', (time.time() - start), 's')
+
+    root = xmltree.getroot()
+    rec_sims = []
+    for child in root:
+        kw_node = child.find('keywords_spell')
+        symp_node = child.find('narr_symp')
+        if kw_node is None or symp_node is None or kw_node.text is None or symp_node.text is None:
+            print('WARNING: ones of the nodes is None!')
+            rec_sims.append(0.0)
+        else:
+            kws = kw_node.text.split(',')
+            symp = symp_node.text.split(',')
+
+            kw_clusters = cluster_keywords.get_clusters_for_kws(kws, cluster_centers, vec_model)
+            symp_clusters = cluster_keywords.get_clusters_for_kws(symp, cluster_centers, vec_model)
+            symp_total = len(symp_clusters)
+            kw_total = len(kw_clusters)
+            correct = 0
+            # Compute recall
+            for entry in kw_clusters:
+                if entry in symp_clusters:
+                    correct += 1
+            recall = float(correct)/float(kw_total)
+            for entry in symp_clusters:
+                if entry in kw_clusters:
+                    correct += 1
+            precision = float(correct)/float(symp_total)
+            if (precision + recall) == 0:
+                f1 = 0.0
+            else:
+                f1 = 2 * ((precision*recall)/(precision+recall))
+            #f1 = f1_score(kw_clusters, symp_clusters)
+            print('true:', kw_total, 'symp:', symp_total, 'rec kw F1:', str(f1))
+            rec_sims.append(f1)
+
+    # Compute the average best cosine similarity
+    avg_f1 = numpy.average(numpy.asarray(rec_sims))
+    print('total avg kw F1:', str(avg_f1))
+    return avg_f1
+
 
 def kw_cosine_sim(infile, vecfile):
 

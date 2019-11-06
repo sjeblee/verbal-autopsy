@@ -14,8 +14,8 @@ from lxml import etree
 from xml.sax.saxutils import unescape
 
 va_path = '/u/sjeblee/research/data/va'
-va_ref = va_path + '/anafora/test_ABC_JJT'
-va_xml = va_path + '/test_all_cat_ABC_JJT_filtered.xml'
+va_ref = va_path + '/anafora/test_I_rankSJ'
+va_xml = va_path + '/test_all_cat_I_rankSJ.xml'
 #anafora_dir = '/nbb/sjeblee/thyme/output/system_anafora'
 
 def main():
@@ -32,6 +32,7 @@ def main():
         exit()
 
     # Convert reference format to anafora (only need to do this once)
+    '''
     print("Converting ref dir...")
     va_dir = va_path + '/test_ref_ABC_JJT'
     tempfile = va_xml + ".fixed"
@@ -39,6 +40,7 @@ def main():
     tools.adjust_spans(va_xml, tempfile, ref_name, id_name='MG_ID')
     tools.to_dir(tempfile, va_dir, ref_name, id_name='MG_ID')
     timeml._timeml_dir_to_anafora_dir(va_dir, va_ref)
+    '''
 
     # Convert output tags to inline and split into individual files
     anafora_dir = args.outdir + ".anafora"
@@ -51,7 +53,7 @@ def main():
 
     # Run evaluation
     print("Running anafora eval script...")
-    evaluate.main(["--reference", va_ref, "--predicted", anafora_dir, "--include", "TIMEX3", "EVENT", "--verbose", "--no-props", "--overlap"])
+    evaluate.main(["--reference", va_ref, "--predicted", anafora_dir, "--include", "TIMEX3", "EVENT", "--verbose", "--no-props"])#, "--overlap"])
 
 
 def write_eval_files(output_file, eval_dir):

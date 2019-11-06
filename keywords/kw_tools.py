@@ -8,7 +8,7 @@ import csv
 import pandas
 
 #sys.path.append('/home/sjeblee/Documents/Research/git/negex/negex.python') # PATH to NEGEX
-from negex.negex import negTagger, sortRules
+#from keywords.negex.negex import negTagger, sortRules
 
 
 ''' Create a csv file from an xml file

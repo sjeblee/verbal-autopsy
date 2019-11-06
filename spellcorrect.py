@@ -9,6 +9,7 @@ import enchant
 import kenlm
 import re
 import string
+from nltk.tokenize import wordpunct_tokenize
 
 import extract_features
 
@@ -69,7 +70,7 @@ def run(infile, outfile, arg_lm=False, fix_keywords=True):
                 if word in mapping.keys():
                     narr_fixed = narr_fixed + " " + mapping[word]
                     prevwords.append(mapping[word])
-                    print word + " -> " + mapping[word]
+                    print(word + " -> " + mapping[word])
                 elif d.check(word) or word.isdigit() or word.isupper() or word.istitle() or (len(word) < 3):
                     narr_fixed = narr_fixed + " " + word
                     prevwords.append(word)
@@ -102,7 +103,7 @@ def run(infile, outfile, arg_lm=False, fix_keywords=True):
                     else:
                         if len(sugg) > 0 and editdistance.eval(word, sugg[0]) < bested:
                             bestw = sugg[0]
-                    print word + " -> " + bestw
+                    print(word + " -> " + bestw)
                     narr_fixed = narr_fixed + " " + bestw
                     prevwords.append(bestw)
                 if len(prevwords) > prevn:
@@ -124,13 +125,13 @@ def run(infile, outfile, arg_lm=False, fix_keywords=True):
                 prevwords = []
                 prevn = 4
                 for word in kw_phrase.split(' '):
-                    word = word.strip().lower().translate(None, string.punctuation)
+                    word = ' '.join(wordpunct_tokenize(word.strip().lower()))
                     if len(word) > 0:
                         # Hand-crafted mappings
                         if word in mapping.keys():
                             kw_fixed = kw_fixed + " " + mapping[word]
                             prevwords.append(mapping[word])
-                            print word + " -> " + mapping[word]
+                            print(word + " -> " + mapping[word])
                         elif d.check(word) or word.isdigit() or (len(word) < 3):
                             kw_fixed = kw_fixed + " " + word
                             prevwords.append(word)
@@ -143,7 +144,7 @@ def run(infile, outfile, arg_lm=False, fix_keywords=True):
                             print('orig:', ngram, ':', str(bestp))
                             if len(sugg) > 0 and editdistance.eval(word, sugg[0]) < bested:
                                 bestw = sugg[0]
-                            print word + " -> " + bestw
+                            print(word + " -> " + bestw)
                             kw_fixed = kw_fixed + " " + bestw
                             prevwords.append(bestw)
                         if len(prevwords) > prevn:
@@ -164,4 +165,5 @@ def get_ngram(word, prevwords):
     ngram = ngram + word
     return ngram
 
-if __name__ == "__main__":main()
+
+if __name__ == "__main__": main()

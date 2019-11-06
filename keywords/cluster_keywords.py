@@ -15,7 +15,7 @@ import os
 import time
 import sys
 
-import kw_tools
+from keywords import kw_tools
 
 numpy.set_printoptions(threshold=sys.maxsize)
 
@@ -456,8 +456,9 @@ def cluster_embeddings(labels, clusterfile, vecfile, return_phrases=False, max_l
     clusterfile: the name of the cluster file without the .centers extension
     returns: a list of lists of cluster numbers (as a python list)
 '''
-def embeddings_to_clusters(embeddings, clusterfile):
-    cluster_centers = get_cluster_centers(clusterfile)
+def embeddings_to_clusters(embeddings, clusterfile=None, cluster_centers=None):
+    if cluster_centers is None:
+        cluster_centers = get_cluster_centers(clusterfile)
     cluster_nums = []
     for seq in embeddings:
         cluster_list = []
@@ -489,6 +490,26 @@ def get_cluster_centers(filename):
     #else:
     #    print "WARNING: cluster centers file not found: " + filename
     return cluster_centers
+
+
+def get_clusters_for_kws(kws, cluster_centers, vec_model):
+    kw_embs = []
+    dim = vec_model.vector_size
+    for kw in kws:
+        kw_vec = vectorize(kw, vec_model, dim)
+        kw_embs.append(kw_vec)
+    cluster_nums = []
+    for vec in kw_embs:
+        best_num = 0
+        best_dist = float('inf')
+        for num in cluster_centers.keys():
+            cluster_vec = cluster_centers[num]
+            dist = numpy.linalg.norm(vec-cluster_vec)
+            if dist < best_dist:
+                best_dist = dist
+                best_num = num
+        cluster_nums.append(best_num)
+    return cluster_nums
 
 
 if __name__ == "__main__": main()
