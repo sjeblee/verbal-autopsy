@@ -736,16 +736,16 @@ def get_keywords(elem, name=None):
     if name is None:
         keywords1 = elem.find('CODINGKEYWORDS1')
         if keywords1 is not None and keywords1.text is not None:
-            keyword_string = keyword_string + keywords1.text.encode("utf-8")
+            keyword_string = keyword_string + keywords1.text#.encode("utf-8")
         keywords2 = elem.find('CODINGKEYWORDS2')
         if keywords2 is not None and keywords2.text is not None:
             if keyword_string != "":
                 keyword_string = keyword_string + ","
-            keyword_string = keyword_string + keywords2.text.encode("utf-8")
+            keyword_string = keyword_string + keywords2.text#.encode("utf-8")
     else:
         keywords = elem.find(name)
         if keywords is not None and keywords.text is not None:
-            keyword_string = keywords.text.encode("utf-8")
+            keyword_string = keywords.text#.encode("utf-8")
 
     return keyword_string.lower()
 
