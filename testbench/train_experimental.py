@@ -1,15 +1,23 @@
-from models_experimental import * 
+import models_experimental as mdl
+import torch 
+import torch.nn as nn 
+import torch.nn.functional as F 
+import time 
 
+def chunks(l, n):
+    """Yield successive n-sized chunks from l."""
+    for i in range(0, len(l), n):
+        yield l[i:i + n]
 
 def train_model(model_type, X, Y, param_dict=None):
     # call different trainer functions based off of the input arguments
     # parameter_dict:
     #   epochs, steps, batch_size, lr, loss, dropout, kernel_num, kernel_sizes (cnntext)
-    if model_type is not None and parameter_dict is None:
+    if model_type is not None and param_dict is None:
         raise #error of some kind
     if model_type == 'cnntext':
         # X -> cnntext_data
-        cnn_model = mdl.CNNText(300, len(param_dict['unique_labels']), dropout=param_dict['dropout_rate'], ensemble=False)
+        cnn_model = mdl.CNNText(param_dict['embed_size'], len(param_dict['unique_labels']), dropout=param_dict['dropout_rate'], ensemble=False)
         cnn_opt = torch.optim.Adam(cnn_model.parameters(), lr=param_dict['lr'])
         batch_size = param_dict['batch_size']
         epoch_num = param_dict['epoch_num']
@@ -17,7 +25,7 @@ def train_model(model_type, X, Y, param_dict=None):
         return train_cnntext(cnn_model, X, Y, epoch_num, index_chunk_list, cnn_opt)
     elif model_type == 'cnnrnn':
         # X -> cnntext_data 
-        cnn_model = mdl.CNNText(300, len(param_dict['unique_labels']), dropout=param_dict['dropout_rate'], ensemble=True)
+        cnn_model = mdl.CNNText(param_dict['embed_size'], len(param_dict['unique_labels']), dropout=param_dict['dropout_rate'], ensemble=True)
         rnn_model = mdl.TextRNNClassifier(param_dict['kernel_num'] * param_dict['kernel_sizes'], hidden_size = param_dict['hidden_size'], output_size = len(param_dict['unique_labels']))
         cnn_opt = torch.optim.Adam(cnn_model.parameters(), lr=param_dict['lr'])
         rnn_opt = torch.optim.Adam(rnn_model.parameters(), lr=param_dict['lr'])
@@ -27,29 +35,84 @@ def train_model(model_type, X, Y, param_dict=None):
         return train_cnnrnn([cnn_model, rnn_model], X, Y, epoch_num, index_chunk_list, [cnn_opt, rnn_opt])
     elif model_type == 'basernn':
         # X -> input_matrix 
-        base_rnn = mdl.BaseRNN(len(list(param_dict['deva_index'].keys())), 300, param_dict['embed_mat'], len(param_dict['unique_labels']))
-        optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, base_rnn.parameters()), lr=param_dict['lr'], weight_decay=param_dict['weight_decay'])
+        base_rnn = mdl.BaseRNN(len(list(param_dict['deva_index'].keys())), param_dict['embed_size'], param_dict['embed_mat'], len(param_dict['unique_labels']), param_dict['batch_size'], hidden_size=16)
+        optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, base_rnn.parameters()), lr=param_dict['lr'])
         batch_size = param_dict['batch_size']
         epoch_num = param_dict['num_epochs']
-        index_chunk_list = list(chunks(list(range(0, X.shape[0])), batch_size))
+        index_chunks = list(chunks(list(range(0, X.shape[0])), batch_size))
+        index_chunk_list = [x for x in index_chunks if len(x) == batch_size ]
         return train_basernn(base_rnn, X, Y, epoch_num, index_chunk_list, optimizer)
+    elif model_type == 'seqcnn':
+        seq_cnn = mdl.SequenceCNN(param_dict['embed_size'], len(list(param_dict['deva_index'].keys())), len(param_dict['unique_labels']), param_dict['seq_len'], conv_filters=param_dict['conv_filters'])
+        optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, seq_cnn.parameters()), lr=param_dict['lr'])
+        batch_size = param_dict['batch_size']
+        epoch_num = param_dict['num_epochs']
+        index_chunks = list(chunks(list(range(0, X.shape[0])), batch_size))
+        index_chunk_list = [x for x in index_chunks if len(x) == batch_size ]
+        return train_seqcnn(seq_cnn, X, Y, epoch_num, index_chunk_list, optimizer)
+    elif model_type == 'seqcnn2d':
+        seq_cnn2d = mdl.SequenceCNN2D(param_dict['embed_size'], len(list(param_dict['deva_index'].keys())), len(param_dict['unique_labels']), param_dict['seq_len'], conv_filters=param_dict['conv_filters'])
+        optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, seq_cnn2d.parameters()), lr=param_dict['lr'])
+        batch_size = param_dict['batch_size']
+        epoch_num = param_dict['num_epochs']
+        index_chunks = list(chunks(list(range(0, X.shape[0])), batch_size))
+        index_chunk_list = [x for x in index_chunks if len(x) == batch_size ]
+        return train_seqcnn(seq_cnn2d, X, Y, epoch_num, index_chunk_list, optimizer)
     else:
         raise # error 
+
+def train_seqcnn(model, X, Y, epoch_num, index_chunk_list, cnn_opt):
+    criterion = nn.CrossEntropyLoss()
+    model.train()
+
+    for i in range(epoch_num):
+        print('current epoch: {}'.format(str(i)))
+        start_time = time.time()
+        for index_chunk in index_chunk_list:
+
+            X_batch = X[index_chunk, :, :]
+            y_batch = Y[index_chunk]
+
+            # print(X_batch.shape, y_batch.shape)
+
+            features = torch.FloatTensor(X_batch)
+            target = torch.LongTensor(y_batch)
+
+            # print(features.shape, target.shape)
+
+            # print(type(features), type(target))
+
+            model.zero_grad()
+
+            cnn_out = model(features)
+            # print(cnn_out)
+
+            loss = criterion(cnn_out, target)
+            loss.backward()
+            cnn_opt.step()
+        print('epoch time elapsed: {}'.format(str(time.time() - start_time)))
+    return model
 
 def train_cnntext(model, X, Y, epoch_num, index_chunk_list, cnn_opt):
     # use_cuda = 0
     criterion = nn.CrossEntropyLoss()
 
-    cnn_model.train()
+    model.train()
 
     for i in range(epoch_num):
         print('current epoch: {}'.format(str(i)))
         for index_chunk in index_chunk_list:
 
-            X_batch = X[index_chunk, :, :, :]
+            print('checking')
+
+            X_batch = X[index_chunk, :, :] # set this back to X[index_chunk, :, :] if needed
             y_batch = Y[index_chunk]
 
+            print('test')
+
             print(X_batch.shape, y_batch.shape)
+
+            print('shape above')
 
             features = torch.FloatTensor(X_batch)
             target = torch.LongTensor(y_batch)
@@ -76,9 +139,9 @@ def train_cnntext(model, X, Y, epoch_num, index_chunk_list, cnn_opt):
 
     return model
 
-def train_cnnrnn(model_ensemble_list, X, Y, epoch_num, opt_list):
+def train_cnnrnn(model_ensemble_list, X, Y, epoch_num, index_chunk_list, opt_list):
     # use_cuda = 0
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.NLLLoss()
 
     cnn_model = model_ensemble_list[0]
     rnn_model = model_ensemble_list[1]
@@ -93,8 +156,8 @@ def train_cnnrnn(model_ensemble_list, X, Y, epoch_num, opt_list):
         print('current epoch: {}'.format(str(i)))
         for index_chunk in index_chunk_list:
 
-            X_batch = cnntext_data[index_chunk, :, :, :]
-            y_batch = labels[index_chunk]
+            X_batch = X[index_chunk, :, :, :]
+            y_batch = Y[index_chunk]
 
             print(X_batch.shape, y_batch.shape)
 
@@ -104,6 +167,7 @@ def train_cnnrnn(model_ensemble_list, X, Y, epoch_num, opt_list):
             # print(type(features), type(target))
 
             cnn_opt.zero_grad()
+            rnn_opt.zero_grad()
 
             cnn_out = cnn_model(features)
             # print(target.shape)
@@ -117,19 +181,28 @@ def train_cnnrnn(model_ensemble_list, X, Y, epoch_num, opt_list):
             # print(target)
             # print(pred_labels)
             # one at a time ...
+
+            # all batch at once
+            # rnn_out = rnn_model(cnn_out, X_batch.shape[0])
+            # loss = F.cross_entropy(rnn_out, target)
+            
             for j in range(cnn_out.shape[0]):
-                rnn_out = rnn_model(cnn_out[j], 1)
-                loss = F.cross_entropy(rnn_out, torch.argmax(target[j]).reshape((1,)))
+                rnn_out = rnn_model(cnn_out[j])
+                # print(rnn_out)
+                # print(target[j])
+                loss = criterion(rnn_out, target[j].reshape((1,)))
             # loss = criterion(cnn_out, target)
-            loss.backward()
+            
+            loss.backward(retain_graph=True)
             cnn_opt.step()
             rnn_opt.step()
     return cnn_model, rnn_model
 
-def train_basernn(model, X, Y, epoch_num, optimizer):
+def train_basernn(model, X, Y, epoch_num, index_chunk_list, optimizer):
     use_cuda = 0
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.NLLLoss()
     model.train()
+    tracked_loss = []
     for i in range(epoch_num):
         print('current epoch: {}'.format(str(i)))
         for index_chunk in index_chunk_list:
@@ -142,21 +215,37 @@ def train_basernn(model, X, Y, epoch_num, optimizer):
             features = torch.LongTensor(X_batch)
             target = torch.LongTensor(y_batch)
 
+            print(features.shape, target.shape)
+
             # print(type(features), type(target))
 
-            optimizer.zero_grad()
+            model.zero_grad()
+
+            model.hidden = model.init_hidden(features.shape[0])
+
+            print(features.shape)
 
             basernn_out = model(features)
-            print(target.shape)
-            print(basernn_out.shape)
+
+            # print('out shape')
+            # print(basernn_out)
+            # print(basernn_out.shape)
+            # print(target.shape)
+            # print(basernn_out.shape)
             # pred_labels_tuple = torch.max(basernn_out, dim=1)
             # pred_labels = pred_labels_tuple[1] 
             # print(target)
             # print(pred_labels)
+            # print(basernn_out)
+            print('shapes: ')
+            print(basernn_out.shape, target.shape)
             loss = criterion(basernn_out, target)
+            tracked_loss.append(loss.item())
             loss.backward()
             optimizer.step()
-    return model
+    print('final_tracked_loss:')
+    print(tracked_loss[-10:])
+    return model, model.hidden 
 
 def save_model(model, location):
     # https://pytorch.org/tutorials/beginner/saving_loading_models.html
@@ -164,7 +253,7 @@ def save_model(model, location):
     torch.save(model.state_dict(), location)
     print('saved.')
     return 
-    
+
 '''
 def train_model(model_type, X, Y, parameter_dict=None):
     # call different trainer functions based off of the input arguments

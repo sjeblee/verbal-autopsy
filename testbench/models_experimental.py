@@ -83,7 +83,7 @@ class CNNText(nn.Module):
         return x
 
     def forward(self, x):
-        # x = x.unsqueeze(1)  # (N, Ci, W, D)]
+        x = x.unsqueeze(1)  # (N, Ci, W, D)]
         x1 = self.conv_and_pool(x, self.conv11) # (N,Co)
         x2 = self.conv_and_pool(x, self.conv12) # (N,Co)
         x3 = self.conv_and_pool(x, self.conv13) # (N,Co)
@@ -296,51 +296,222 @@ class PosEncoder(nn.Module):
 
 class BaseRNN(nn.Module):
 
-    def __init__(self, vocab_size, embed_size, embed_matrix, output_num, hidden_size=100, pad_idx=0, num_layers=2):
+    def __init__(self, vocab_size, embed_size, embed_matrix, output_num, batch_size=10, hidden_size=100, pad_idx=0, num_layers=1):
         super(BaseRNN, self).__init__()
 
         embedding_tensor = torch.tensor(embed_matrix, dtype=torch.float64)
+        self.num_layers = num_layers
         self.embedding = nn.Embedding.from_pretrained(embedding_tensor)
         # self.embedding.weight = embedding_tensor
         self.embedding.weight.requires_grad = False 
+        self.hidden_size = hidden_size
 
-        self.dropout_emb = nn.Dropout(p=0.5)
+        self.dropout_emb = nn.Dropout(p=0.0)
 
-        self.gru = nn.GRU(
+        self.gru = nn.GRU(input_size=embed_size, hidden_size=hidden_size)
+
+        self.lstm = nn.LSTM(
             input_size=embed_size,
             hidden_size=hidden_size,
             num_layers=num_layers,
-            dropout=0.5,
-            bidirectional=True
-        )
+            batch_first=True)
 
-        self.batch_normalization = nn.BatchNorm1d(hidden_size * 2)
-        self.fully_connected = nn.Linear(hidden_size * 2, output_num)
-        self.out_softmax = nn.Softmax(dim=0)
+        # self.batch_normalization = nn.BatchNorm1d(hidden_size * 2)
+        # self.fully_connected = nn.Linear(hidden_size * 2, output_num)
+        # self.out_softmax = nn.Softmax(dim=0)
+        self.fc_to_label = nn.Linear(hidden_size, output_num)
+        # self.hidden_layer = self.init_hidden(batch_size, hidden_size)
+        self.hidden = self.init_hidden(batch_size)
+
+    def init_hidden(self, batch_size):
+        # return (Variable(torch.zeros(1, batch_size, self.hidden_size)), Variable(torch.zeros(1, batch_size, self.hidden_size)))
+        return Variable(torch.zeros((1,batch_size,self.hidden_size)))
         
     def forward(self, x):
 
         # x : (batch, word num in sentence, vector size)
+        print('raw x:')
+        print(x)
         x_embedded = self.embedding(x)
-        x_embedded = self.dropout_emb(x_embedded)
+        x_embedded = x_embedded.permute(1, 0, 2)
         x_embed = x_embedded.float()
-        
-        gru_out, _ = self.gru(x_embed, None)
+        print('embed shape:')
+        print(x_embed.shape)
 
-        row_idx = torch.arange(0, x.size(0)).long()
+        # batch_size = 10
 
-        bn_tensor = torch.mean(gru_out[row_idx, :, :], dim=1)
+        # hidden = self.init_hidden(x_embed.shape[0])
 
-        batch_norm = self.batch_normalization(bn_tensor)
+        # print("embed input:")
+        # print(x_embed)
+        '''
+        print('prior lstm')
+        for name, param in self.lstm.state_dict().items():
+            print(name, param)
 
-        fc_out = self.fully_connected(batch_norm)
-        soft_out = self.out_softmax(fc_out)
+        '''
+        gru_out, self.hidden = self.gru(x_embed, self.hidden)
+        '''
+        print('post lstm')
+        for name, param in self.lstm.state_dict().items():
+            print(name, param)
+        '''
+
+        # print("hidden shape: ")
+        # print(self.hidden[0].shape, self.hidden[1].shape)
+
+        # print("lstm_out shape: ")
+        # print(lstm_out.shape)
+
+        print("hidden last step: ")
+        print(self.hidden.shape)
+        print(self.hidden[-1].shape)
+        print(self.hidden[-1])
+
+        # row_idx = torch.arange(0, x.size(0)).long()
+
+        # bn_tensor = torch.mean(gru_out[row_idx, :, :], dim=1)
+
+        # batch_norm = self.batch_normalization(bn_tensor)
+
+        #fc_out = self.fc_to_label(lstm_out[-1])
+        fc_set = self.fc_to_label(self.hidden[-1])
+        print('fc set:')
+        print(fc_set)
+        # print('fc_set: ')
+        # print(fc_set)
+
+        # batch_idx = torch.arange(0, x.size(0)).long()
+        # fc_mean = torch.mean(fc_set[batch_idx, :, :], dim=1)
+        # print('fc_mean: ')
+        # print(fc_mean) 
+        soft_out = F.log_softmax(fc_set, dim=-1)
+        print('soft out:')
+        print(soft_out)
 
         return soft_out
 
+    '''
     def init_hidden(self, batch_size):
         return nn.Variable(torch.zeros(self.num_layers, batch_size, self.hidden_size)) 
+    '''
 
+class SequenceCNN2D(nn.Module):
+    def __init__(self, embed_size, vocab_size, output_size, seq_len, hidden_size=32, dropout=0.2, conv_filters=128):
+        super(SequenceCNN2D, self).__init__()
+
+        # embedding_tensor = torch.tensor(embed_matrix, dtype=torch.float64)
+        # self.embedding = nn.Embedding.from_pretrained(embedding_tensor)
+        # self.embedding.weight = embedding_tensor
+        # self.embedding.weight.requires_grad = False 
+
+        # INPUT (N, C=1, seq_len, embed_size)
+        CHANNELS = 1
+
+        # self.conv_01 = nn.Conv2d(CHANNELS, conv_filters, kernel_size=(3, embed_size))
+        # self.conv_02 = nn.Conv2d(CHANNELS, conv_filters, kernel_size=(4, embed_size))
+        self.conv_03 = nn.Conv2d(CHANNELS, conv_filters, kernel_size=(5, embed_size))
+        self.conv_04 = nn.Conv2d(CHANNELS, conv_filters, kernel_size=(6, embed_size))
+        self.conv_05 = nn.Conv2d(CHANNELS, conv_filters, kernel_size=(7, embed_size))
+        self.conv_06 = nn.Conv2d(CHANNELS, conv_filters, kernel_size=(8, embed_size))
+        # self.conv_07 = nn.Conv2d(CHANNELS, conv_filters, kernel_size=(9, embed_size))
+        # self.conv_08 = nn.Conv2d(CHANNELS, conv_filters, kernel_size=(10, embed_size))
+
+        self.dense_01 = nn.Linear(conv_filters * 4, hidden_size)
+        self.dense_out = nn.Linear(hidden_size, output_size) 
+
+        self.batch_norm_conv = nn.BatchNorm1d(conv_filters)
+        self.batch_norm_out = nn.BatchNorm1d(hidden_size)
+        self.dropout = nn.Dropout(dropout)
+
+    def seq_conv2d(self, x_emb, conv_2d, bn_1d, dropout_1d):
+        x = conv_2d(x_emb)
+        x = x[:,:,:,-1] # drop last dimension, now (N, 128, seq_len)
+        x = bn_1d(x) 
+        x = dropout_1d(x)
+        x = F.relu(x)
+        x = F.max_pool1d(x, x.size(2))
+        return x 
+
+    def forward(self, x):
+        x = x.unsqueeze(1) # (N, seq_len, embed) -> (N, 1, seq_len, embed) 
+        x_embed = x # input is now just straight up (N, max_len, embed_size)
+
+        conv_out_1 = self.seq_conv2d(x_embed, self.conv_03, self.batch_norm_conv, self.dropout)
+        conv_out_2 = self.seq_conv2d(x_embed, self.conv_04, self.batch_norm_conv, self.dropout)
+        conv_out_3 = self.seq_conv2d(x_embed, self.conv_05, self.batch_norm_conv, self.dropout)
+        conv_out_4 = self.seq_conv2d(x_embed, self.conv_06, self.batch_norm_conv, self.dropout)
+        # conv_out_5 = self.seq_conv2d(x_embed, self.conv_05, self.batch_norm_conv, self.dropout)
+        # conv_out_6 = self.seq_conv2d(x_embed, self.conv_06, self.batch_norm_conv, self.dropout)
+        # conv_out_7 = self.seq_conv2d(x_embed, self.conv_07, self.batch_norm_conv, self.dropout)
+        # conv_out_8 = self.seq_conv2d(x_embed, self.conv_08, self.batch_norm_conv, self.dropout)
+
+        cn = torch.cat((conv_out_1, conv_out_2, conv_out_3, conv_out_4), 1)
+        x = self.dropout(cn)
+        x = torch.squeeze(x, 2)
+
+        dense_out = self.dense_01(x)
+        x = F.relu(dense_out)
+        x = self.batch_norm_out(x)
+        x = self.dropout(x)
+
+        out = self.dense_out(x)
+
+        return out 
+
+
+class SequenceCNN(nn.Module):
+    # Yoon Kim's sequence CNN 
+
+    def __init__(self, embed_size, vocab_size, output_size, seq_len, hidden_size=32, dropout=0.2, conv_filters=128):
+        super(SequenceCNN, self).__init__()
+
+        # embedding_tensor = torch.tensor(embed_matrix, dtype=torch.float64)
+        # self.embedding = nn.Embedding.from_pretrained(embedding_tensor)
+        # self.embedding.weight = embedding_tensor
+        # self.embedding.weight.requires_grad = False 
+
+        self.conv_01 = nn.Conv1d(seq_len, conv_filters, kernel_size=3)
+        self.conv_02 = nn.Conv1d(seq_len, conv_filters, kernel_size=4)
+        self.conv_03 = nn.Conv1d(seq_len, conv_filters, kernel_size=5)
+        self.conv_04 = nn.Conv1d(seq_len, conv_filters, kernel_size=6)
+
+        self.dense_01 = nn.Linear(conv_filters * 2, hidden_size)
+        self.dense_out = nn.Linear(hidden_size, output_size) 
+
+        self.batch_norm_conv = nn.BatchNorm1d(conv_filters)
+        self.batch_norm_out = nn.BatchNorm1d(hidden_size)
+        self.dropout = nn.Dropout(dropout)
+
+    def seq_conv(self, x_emb, conv_1d, bn_1d, dropout_1d):
+        x = conv_1d(x_emb)
+        x = bn_1d(x)
+        x = dropout_1d(x)
+        x = F.relu(x)
+        x = F.max_pool1d(x, x.size(2))
+        return x 
+
+    def forward(self, x):
+
+        x_embed = x # input is now just straight up (N, max_len, embed_size)
+
+        # conv_out_1 = self.seq_conv(x_embed, self.conv_01, self.batch_norm_conv, self.dropout)
+        # conv_out_2 = self.seq_conv(x_embed, self.conv_02, self.batch_norm_conv, self.dropout)
+        conv_out_3 = self.seq_conv(x_embed, self.conv_03, self.batch_norm_conv, self.dropout)
+        conv_out_4 = self.seq_conv(x_embed, self.conv_04, self.batch_norm_conv, self.dropout)
+
+        cn = torch.cat((conv_out_3, conv_out_4), 1)
+        x = self.dropout(cn)
+        x = torch.squeeze(x, 2)
+
+        dense_out = self.dense_01(x)
+        x = F.relu(dense_out)
+        x = self.batch_norm_out(x)
+        x = self.dropout(x)
+
+        out = self.dense_out(x)
+
+        return out 
 # ##
 
 class TextCNN(nn.Module):
@@ -392,30 +563,37 @@ class TextCNN(nn.Module):
 
 class TextRNNClassifier(nn.Module):
 
-    def __init__(self, input_size, hidden_size, output_size, n_layers=1, bidirectional=False):
+    def __init__(self, input_size, hidden_size, output_size, n_layers=2, bidirectional=False):
         super(TextRNNClassifier, self).__init__()
         self.hidden_size = hidden_size
         self.n_layers = n_layers
         self.n_directions = int(bidirectional) + 1
         self.gru = nn.GRU(input_size, hidden_size, n_layers, bidirectional=bidirectional)
         self.fc = nn.Linear(hidden_size, output_size)
+        self.hidden = self._init_hidden(batch_size=1)
 
-    def forward(self, input, seq_lengths):
+    def forward(self, input): # seq_lengths
         print("Size of RNN input: ", str(input.size()))
         # batch size set to 1. Take one data at a time.
         batch_size = 1
 
         # Make a hidden
-        hidden = self._init_hidden(batch_size)
+        # hidden = self._init_hidden(batch_size)
 
         # No embedding necessary since it takes output from CNN
         embedded = input.view(1, batch_size, -1)
+        # print('embedded: ')
+        # print(embedded)
 
-        output, hidden = self.gru(embedded, hidden)
+        output, self.hidden = self.gru(embedded, self.hidden)
 
         # Use hidden layer as an input to the final layer
-        #fc_output = self.fc(hidden[-1])
-        fc_output = F.log_softmax(self.fc(output[0]), dim=1)
+        # print('hidden: {}'.format(str(hidden.shape)))
+        # print(hidden[0])
+        # print('output: {}'.format(str(output.shape)))
+        # print(output[0])
+        # fc_output = self.fc(hidden[-1])
+        fc_output = F.log_softmax(self.fc(output[-1]), dim=1)
         return fc_output
 
     def _init_hidden(self, batch_size):
