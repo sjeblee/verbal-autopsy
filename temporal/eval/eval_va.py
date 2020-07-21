@@ -53,7 +53,7 @@ def main():
 
     # Run evaluation
     print("Running anafora eval script...")
-    evaluate.main(["--reference", va_ref, "--predicted", anafora_dir, "--include", "TIMEX3", "EVENT", "--verbose", "--no-props"])#, "--overlap"])
+    evaluate.main(["--reference", va_ref, "--predicted", anafora_dir, "--include", "TIMEX3", "EVENT", "--verbose", "--no-props", "--overlap"])
 
 
 def write_eval_files(output_file, eval_dir):

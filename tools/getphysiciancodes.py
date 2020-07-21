@@ -30,6 +30,7 @@ def get_records(inf, outf, mapf):
             icdmap[icd] = cat.strip()
 
     codes = []
+    skipped = 0
 
     # Get the xml from file
     tree = etree.parse(inf)
@@ -50,24 +51,41 @@ def get_records(inf, outf, mapf):
         if node is not None:
             codefinal = node.text
 
-        if codefinal == "" or code1 == "" or code2 == "":
+        #print('code1:', code1, 'code2:', code2, 'final_code:', codefinal)
+
+        if codefinal == "" or code1 == "" or code2 == "" or codefinal is None or code1 is None or code2 is None:
             print('Skipping record because of missing code! code1:', code1, 'code2:', code2, 'final:', codefinal)
             node = child.find('MG_ID')
             if node is not None:
                 print(node.text)
+            skipped += 1
         else:
-            rec.append(icdmap[codefinal])
-            rec.append(icdmap[code1])
-            rec.append(icdmap[code2])
+            cat = 6 # Assign ill-defined to codes not in the map
+            if codefinal in icdmap:
+                cat_final = icdmap[codefinal]
+            else:
+                cat_final = cat
+            if code1 in icdmap:
+                cat_code1 = icdmap[code1]
+            else:
+                cat_code1 = cat
+            if code2 in icdmap:
+                cat_code2 = icdmap[code2]
+            else:
+                cat_code2 = cat
+            rec.append(cat_final)
+            rec.append(cat_code1)
+            rec.append(cat_code2)
             codes.append(rec)
 
-    print('processed', str(len(codes)), 'records')
+    print('processed', str(len(codes)), 'records, skipped', skipped, 'records')
 
     # Generate confusion matrix
+    maxcat = 7 # num categories +1
     matrix = []
-    for x in range(0, 18):
+    for x in range(0, maxcat):
         row = []
-        for y in range(0, 18):
+        for y in range(0, maxcat):
             row.append(0)
         matrix.append(row)
 
@@ -87,24 +105,60 @@ def get_records(inf, outf, mapf):
         elif code2 != finalcode:
             matrix[finalcode][code2] = matrix[finalcode][code2] + 1
 
+    totals = []
+    for x in range(0, maxcat):
+        cat_total = sum(matrix[x])
+        totals.append(cat_total)
+    print('totals:', totals)
+
+    # Convert to pecrcentages
+    percent_matrix = []
+    for x in range(0, maxcat):
+        row = []
+        total = totals[x]
+        for y in range(0, maxcat):
+            if x == 0 or y == 0:
+                row.append(0)
+            else:
+                val = matrix[x][y]
+                if total == 0:
+                    percent = 0
+                else:
+                    percent = float(val) / total
+                row.append(percent)
+        percent_matrix.append(row)                            
+
     # write the csv to file
     fileout = open(outf, 'w')
     fileout.write('confusion matrix')
     # Title row
-    for x in range(1, 18):
+    for x in range(1, maxcat):
         fileout.write("," + str(x))
     fileout.write("\n")
     # Matrix
-    for y in range(1, 18):
+    for y in range(1, maxcat):
         fileout.write(str(y))
-        for z in range(1, 18):
+        for z in range(1, maxcat):
             fileout.write("," + str(matrix[y][z]))
+        fileout.write("\n")
+
+    # Percent Matrix
+    fileout.write('percent confusion matrix')
+    # Title row
+    for x in range(1, maxcat):
+        fileout.write("," + str(x))
+    fileout.write(",total\n")
+    for y in range(1, maxcat):
+        fileout.write(str(y))
+        for z in range(1, maxcat):
+            fileout.write("," + str(percent_matrix[y][z]))
+        fileout.write("," + str(totals[y]))
         fileout.write("\n")
 
     fileout.write("\nFinal_code, code1, code2\n")
     for vec in codes:
         for item in vec:
-            fileout.write(item + ",")
+            fileout.write(str(item) + ",")
         fileout.write("\n")
     fileout.close()
 
